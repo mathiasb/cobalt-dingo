@@ -18,8 +18,8 @@
   "env": {
     "FORTNOX_ENV": "sandbox",
     "LOG_LEVEL": "INFO",
-    "AUDIT_LOG_PATH": "~/.fn/audit.log",
-    "TOKEN_PATH": "~/.fn/tokens.enc"
+    "AUDIT_LOG_PATH": "~/.coo-agent/audit.log",
+    "TOKEN_PATH": "~/.coo-agent/tokens.enc"
   },
   "notes": {
     "FORTNOX_ENV": "Byt till 'production' när sandbox-tester är godkända",
