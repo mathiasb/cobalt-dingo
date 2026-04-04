@@ -1,0 +1,28 @@
+# Credentials och secrets – committas ALDRIG
+.env
+.env.local
+.env.production
+*.enc
+tokens/
+credentials/
+
+# Loggar
+*.log
+audit/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+
+# Personliga Claude-inställningar
+.claude/settings.local.json
+CLAUDE.local.md
+
+# Temporärt
+*.tmp
+.DS_Store
