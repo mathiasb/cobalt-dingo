@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/joho/godotenv"
 	"github.com/mathiasb/coo-agent/internal/api"
 	"github.com/mathiasb/coo-agent/internal/audit"
 	"github.com/mathiasb/coo-agent/internal/auth"
@@ -34,6 +35,11 @@ func main() {
 	flag.Parse()
 
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, nil)))
+
+	// Auto-load .env if present (ignored silently if missing).
+	if err := godotenv.Load(); err == nil {
+		slog.Debug("loaded .env file")
+	}
 
 	if *doAuth {
 		runAuth()
