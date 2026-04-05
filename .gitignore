@@ -10,14 +10,11 @@ credentials/
 *.log
 audit/
 
-# Python
-__pycache__/
-*.pyc
-*.pyo
-.pytest_cache/
-.venv/
-venv/
-*.egg-info/
+# Go
+bin/
+*.test
+*.out
+coverage.html
 
 # Personliga Claude-inställningar
 .claude/settings.local.json
