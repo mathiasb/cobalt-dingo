@@ -2,35 +2,41 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 
 	"github.com/mathiasb/coo-agent/internal/api"
 	"github.com/mathiasb/coo-agent/internal/audit"
 	"github.com/mathiasb/coo-agent/internal/auth"
-	"github.com/mathiasb/coo-agent/internal/mcp"
-	"github.com/mathiasb/coo-agent/internal/scheduler"
 	"github.com/mathiasb/coo-agent/internal/validator"
 )
 
 var version = "dev"
 
 func main() {
-	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	slog.SetDefault(logger)
-
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, nil)))
 	slog.Info("starting coo-agent", "version", version)
 
-	auditLog, err := audit.New(auditLogPath())
+	auditLog, err := audit.NewFileLogger(auditLogPath())
 	if err != nil {
 		slog.Error("failed to open audit log", "err", err)
 		os.Exit(1)
 	}
 	defer auditLog.Close()
 
-	tokenStore, err := auth.NewTokenStore(tokenPath())
+	encKey, err := loadOrCreateKey()
+	if err != nil {
+		slog.Error("failed to load encryption key", "err", err)
+		os.Exit(1)
+	}
+
+	tokenStore, err := auth.NewFileTokenStore(tokenPath(), encKey)
 	if err != nil {
 		slog.Error("failed to open token store", "err", err)
 		os.Exit(1)
@@ -49,26 +55,20 @@ func main() {
 		os.Exit(1)
 	}
 
-	val := validator.New(fortnoxClient)
-
-	sched := scheduler.New(fortnoxClient, auditLog)
-
-	srv := mcp.NewServer(fortnoxClient, val, auditLog)
+	val, err := validator.New(fortnoxClient)
+	if err != nil {
+		slog.Error("failed to create validator", "err", err)
+		os.Exit(1)
+	}
+	_ = val // wired into MCP server (TODO)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	go func() {
-		if err := sched.Start(ctx); err != nil {
-			slog.Error("scheduler error", "err", err)
-		}
-	}()
-
-	slog.Info("MCP server listening on stdio")
-	if err := srv.Start(ctx); err != nil {
-		slog.Error("MCP server error", "err", err)
-		os.Exit(1)
-	}
+	// TODO: start scheduler and MCP server once implemented.
+	slog.Info("coo-agent running – MCP server and scheduler not yet wired up")
+	<-ctx.Done()
+	slog.Info("shutting down")
 }
 
 func mustEnv(key string) string {
@@ -94,4 +94,29 @@ func tokenPath() string {
 	}
 	home, _ := os.UserHomeDir()
 	return home + "/.coo-agent/tokens.enc"
+}
+
+// loadOrCreateKey reads the AES-256 key from disk, generating a new one if absent.
+// TODO: replace with zalando/go-keyring for system keyring integration.
+func loadOrCreateKey() ([]byte, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+	keyPath := filepath.Join(home, ".coo-agent", "master.key")
+	if err := os.MkdirAll(filepath.Dir(keyPath), 0o700); err != nil {
+		return nil, err
+	}
+	data, err := os.ReadFile(keyPath)
+	if err == nil && len(data) == 32 {
+		return data, nil
+	}
+	key := make([]byte, 32)
+	if _, err := io.ReadFull(rand.Reader, key); err != nil {
+		return nil, fmt.Errorf("generate key: %w", err)
+	}
+	if err := os.WriteFile(keyPath, key, 0o600); err != nil {
+		return nil, fmt.Errorf("write key: %w", err)
+	}
+	return key, nil
 }
