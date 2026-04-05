@@ -6,9 +6,9 @@
 tokens/
 credentials/
 
-# Loggar
+# Loggar (runtime-filer utanför repot, aldrig källkod)
 *.log
-audit/
+~/.coo-agent/
 
 # Go
 bin/
