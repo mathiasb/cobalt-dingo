@@ -15,7 +15,7 @@ bekräftelse, aldrig radera**.
                     │  Claude (LLM)   │
                     │  + MCP-klient   │
                     └────────┬────────┘
-                             │  MCP-protokoll
+                             │  MCP-protokoll (stdio)
           ┌──────────────────▼──────────────────────┐
           │              MCP-server                  │
           │  (exponerar verktyg, hanterar sessions)  │
@@ -40,83 +40,106 @@ Sidokomponenter (körs parallellt):
 
 ---
 
+## Teknologival
+
+| Komponent       | Val                    | Motivering                                      |
+|-----------------|------------------------|-------------------------------------------------|
+| Språk           | Go 1.23+               | Single binary, snabb, bra cross-compilation     |
+| MCP-ramverk     | `mark3labs/mcp-go`     | De facto standard Go MCP-implementation         |
+| HTTP-klient     | `net/http` + `resty`   | Inbyggt + enkel retry/middleware                |
+| OAuth2          | `golang.org/x/oauth2`  | Officiellt Google-paket, fungerar med Fortnox   |
+| Kryptering      | `golang.org/x/crypto`  | Välbeprövat                                     |
+| Nyckelring      | `zalando/go-keyring`   | Plattformsoberoende, systemnyckelring            |
+| Scheduler       | `robfig/cron/v3`       | Cron-syntax, produktionsbeprövad                |
+| E-post          | IMAP via `emersion/go-imap` | Protokollstandard – ej inlåst till Gmail   |
+| PDF-parsning    | `pdfcpu` eller `unipdf`| Extrahera belopp/datum ur faktura-PDF:er        |
+| Testramverk     | `testing` + `testify`  | Standard Go                                     |
+| Webb-UI (senare)| `html/template` + HTMX | Om admin-gränssnitt behövs framöver             |
+
+### Kompilerade targets
+
+| Host    | OS/Arch          | Notering                        |
+|---------|------------------|---------------------------------|
+| koala   | `linux/amd64`    | Primär host för scheduler       |
+| piguard | `linux/arm64`    | Raspberry Pi 4/5                |
+| piblock | `linux/arm64`    | Raspberry Pi 4/5                |
+| iguana  | `darwin/arm64`   | Mac Studio M2 Ultra             |
+
+Rekommendation: kör schedulern på **koala** (Linux-server, alltid igång).
+
+---
+
 ## Komponenter
 
-### 1. MCP-server (`src/mcp/`)
+### 1. MCP-server (`internal/mcp/`)
 
-Exponerar verktyg mot Claude via Model Context Protocol. Ansvarar för:
+Exponerar verktyg mot Claude via Model Context Protocol över stdio.
+Ansvarar för:
 
 - Registrering av alla tillgängliga verktyg (läs, skriv, rapport)
-- Sessionhantering och kontextbegränsning
-- Vidarebefordran av anrop till rätt underkomponent
 - Säkerhetscheck: blockerar röd-nivå-operationer innan de når API-klienten
+- Vidarebefordran av anrop till rätt underkomponent
 
-**Verktygsgrupper som exponeras:**
+**Verktygsgrupper:**
 
-| Grupp | Verktyg | Nivå |
-|-------|---------|------|
-| Fakturor | `list_invoices`, `get_invoice` | Grön |
-| Fakturor | `create_invoice`, `update_invoice` | Gul |
-| Verifikationer | `list_vouchers`, `get_voucher` | Grön |
-| Verifikationer | `create_voucher` | Gul |
-| Kunder/Leverantörer | `list_customers`, `list_suppliers` | Grön |
-| Konton | `list_accounts` | Grön |
-| Anläggningar | `list_assets` | Grön |
-| Momsrapport | `get_vat_report` | Grön |
-| Likviditet | `get_balance_overview` | Grön |
+| Grupp              | Verktyg                                  | Nivå |
+|--------------------|------------------------------------------|------|
+| Fakturor           | `list_invoices`, `get_invoice`           | Grön |
+| Fakturor           | `create_invoice`, `update_invoice`       | Gul  |
+| Verifikationer     | `list_vouchers`, `get_voucher`           | Grön |
+| Verifikationer     | `create_voucher`                         | Gul  |
+| Kunder/Leverantörer| `list_customers`, `list_suppliers`       | Grön |
+| Konton             | `list_accounts`                          | Grön |
+| Anläggningar       | `list_assets`                            | Grön |
+| Momsrapport        | `get_vat_report`                         | Grön |
+| Likviditet         | `get_balance_overview`                   | Grön |
+| Inkorgsbevakning   | `check_inbox`                            | Grön |
+| PDF-inläsning      | `process_invoice_pdf`                    | Grön |
 
-### 2. API-klient (`src/api/`)
+### 2. API-klient (`internal/api/`)
 
 Hanterar all kommunikation med Fortnox REST API.
 
 - **OAuth 2.0** – Authorization Code Flow, automatisk token-refresh
-- **Retry-logik** – exponentiell backoff vid 429/503 (se `rules/fortnox-api.md`)
+- **Retry-logik** – exponentiell backoff vid 429 (3 försök) och 503 (2 försök)
 - **Rate limiting** – max 250 anrop/sekund, intern kö vid överskridning
 - **Sandboxläge** – aktiveras via `FORTNOX_ENV=sandbox` i `.env`
-- Loggar varje anrop till audit-loggen (timestamp, endpoint, metod, statuskod, ms)
+- Loggar varje anrop till audit-loggen
+
+**Kontoplan:** hämtas live från Fortnox `/accounts` vid start och cachas i minnet.
+Ingen manuell BAS-JSON att underhålla.
 
 ```
-src/api/
-  client.py        # Bas-HTTP-klient med retry och rate limiting
-  auth.py          # OAuth2-flöde, token-refresh, token-lagring
-  invoices.py      # Faktura-endpoints
-  vouchers.py      # Verifikations-endpoints
-  customers.py     # Kund-endpoints
-  suppliers.py     # Leverantörs-endpoints
-  accounts.py      # Konto-endpoints
-  assets.py        # Anläggnings-endpoints
-  vat.py           # Momsrapport-endpoints
+internal/api/
+  client.go      # Bas-HTTP-klient med retry och rate limiting
+  auth.go        # OAuth2-flöde, token-refresh
+  invoices.go    # Faktura-endpoints
+  vouchers.go    # Verifikations-endpoints
+  customers.go   # Kund-endpoints
+  suppliers.go   # Leverantörs-endpoints
+  accounts.go    # Konto-endpoints (inkl. kontoplanskache)
+  assets.go      # Anläggnings-endpoints
+  vat.go         # Momsrapport-endpoints
 ```
 
-### 3. Validator (`src/validator/`)
+### 3. Validator (`internal/validator/`)
 
-Validerar verifikationer och bokföringsdata innan de presenteras för användaren eller
-skickas till Fortnox.
+Validerar verifikationer och bokföringsdata.
 
 Valideringsregler:
-- Alla konton existerar i BAS 2024-kontoplanen
+- Alla konton existerar i live-kontoplanen (från Fortnox)
 - Verifikation är balanserad: `sum(debet) == sum(kredit)`, tolerans 0 SEK
 - Momskod matchar kontotyp (t.ex. konto 6212 → MP1)
 - Datum inom rimlig period (max 1 år bakåt, ej framåt)
 - Verifikationstext är ifylld och beskrivande
 
-```
-src/validator/
-  balance.py       # Balanscheck debet/kredit
-  accounts.py      # BAS-kontoplanskontroll
-  vat_rules.py     # Momskod–konto-validering
-  dates.py         # Datumgränskontroll
-  bas_2024.json    # BAS-kontoplan som JSON-uppslagsverk
-```
-
-### 4. Audit-logg (`src/audit/`)
+### 4. Audit-logg (`internal/audit/`)
 
 Append-only loggning av alla API-anrop och agentbeslut.
 
 - **Format:** JSON Lines (ett JSON-objekt per rad)
 - **Sökväg:** `~/.coo-agent/audit.log`
 - **Rensas aldrig automatiskt**
-- Känsliga parametrar (belopp, personnummer) maskeras i läsbart gränssnitt men loggas i full
 
 ```json
 {
@@ -130,79 +153,140 @@ Append-only loggning av alla API-anrop och agentbeslut.
 }
 ```
 
-### 5. Scheduler (`src/scheduler/`)
+### 5. Scheduler (`internal/scheduler/`)
 
-Cron-baserad bevakning av deadlines och återkommande utlägg.
+Cron-baserad bevakning. Kör **uteslutande läs-only + notifieringar** – inga
+skrivoperationer utan interaktiv bekräftelse.
 
-Schemalagda jobb:
+| Jobb                  | Schema        | Beskrivning                                      |
+|-----------------------|---------------|--------------------------------------------------|
+| `daily_briefing`      | `0 8 * * *`   | Daglig genomgång, notifierar om åtgärdspunkter   |
+| `inbox_check`         | `0 8 * * *`   | IMAP-sökning efter fakturor/kvitton              |
+| `vat_deadline_check`  | `0 9 1 * *`   | Påminnelse om kommande momsdeadline              |
+| `expense_reminder`    | `0 9 1 * *`   | Påminnelse om återkommande utlägg att bokföra    |
+| `invoice_reminder`    | Per schema     | Notifiering: "Dags att hämta WorkforceLogiq-faktura" |
 
-| Jobb | Schema | Beskrivning |
-|------|--------|-------------|
-| `daily_briefing` | `0 8 * * *` | Daglig genomgång, notifierar vid åtgärdspunkter |
-| `monitor_inbox` | `0 8 * * *` | Söker e-post efter fakturor/kvitton |
-| `mynt_reconcile` | `0 9 * * 1` | Veckovis Mynt-avstämning (måndag) |
-| `vat_deadline_check` | `0 9 1 * *` | Påminnelse om kommande momsdeadline |
-| `expense_reminder` | `0 9 1 * *` | Påminnelse om återkommande utlägg |
+> **Obs:** Mynt-avstämning är parkerad tills API-access eller bättre lösning finns.
 
-### 6. Token-store (`src/auth/`)
+### 6. Token-store (`internal/auth/`)
 
-Säker hantering av OAuth-tokens.
+Säker hantering av OAuth-tokens för Fortnox (och framtida IMAP/Google).
 
-- Tokens krypteras med Fernet (symmetrisk kryptering)
-- Krypteringsnyckel hämtas från systemnyckelring via `keyring`-biblioteket
+- Tokens krypteras med AES-GCM
+- Krypteringsnyckel hämtas från systemnyckelring via `go-keyring`
 - Lagras på disk: `~/.coo-agent/tokens.enc`
-- Tokens loggas aldrig – inte ens maskerade versioner
-- Refresh sker automatiskt 60 sekunder före utgång
+- Tokens loggas aldrig
+- Fortnox-refresh sker automatiskt 60 sekunder före utgång
 
----
+### 7. E-postbevakning (`internal/mail/`)
 
-## Agenter
+IMAP-baserad, fungerar med valfri e-postleverantör (Google Workspace, Fastmail,
+Proton Mail, etc.). Inga leverantörsspecifika API:er.
 
-Systemet definierar två specialiserade sub-agenter som Claude kan delegera till:
-
-### Ekonomirapportör (`read-only-reporter`)
-Läs-only. Hämtar, analyserar och rapporterar ekonomisk data. Kan aldrig skriva till Fortnox.
-Se `.claude/agents/read-only-reporter.md`.
-
-### Bokförare (`bookkeeper`)
-Skrivbehörighet – men kräver alltid explicit "ja" från användaren innan varje operation.
-Validerar fullständigt innan förslag presenteras. Se `.claude/agents/bookkeeper.md`.
+- Söker inkorgen efter avsändare: Telenor, Telia, Bahnhof, BMW Financial Services,
+  Söderberg & Partners, Fortnox, Skatteverket
+- Laddar ner bilagor (PDF-fakturor) till bevakad mapp för vidare bearbetning
+- Raderar aldrig e-post
+- Öppnar aldrig bilagor automatiskt utan att notera dem för granskning
 
 ---
 
 ## Integrationer
 
 ### Fortnox
-- REST API, bas-URL: `https://api.fortnox.se/3/`
-- OAuth 2.0, Authorization Code Flow
+- REST API: `https://api.fortnox.se/3/`
+- OAuth 2.0 Authorization Code Flow
 - Sandbox: samma URL, separata testcredentials
+- Redirect URI för initial setup: `http://localhost:8080/callback`
+
+### WorkforceLogiq (kundportal)
+- URL: `https://eu.workforcelogiq.com`
+- Kräver användarnamn/lösenord + SMS OTP var 30:e dag
+- **Kan inte automatiseras** pga SMS-steget
+- Flöde: systemet notifierar när faktura borde finnas → användaren loggar in och
+  laddar ner PDF → PDF läggs i bevakad mapp → systemet läser och föreslår bokning
+
+### Kivra (BMW Financial Services)
+- Kivra saknar publikt API
+- **Lösning:** aktivera e-postvidarebefordran i Kivra → BMW-fakturor landar i
+  företagsinkorgen → IMAP-bevakningen fångar dem automatiskt
+
+### E-post (IMAP)
+- Protokoll: IMAP4 med TLS
+- Konfigureras med host/port/credentials i `.env`
+- Fungerar med Google Workspace idag, migrerbart till EU-alternativ utan kodändring
 
 ### Mynt (företagskort)
-- Integration via Mynt API (credentials konfigureras i `.env` när tillgängligt)
-- Fallback: CSV-export från Mynt-portalen parsas lokalt
-- Används för kvittomatchning i `mynt-reconcile`-skill
+- Inget publikt API tillgängligt
+- **Parkerad:** hanteras manuellt tills vidare
+- Framtida alternativ: CSV-export från Mynt-portalen + importverktyg
 
-### Gmail
-- Läsåtkomst via Google OAuth2 / Gmail API
-- Söker efter fakturor och kvitton från kända leverantörer
-- Öppnar aldrig bilagor automatiskt
-- Raderar aldrig e-post
-- Används av `monitor-inbox`-skill
+---
+
+## Specifika use cases
+
+### Återkommande privata utlägg (Telenor, Telia, Bahnhof)
+Fakturor anländer via e-post → IMAP-bevakning identifierar dem →
+`book-expense`-kommandot föreslår verifikation → användaren bekräftar.
+
+Schema (CLAUDE.md):
+
+| Leverantör | Periodicitet | Konto | Momskod |
+|------------|-------------|-------|---------|
+| Telenor    | Månad        | 6212  | MP1     |
+| Telia      | Månad        | 6212  | MP1     |
+| Bahnhof    | Kvartal      | 6212  | MP1     |
+
+### Finansiellt leasing – BMW Financial Services
+Finansiellt leasing innebär att bilen finns i anläggningsregistret.
+Varje månad behövs tre separata bokningar:
+
+| Händelse          | Debet              | Kredit             |
+|-------------------|--------------------|--------------------|
+| Leasingbetalning  | 2350 (amortering)  | 1930 Bankkonto     |
+|                   | 6310 (ränta)       |                    |
+| Avskrivning       | 7832               | 1229               |
+
+Kräver: amorteringsplan från BMW Financial Services (totalskuld, räntesats,
+amortering per månad). Systemet läser planen och föreslår korrekt uppdelning
+varje månad.
+
+> **OBS:** Privat användning av leasingbil i enskild firma begränsar
+> momsavdragsrätten. Normalt max 50% ingående moms på bilrelaterade kostnader.
+> Dokumentera verklig tjänsteandel.
+
+### WorkforceLogiq-faktura (enda kunden)
+1. Scheduler notifierar vid förväntad fakturadatum
+2. Användaren loggar in manuellt och laddar ner PDF
+3. PDF placeras i `~/.coo-agent/inbox/`
+4. Systemet läser PDF, extraherar belopp och period
+5. Bokning föreslås (konto 3001, utgående moms 25%)
+6. Användaren bekräftar → verifikation skapas i Fortnox
+
+### Momsrapport (kvartalsvis)
+Läs-only sammanställning från Fortnox. Presenteras för granskning.
+**Skickas aldrig automatiskt till Skatteverket.**
+
+Deadlines:
+- Q1 → 12 maj
+- Q2 → 12 aug
+- Q3 → 12 nov
+- Q4 → 12 feb
 
 ---
 
 ## Säkerhetsmodell
 
-Se `.claude/rules/security.md` för fullständig beskrivning. Kortfattat:
+Se `.claude/rules/security.md` för fullständig beskrivning.
 
 ```
-Grön  →  Kör automatiskt    (alla GET-operationer)
+Grön  →  Kör automatiskt    (alla GET-operationer, PDF-läsning, IMAP-läsning)
 Gul   →  Kräver "ja"        (POST/PUT till Fortnox)
-Röd   →  Alltid blockerat   (DELETE, momsdeklaration, tredjepartsdelning)
+Röd   →  Alltid blockerat   (DELETE, momsdeklaration till Skatteverket, tredjepartsdelning)
 ```
 
-MCP-servern tillämpar dessa nivåer programmatiskt – röd-nivå-operationer
-blockeras i koden och når aldrig API-klienten.
+MCP-servern tillämpar nivåerna programmatiskt – röd-nivå-operationer blockeras
+innan de når API-klienten.
 
 ---
 
@@ -210,81 +294,69 @@ blockeras i koden och når aldrig API-klienten.
 
 ```
 coo-agent/
-├── CLAUDE.md                    # Projektkonfiguration för Claude
-├── .env.example                 # Miljövariabelsmall (committas)
-├── .env                         # Verkliga värden (committas ALDRIG)
-├── .gitignore
-├── docs/
-│   └── architecture.md          # Det här dokumentet
-├── src/
-│   ├── mcp/                     # MCP-server och verktygsregistrering
+├── cmd/
+│   └── coo-agent/
+│       └── main.go              # Entrypoint – startar MCP-server + scheduler
+├── internal/
+│   ├── mcp/                     # MCP-server, verktygsregistrering
 │   ├── api/                     # Fortnox API-klient
 │   ├── validator/               # BAS/moms-validering
 │   ├── audit/                   # Audit-logg
 │   ├── scheduler/               # Cron-schemaläggning
-│   └── auth/                    # Token-hantering
-├── tests/
-│   ├── unit/                    # Enhetstester per komponent
-│   └── integration/             # Integrationstester mot Fortnox sandbox
-├── .claude/
-│   ├── agents/                  # Sub-agentdefinitioner
-│   ├── commands/                # Slash-kommandon
-│   ├── rules/                   # Regler och konventioner
-│   ├── skills/                  # Auto-aktiverade skills
-│   └── settings.json            # Behörighetsinställningar
-└── ~/.coo-agent/                # Runtime-data (utanför repo)
-    ├── tokens.enc               # Krypterade OAuth-tokens
-    └── audit.log                # Audit-logg (append-only)
+│   ├── auth/                    # Token-hantering, OAuth2-flöde
+│   ├── mail/                    # IMAP-bevakning
+│   └── pdf/                     # PDF-parsning för faktura-inläsning
+├── docs/
+│   └── architecture.md          # Det här dokumentet
+├── testdata/                    # Testfixtures (exempel-PDF:er, mock-svar)
+├── go.mod
+├── go.sum
+├── CLAUDE.md
+├── .env.example
+└── .gitignore
+
+# Runtime-data (utanför repo)
+~/.coo-agent/
+├── tokens.enc                   # Krypterade OAuth-tokens
+├── audit.log                    # Audit-logg (append-only)
+└── inbox/                       # Bevakad mapp för inkommande PDF:er
 ```
 
 ---
 
-## Dataflöde – exempel: bokföra ett privat utlägg
+## Dataflöde – exempel: bokföra Telenor-faktura
 
 ```
-Användare: "Bokför Telenor-faktura 450 kr för mars"
+IMAP-scheduler hittar e-post från Telenor
     │
     ▼
-Claude aktiverar /project:book-expense
+Bilaga (PDF) sparas i ~/.coo-agent/inbox/
     │
     ▼
-Ekonomirapportör (read-only) hämtar:
-  - Senaste verifikationer för Telenor (kontroll mot dubbletter)
-  - Aktuellt saldo på konto 2893 (skuld till ägare)
+pdf-parser extraherar: belopp 450 kr, period mars 2025
     │
     ▼
-Validator beräknar verifikation:
+Claude notifieras / användaren frågar "vad har kommit in?"
+    │
+    ▼
+Ekonomirapportör kontrollerar: finns redan verifikation för Telenor mars?
+    │
+    ▼
+Validator bygger förslag:
   Debet  6212  360,00 SEK  (kostnad exkl. moms)
   Debet  2640   90,00 SEK  (ingående moms 25%)
   Kredit 2893  450,00 SEK  (skuld till ägare)
   Kontroll: 450 = 450 ✓
     │
     ▼
-Claude presenterar förslaget för användaren
+Claude presenterar förslaget
     │
     ▼
 Användaren: "ja"
     │
     ▼
-Bokförare (bookkeeper) anropar POST /vouchers
+Bokförare anropar POST /vouchers
     │
     ▼
-Audit-loggen uppdateras
-    │
-    ▼
-Claude bekräftar med verifikationsnummer
+Audit-loggen uppdateras, verifikationsnummer bekräftas
 ```
-
----
-
-## Teknologival
-
-| Komponent | Val | Motivering |
-|-----------|-----|------------|
-| Språk | Python 3.12 | Mogna bibliotek för OAuth, krypto, HTTP |
-| MCP-ramverk | `mcp` (Anthropic SDK) | Native integration med Claude |
-| HTTP-klient | `httpx` | Async, enkel retry-hantering |
-| Kryptering | `cryptography` (Fernet) | Välbeprövat, enkelt nyckelhantering |
-| Nyckelring | `keyring` | Plattformsoberoende, systemnyckelring |
-| Schemaläggning | `APScheduler` | Cron-syntax, persistent jobbstore |
-| Testramverk | `pytest` | Standard, bra async-stöd |
