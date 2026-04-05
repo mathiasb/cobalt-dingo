@@ -44,7 +44,7 @@ Sidokomponenter (körs parallellt):
 
 | Komponent       | Val                    | Motivering                                      |
 |-----------------|------------------------|-------------------------------------------------|
-| Språk           | Go 1.23+               | Single binary, snabb, bra cross-compilation     |
+| Språk           | Go 1.24+               | Single binary, snabb, bra cross-compilation     |
 | MCP-ramverk     | `mark3labs/mcp-go`     | De facto standard Go MCP-implementation         |
 | HTTP-klient     | `net/http` + `resty`   | Inbyggt + enkel retry/middleware                |
 | OAuth2          | `golang.org/x/oauth2`  | Officiellt Google-paket, fungerar med Fortnox   |
