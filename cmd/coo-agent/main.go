@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"strings"
+
 	"github.com/joho/godotenv"
 	"github.com/mathiasb/coo-agent/internal/api"
 	"github.com/mathiasb/coo-agent/internal/audit"
@@ -21,13 +23,12 @@ import (
 
 var version = "dev"
 
-// Fortnox scopes required by this application.
-var fortnoxScopes = []string{
+// defaultScopes is the minimal set needed for this application.
+// Override by setting FORTNOX_SCOPES=scope1,scope2 in .env.
+var defaultScopes = []string{
 	"companyinformation",
 	"bookkeeping",
 	"invoice",
-	"supplierinvoice",
-	"print",
 }
 
 func main() {
@@ -57,7 +58,7 @@ func runAuth() {
 		ClientID:     mustEnv("FORTNOX_CLIENT_ID"),
 		ClientSecret: mustEnv("FORTNOX_CLIENT_SECRET"),
 		RedirectURI:  mustEnv("FORTNOX_REDIRECT_URI"),
-		Scopes:       fortnoxScopes,
+		Scopes:       scopes(),
 	}
 
 	authURL, state := auth.AuthorizationURL(cfg)
@@ -171,6 +172,22 @@ func runServer() {
 }
 
 // --- helpers ---
+
+// scopes returns the configured OAuth2 scopes, falling back to defaultScopes.
+func scopes() []string {
+	if v := os.Getenv("FORTNOX_SCOPES"); v != "" {
+		var result []string
+		for _, s := range strings.Split(v, ",") {
+			if s = strings.TrimSpace(s); s != "" {
+				result = append(result, s)
+			}
+		}
+		if len(result) > 0 {
+			return result
+		}
+	}
+	return defaultScopes
+}
 
 func mustEnv(key string) string {
 	v := os.Getenv(key)
