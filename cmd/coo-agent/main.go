@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"flag"
 	"fmt"
 	"io"
 	"log/slog"
@@ -19,8 +20,96 @@ import (
 
 var version = "dev"
 
+// Fortnox scopes required by this application.
+var fortnoxScopes = []string{
+	"companyinformation",
+	"bookkeeping",
+	"invoice",
+	"supplierinvoice",
+	"print",
+}
+
 func main() {
+	doAuth := flag.Bool("auth", false, "Run the OAuth2 authorization flow to obtain a Fortnox token")
+	flag.Parse()
+
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, nil)))
+
+	if *doAuth {
+		runAuth()
+		return
+	}
+
+	runServer()
+}
+
+// runAuth performs the one-time OAuth2 Authorization Code Flow.
+func runAuth() {
+	slog.Info("starting OAuth2 authorization flow")
+
+	cfg := auth.OAuthConfig{
+		ClientID:     mustEnv("FORTNOX_CLIENT_ID"),
+		ClientSecret: mustEnv("FORTNOX_CLIENT_SECRET"),
+		RedirectURI:  mustEnv("FORTNOX_REDIRECT_URI"),
+		Scopes:       fortnoxScopes,
+	}
+
+	authURL, state := auth.AuthorizationURL(cfg)
+
+	fmt.Println()
+	fmt.Println("Öppna följande URL i din webbläsare och logga in med ditt Fortnox-konto:")
+	fmt.Println()
+	fmt.Println(" ", authURL)
+	fmt.Println()
+
+	callbackAddr := extractCallbackAddr(cfg.RedirectURI)
+	srv, err := auth.NewCallbackServer(callbackAddr)
+	if err != nil {
+		slog.Error("failed to start callback server", "err", err)
+		os.Exit(1)
+	}
+	fmt.Printf("Väntar på svar från Fortnox (lyssnar på %s)...\n", callbackAddr)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*60*1e9) // 5 min
+	defer cancel()
+
+	result := srv.Wait(ctx)
+	if result.Err != nil {
+		slog.Error("authorization failed", "err", result.Err)
+		os.Exit(1)
+	}
+	if err := auth.ValidateState(state, result.State); err != nil {
+		slog.Error("state validation failed", "err", err)
+		os.Exit(1)
+	}
+
+	token, err := auth.ExchangeCode(ctx, cfg, result.Code)
+	if err != nil {
+		slog.Error("token exchange failed", "err", err)
+		os.Exit(1)
+	}
+
+	encKey, err := loadOrCreateKey()
+	if err != nil {
+		slog.Error("failed to load encryption key", "err", err)
+		os.Exit(1)
+	}
+	store, err := auth.NewFileTokenStore(tokenPath(), encKey)
+	if err != nil {
+		slog.Error("failed to open token store", "err", err)
+		os.Exit(1)
+	}
+	if err := store.Save(token); err != nil {
+		slog.Error("failed to save token", "err", err)
+		os.Exit(1)
+	}
+
+	fmt.Println()
+	fmt.Println("✓ Token sparad. Du kan nu starta coo-agent utan -auth flaggan.")
+}
+
+// runServer starts the MCP server and scheduler.
+func runServer() {
 	slog.Info("starting coo-agent", "version", version)
 
 	auditLog, err := audit.NewFileLogger(auditLogPath())
@@ -35,10 +124,14 @@ func main() {
 		slog.Error("failed to load encryption key", "err", err)
 		os.Exit(1)
 	}
-
 	tokenStore, err := auth.NewFileTokenStore(tokenPath(), encKey)
 	if err != nil {
 		slog.Error("failed to open token store", "err", err)
+		os.Exit(1)
+	}
+	// Fail early if no token has been obtained yet.
+	if _, err := tokenStore.Load(); err != nil {
+		slog.Error("no Fortnox token found – run 'coo-agent -auth' first", "err", err)
 		os.Exit(1)
 	}
 
@@ -71,6 +164,8 @@ func main() {
 	slog.Info("shutting down")
 }
 
+// --- helpers ---
+
 func mustEnv(key string) string {
 	v := os.Getenv(key)
 	if v == "" {
@@ -94,6 +189,22 @@ func tokenPath() string {
 	}
 	home, _ := os.UserHomeDir()
 	return home + "/.coo-agent/tokens.enc"
+}
+
+// extractCallbackAddr extracts ":port" from a redirect URI like "http://localhost:8080/callback".
+func extractCallbackAddr(redirectURI string) string {
+	// Simple extraction: find the port from the URI.
+	// Works for http://localhost:PORT/anything.
+	for i := len("http://localhost"); i < len(redirectURI); i++ {
+		if redirectURI[i] == ':' {
+			end := i + 1
+			for end < len(redirectURI) && redirectURI[end] >= '0' && redirectURI[end] <= '9' {
+				end++
+			}
+			return ":" + redirectURI[i+1:end]
+		}
+	}
+	return ":8080"
 }
 
 // loadOrCreateKey reads the AES-256 key from disk, generating a new one if absent.
