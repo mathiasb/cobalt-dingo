@@ -11,8 +11,7 @@
     "deny": [
       "Bash(rm:*)",
       "Bash(curl:*DELETE*)",
-      "Bash(curl:*skatteverket.se*)",
-      "Bash(git push:*)"
+      "Bash(curl:*skatteverket.se*)"
     ]
   },
   "env": {
