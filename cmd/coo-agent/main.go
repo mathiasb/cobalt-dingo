@@ -58,7 +58,7 @@ func runAuth() {
 	authURL, state := auth.AuthorizationURL(cfg)
 
 	fmt.Println()
-	fmt.Println("Öppna följande URL i din webbläsare och logga in med ditt Fortnox-konto:")
+	fmt.Println("\u00d6ppna f\u00f6ljande URL i din webbl\u00e4sare och logga in med ditt Fortnox-konto:")
 	fmt.Println()
 	fmt.Println(" ", authURL)
 	fmt.Println()
@@ -69,7 +69,7 @@ func runAuth() {
 		slog.Error("failed to start callback server", "err", err)
 		os.Exit(1)
 	}
-	fmt.Printf("Väntar på svar från Fortnox (lyssnar på %s)...\n", callbackAddr)
+	fmt.Printf("V\u00e4ntar p\u00e5 svar fr\u00e5n Fortnox (lyssnar p\u00e5 %s)...\n", callbackAddr)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*60*1e9) // 5 min
 	defer cancel()
@@ -106,7 +106,7 @@ func runAuth() {
 	}
 
 	fmt.Println()
-	fmt.Println("✓ Token sparad. Du kan nu starta coo-agent utan -auth flaggan.")
+	fmt.Println("\u2713 Token sparad. Du kan nu starta coo-agent utan -auth flaggan.")
 }
 
 // runServer starts the MCP server and scheduler.
@@ -174,7 +174,7 @@ func mustEnv(key string) string {
 }
 
 func auditLogPath() string {
-	if p := os.Getenv("AUDIT_LOG_PATH"); p != '' {
+	if p := os.Getenv("AUDIT_LOG_PATH"); p != "" {
 		return p
 	}
 	home, _ := os.UserHomeDir()
