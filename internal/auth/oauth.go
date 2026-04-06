@@ -34,10 +34,10 @@ const (
 
 // OAuthConfig holds the parameters for the Fortnox OAuth2 flow.
 type OAuthConfig struct {
-	ClientID      string
-	ClientSecret  string
-	RedirectURI   string
-	Scopes        []string
+	ClientID     string
+	ClientSecret string
+	RedirectURI  string
+	Scopes       []string
 	// AuthEndpoint and TokenEndpoint can be overridden for tests.
 	AuthEndpoint  string
 	TokenEndpoint string

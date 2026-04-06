@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"flag"
-	"flag"
 	"fmt"
 	"io"
 	"log/slog"
@@ -13,9 +12,6 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"strings"
-
-	"github.com/joho/godotenv"
 	"github.com/mathiasb/coo-agent/internal/api"
 	"github.com/mathiasb/coo-agent/internal/audit"
 	"github.com/mathiasb/coo-agent/internal/auth"
@@ -30,6 +26,72 @@ func main() {
 	flag.Parse()
 
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, nil)))
+
+	if *doAuth {
+		runAuth()
+		return
+	}
+
+	runServer()
+}
+
+func runAuth() {
+	slog.Info("starting OAuth2 authorization flow")
+
+	encKey, err := loadOrCreateKey()
+	if err != nil {
+		slog.Error("failed to load encryption key", "err", err)
+		os.Exit(1)
+	}
+	tokenStore, err := auth.NewFileTokenStore(tokenPath(), encKey)
+	if err != nil {
+		slog.Error("failed to open token store", "err", err)
+		os.Exit(1)
+	}
+
+	redirectURI := mustEnv("FORTNOX_REDIRECT_URI")
+	cfg := auth.OAuthConfig{
+		ClientID:     mustEnv("FORTNOX_CLIENT_ID"),
+		ClientSecret: mustEnv("FORTNOX_CLIENT_SECRET"),
+		RedirectURI:  redirectURI,
+	}
+
+	authURL, state := auth.AuthorizationURL(cfg)
+	fmt.Fprintf(os.Stderr, "Open this URL in your browser:\n\n  %s\n\n", authURL)
+
+	addr := extractCallbackAddr(redirectURI)
+	srv, err := auth.NewCallbackServer(addr)
+	if err != nil {
+		slog.Error("failed to start callback server", "err", err)
+		os.Exit(1)
+	}
+
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
+
+	result := srv.Wait(ctx)
+	if result.Err != nil {
+		slog.Error("callback error", "err", result.Err)
+		os.Exit(1)
+	}
+	if err := auth.ValidateState(state, result.State); err != nil {
+		slog.Error("state validation failed", "err", err)
+		os.Exit(1)
+	}
+
+	token, err := auth.ExchangeCode(ctx, cfg, result.Code)
+	if err != nil {
+		slog.Error("token exchange failed", "err", err)
+		os.Exit(1)
+	}
+	if err := tokenStore.Save(token); err != nil {
+		slog.Error("failed to save token", "err", err)
+		os.Exit(1)
+	}
+	slog.Info("authorization complete – token stored")
+}
+
+func runServer() {
 	slog.Info("starting coo-agent", "version", version)
 
 	auditLog, err := audit.NewFileLogger(auditLogPath())

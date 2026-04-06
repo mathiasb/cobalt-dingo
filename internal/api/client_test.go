@@ -192,12 +192,12 @@ func TestClient_RefreshesTokenWhenExpired(t *testing.T) {
 	require.NoError(t, tokenStore.Save(expiredToken))
 
 	client, err := api.New(api.Config{
-		ClientID:     "test-id",
-		ClientSecret: "test-secret",
-		BaseURL:      srv.URL + "/3/",
+		ClientID:        "test-id",
+		ClientSecret:    "test-secret",
+		BaseURL:         srv.URL + "/3/",
 		TokenRefreshURL: srv.URL + "/oauth/token",
-		TokenStore:   tokenStore,
-		AuditLog:     &audit.MemoryLogger{},
+		TokenStore:      tokenStore,
+		AuditLog:        &audit.MemoryLogger{},
 	})
 	require.NoError(t, err)
 

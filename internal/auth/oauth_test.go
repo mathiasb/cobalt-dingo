@@ -60,10 +60,10 @@ func TestOAuth_ExchangeCode_SendsCorrectRequest(t *testing.T) {
 	defer srv.Close()
 
 	cfg := auth.OAuthConfig{
-		ClientID:        "my-client",
-		ClientSecret:    "my-secret",
-		RedirectURI:     "http://localhost:8080/callback",
-		TokenEndpoint:   srv.URL,
+		ClientID:      "my-client",
+		ClientSecret:  "my-secret",
+		RedirectURI:   "http://localhost:8080/callback",
+		TokenEndpoint: srv.URL,
 	}
 	token, err := auth.ExchangeCode(context.Background(), cfg, "auth-code-xyz")
 	require.NoError(t, err)

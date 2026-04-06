@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
+	mcplib "github.com/mark3labs/mcp-go/mcp"
 	"github.com/mathiasb/coo-agent/internal/api"
 	internalmcp "github.com/mathiasb/coo-agent/internal/mcp"
 	"github.com/mathiasb/coo-agent/internal/validator"
-	mcplib "github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

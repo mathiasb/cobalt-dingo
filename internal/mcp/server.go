@@ -14,9 +14,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/mathiasb/coo-agent/internal/api"
 	mcplib "github.com/mark3labs/mcp-go/mcp"
 	mcpserver "github.com/mark3labs/mcp-go/server"
+	"github.com/mathiasb/coo-agent/internal/api"
 )
 
 // Server wraps the mcp-go MCPServer and holds a reference to the Fortnox client.
