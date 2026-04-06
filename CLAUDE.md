@@ -44,6 +44,10 @@ till en enskild firmas bokföring i Fortnox. Systemet bevakar, automatiserar och
 - Verifikationstext: Kortfattad men spårbar (leverantör + period)
 - Commit-meddelanden: Engelska, conventional commits-format
 
+## API-dokumentation
+- `docs/fortnox-openapi.json` – Komplett OpenAPI 3.0.3-spec (233 endpoints, 1,4 MB)
+- `docs/fortnox-api-reference.md` – Fokuserad referens för de ~15 endpoints som används
+
 ## Arkitektur – kortfattad
 Se `docs/architecture.md` för fullständig beskrivning.
 - MCP-server: Exponerar verktyg mot Claude

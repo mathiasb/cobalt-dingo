@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"flag"
+	"flag"
 	"fmt"
 	"io"
 	"log/slog"
@@ -18,105 +19,17 @@ import (
 	"github.com/mathiasb/coo-agent/internal/api"
 	"github.com/mathiasb/coo-agent/internal/audit"
 	"github.com/mathiasb/coo-agent/internal/auth"
+	internalmcp "github.com/mathiasb/coo-agent/internal/mcp"
 	"github.com/mathiasb/coo-agent/internal/validator"
 )
 
 var version = "dev"
-
-// defaultScopes is the minimal set needed for this application.
-// Override by setting FORTNOX_SCOPES=scope1,scope2 in .env.
-var defaultScopes = []string{
-	"companyinformation",
-	"bookkeeping",
-	"invoice",
-}
 
 func main() {
 	doAuth := flag.Bool("auth", false, "Run the OAuth2 authorization flow to obtain a Fortnox token")
 	flag.Parse()
 
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, nil)))
-
-	// Auto-load .env if present (ignored silently if missing).
-	if err := godotenv.Load(); err == nil {
-		slog.Debug("loaded .env file")
-	}
-
-	if *doAuth {
-		runAuth()
-		return
-	}
-
-	runServer()
-}
-
-// runAuth performs the one-time OAuth2 Authorization Code Flow.
-func runAuth() {
-	slog.Info("starting OAuth2 authorization flow")
-
-	cfg := auth.OAuthConfig{
-		ClientID:     mustEnv("FORTNOX_CLIENT_ID"),
-		ClientSecret: mustEnv("FORTNOX_CLIENT_SECRET"),
-		RedirectURI:  mustEnv("FORTNOX_REDIRECT_URI"),
-		Scopes:       scopes(),
-	}
-
-	authURL, state := auth.AuthorizationURL(cfg)
-
-	fmt.Println()
-	fmt.Println("Öppna följande URL i din webbläsare och logga in med ditt Fortnox-konto:")
-	fmt.Println()
-	fmt.Println(" ", authURL)
-	fmt.Println()
-
-	callbackAddr := extractCallbackAddr(cfg.RedirectURI)
-	srv, err := auth.NewCallbackServer(callbackAddr)
-	if err != nil {
-		slog.Error("failed to start callback server", "err", err)
-		os.Exit(1)
-	}
-	fmt.Printf("Väntar på svar från Fortnox (lyssnar på %s)...\n", callbackAddr)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*60*1e9) // 5 min
-	defer cancel()
-
-	result := srv.Wait(ctx)
-	if result.Err != nil {
-		slog.Error("authorization failed", "err", result.Err)
-		os.Exit(1)
-	}
-	if err := auth.ValidateState(state, result.State); err != nil {
-		slog.Error("state validation failed", "err", err)
-		os.Exit(1)
-	}
-
-	token, err := auth.ExchangeCode(ctx, cfg, result.Code)
-	if err != nil {
-		slog.Error("token exchange failed", "err", err)
-		os.Exit(1)
-	}
-
-	encKey, err := loadOrCreateKey()
-	if err != nil {
-		slog.Error("failed to load encryption key", "err", err)
-		os.Exit(1)
-	}
-	store, err := auth.NewFileTokenStore(tokenPath(), encKey)
-	if err != nil {
-		slog.Error("failed to open token store", "err", err)
-		os.Exit(1)
-	}
-	if err := store.Save(token); err != nil {
-		slog.Error("failed to save token", "err", err)
-		os.Exit(1)
-	}
-
-	fmt.Println()
-	fmt.Println("✓ Token sparad. Du kan nu starta coo-agent utan -auth flaggan.")
-}
-
-// runServer starts the MCP server and scheduler.
-func runServer() {
 	slog.Info("starting coo-agent", "version", version)
 
 	auditLog, err := audit.NewFileLogger(auditLogPath())
@@ -134,11 +47,6 @@ func runServer() {
 	tokenStore, err := auth.NewFileTokenStore(tokenPath(), encKey)
 	if err != nil {
 		slog.Error("failed to open token store", "err", err)
-		os.Exit(1)
-	}
-	// Fail early if no token has been obtained yet.
-	if _, err := tokenStore.Load(); err != nil {
-		slog.Error("no Fortnox token found – run 'coo-agent -auth' first", "err", err)
 		os.Exit(1)
 	}
 
@@ -160,33 +68,18 @@ func runServer() {
 		slog.Error("failed to create validator", "err", err)
 		os.Exit(1)
 	}
-	_ = val // wired into MCP server (TODO)
+	_ = val // used via fortnoxClient in MCP tools
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	// TODO: start scheduler and MCP server once implemented.
-	slog.Info("coo-agent running – MCP server and scheduler not yet wired up")
-	<-ctx.Done()
-	slog.Info("shutting down")
-}
-
-// --- helpers ---
-
-// scopes returns the configured OAuth2 scopes, falling back to defaultScopes.
-func scopes() []string {
-	if v := os.Getenv("FORTNOX_SCOPES"); v != "" {
-		var result []string
-		for _, s := range strings.Split(v, ",") {
-			if s = strings.TrimSpace(s); s != "" {
-				result = append(result, s)
-			}
-		}
-		if len(result) > 0 {
-			return result
-		}
+	mcpServer := internalmcp.New(fortnoxClient)
+	slog.Info("starting MCP server over stdio")
+	if err := mcpServer.ServeStdio(ctx); err != nil {
+		slog.Error("MCP server error", "err", err)
+		os.Exit(1)
 	}
-	return defaultScopes
+	slog.Info("shutting down")
 }
 
 func mustEnv(key string) string {
