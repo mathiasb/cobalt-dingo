@@ -130,12 +130,6 @@ func runServer() {
 		slog.Error("failed to open token store", "err", err)
 		os.Exit(1)
 	}
-	// Fail early if no token has been obtained yet.
-	if _, err := tokenStore.Load(); err != nil {
-		slog.Error("no Fortnox token found – run 'coo-agent -auth' first", "err", err)
-		os.Exit(1)
-	}
-
 	fortnoxClient, err := api.New(api.Config{
 		ClientID:     mustEnv("FORTNOX_CLIENT_ID"),
 		ClientSecret: mustEnv("FORTNOX_CLIENT_SECRET"),
