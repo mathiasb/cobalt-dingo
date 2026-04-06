@@ -174,7 +174,7 @@ func mustEnv(key string) string {
 }
 
 func auditLogPath() string {
-	if p := os.Getenv("AUDIT_LOG_PATH"); p != "" {
+	if p := os.Getenv("AUDIT_LOG_PATH"); p != '' {
 		return p
 	}
 	home, _ := os.UserHomeDir()
