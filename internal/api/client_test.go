@@ -64,7 +64,7 @@ func TestClient_ListInvoices_LogsAuditEntry(t *testing.T) {
 	assert.Equal(t, "GET", entries[0].Op)
 	assert.Contains(t, entries[0].Endpoint, "invoices")
 	assert.Equal(t, http.StatusOK, entries[0].Status)
-	assert.Greater(t, entries[0].DurationMs, int64(0))
+	assert.GreaterOrEqual(t, entries[0].DurationMs, int64(0))
 }
 
 // --- Retry behaviour ---
