@@ -20,6 +20,9 @@ type FortnoxReader interface {
 	ListInvoices(ctx context.Context, filter string) ([]Invoice, error)
 	ListVouchers(ctx context.Context, from, to time.Time) ([]Voucher, error)
 	ListAccounts(ctx context.Context) ([]validator.Account, error)
+	ListSupplierInvoices(ctx context.Context, filter string) ([]SupplierInvoice, error)
+	ListAssets(ctx context.Context) ([]Asset, error)
+	GetCompanyInfo(ctx context.Context) (*CompanyInfo, error)
 }
 
 // FortnoxWriter is the write subset used by the bookkeeper agent.
@@ -75,5 +78,40 @@ type Voucher struct {
 	VoucherNumber int          `json:"VoucherNumber,omitempty"`
 	Description   string       `json:"Description"`
 	VoucherDate   string       `json:"VoucherDate"`
+	Year          int          `json:"Year,omitempty"`
 	Rows          []VoucherRow `json:"VoucherRows"`
+}
+
+// SupplierInvoice represents a Fortnox supplier invoice (leverantörsfaktura).
+type SupplierInvoice struct {
+	GivenNumber  string `json:"GivenNumber"`
+	SupplierName string `json:"SupplierName"`
+	InvoiceDate  string `json:"InvoiceDate"`
+	DueDate      string `json:"DueDate"`
+	Total        string `json:"Total"`
+	Balance      string `json:"Balance"`
+	Booked       bool   `json:"Booked"`
+	Cancelled    bool   `json:"Cancelled"`
+	OCR          string `json:"OCR"`
+}
+
+// Asset represents a Fortnox fixed asset (anläggningstillgång).
+type Asset struct {
+	Number           string `json:"Number"`
+	Description      string `json:"Description"`
+	Status           string `json:"Status"`
+	AcquisitionDate  string `json:"AcquisitionDate"`
+	AcquisitionValue int    `json:"AcquisitionValue"`
+	DepreciatedTo    string `json:"DepreciatedTo"`
+	Group            string `json:"Group"`
+}
+
+// CompanyInfo holds basic company information from Fortnox.
+type CompanyInfo struct {
+	CompanyName        string `json:"CompanyName"`
+	OrganizationNumber string `json:"OrganizationNumber"`
+	Address            string `json:"Address"`
+	ZipCode            string `json:"ZipCode"`
+	City               string `json:"City"`
+	Country            string `json:"Country"`
 }

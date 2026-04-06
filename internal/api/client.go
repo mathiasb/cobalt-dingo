@@ -108,6 +108,40 @@ func (c *Client) ListAccounts(ctx context.Context) ([]validator.Account, error) 
 	return accounts, nil
 }
 
+func (c *Client) ListSupplierInvoices(ctx context.Context, filter string) ([]SupplierInvoice, error) {
+	path := "supplierinvoices"
+	if filter != "" {
+		path += "?filter=" + filter
+	}
+	var resp struct {
+		SupplierInvoices []SupplierInvoice `json:"SupplierInvoices"`
+	}
+	if err := c.get(ctx, path, &resp); err != nil {
+		return nil, fmt.Errorf("api: list supplier invoices: %w", err)
+	}
+	return resp.SupplierInvoices, nil
+}
+
+func (c *Client) ListAssets(ctx context.Context) ([]Asset, error) {
+	var resp struct {
+		Assets []Asset `json:"Assets"`
+	}
+	if err := c.get(ctx, "assets", &resp); err != nil {
+		return nil, fmt.Errorf("api: list assets: %w", err)
+	}
+	return resp.Assets, nil
+}
+
+func (c *Client) GetCompanyInfo(ctx context.Context) (*CompanyInfo, error) {
+	var resp struct {
+		CompanyInformation CompanyInfo `json:"CompanyInformation"`
+	}
+	if err := c.get(ctx, "companyinformation", &resp); err != nil {
+		return nil, fmt.Errorf("api: get company info: %w", err)
+	}
+	return &resp.CompanyInformation, nil
+}
+
 func (c *Client) CreateVoucher(ctx context.Context, v Voucher) (*Voucher, error) {
 	body, err := json.Marshal(map[string]any{"Voucher": v})
 	if err != nil {

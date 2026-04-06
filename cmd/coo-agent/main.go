@@ -15,6 +15,7 @@ import (
 	"github.com/mathiasb/coo-agent/internal/api"
 	"github.com/mathiasb/coo-agent/internal/audit"
 	"github.com/mathiasb/coo-agent/internal/auth"
+	internalmcp "github.com/mathiasb/coo-agent/internal/mcp"
 	"github.com/mathiasb/coo-agent/internal/validator"
 )
 
@@ -153,14 +154,17 @@ func runServer() {
 		slog.Error("failed to create validator", "err", err)
 		os.Exit(1)
 	}
-	_ = val // wired into MCP server (TODO)
+	_ = val // used via fortnoxClient in MCP tools
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	// TODO: start scheduler and MCP server once implemented.
-	slog.Info("coo-agent running – MCP server and scheduler not yet wired up")
-	<-ctx.Done()
+	mcpServer := internalmcp.New(fortnoxClient)
+	slog.Info("starting MCP server over stdio")
+	if err := mcpServer.ServeStdio(ctx); err != nil {
+		slog.Error("MCP server error", "err", err)
+		os.Exit(1)
+	}
 	slog.Info("shutting down")
 }
 
