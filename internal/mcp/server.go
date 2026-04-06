@@ -11,6 +11,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/mathiasb/coo-agent/internal/api"
@@ -41,7 +42,7 @@ func New(client api.FortnoxClient) *Server {
 // ServeStdio runs the MCP server over stdin/stdout (for Claude Desktop integration).
 func (s *Server) ServeStdio(ctx context.Context) error {
 	stdio := mcpserver.NewStdioServer(s.mcp)
-	return stdio.Listen(ctx, nil, nil)
+	return stdio.Listen(ctx, os.Stdin, os.Stdout)
 }
 
 // ListTools returns all registered tools (used in tests).
