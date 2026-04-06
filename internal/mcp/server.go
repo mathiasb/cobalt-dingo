@@ -69,7 +69,6 @@ func (s *Server) CallTool(ctx context.Context, name string, args map[string]any)
 	result := s.mcp.HandleMessage(ctx, msg)
 	resp, ok := result.(mcplib.JSONRPCResponse)
 	if !ok {
-		// Protocol-level error (e.g. tool not found)
 		return nil, fmt.Errorf("mcp: unexpected response type for tool %q: %T", name, result)
 	}
 	ctr, ok := resp.Result.(*mcplib.CallToolResult)
