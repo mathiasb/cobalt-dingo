@@ -12,6 +12,7 @@ credentials/
 
 # Go
 bin/
+coo-agent
 *.test
 *.out
 coverage.html
