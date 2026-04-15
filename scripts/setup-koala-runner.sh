@@ -92,6 +92,8 @@ fi
 info "Configuring sudoers for k3s ctr..."
 sudo tee /etc/sudoers.d/act_runner > /dev/null << 'EOF'
 # Allow act_runner to import images into k3s containerd
+# Both the PATH symlink and the versioned binary are listed for safety
+mathias ALL=(root) NOPASSWD: /usr/local/bin/k3s ctr *
 mathias ALL=(root) NOPASSWD: /var/lib/rancher/k3s/data/current/bin/k3s ctr *
 EOF
 sudo chmod 440 /etc/sudoers.d/act_runner
