@@ -77,8 +77,10 @@ jobs:
         run: |
           ARCHIVE="/tmp/${{ env.IMAGE }}-${{ steps.meta.outputs.sha-tag }}.tar"
           echo "── pushing to OCI archive ──"
+          # Append :<name>:<tag> so buildah embeds the reference in the OCI index.
+          # Without this k3s ctr imports by digest only and the image has no name.
           buildah push ${{ env.IMAGE }}:${{ steps.meta.outputs.sha-tag }} \
-            oci-archive:${ARCHIVE}
+            oci-archive:${ARCHIVE}:${{ env.IMAGE }}:${{ steps.meta.outputs.sha-tag }}
           echo "── archive size ──"
           ls -lh ${ARCHIVE}
           echo "── archive index ──"
