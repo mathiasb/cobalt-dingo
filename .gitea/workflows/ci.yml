@@ -119,10 +119,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Update deployment image
+      - name: Apply manifests and update image
         env:
           IMAGE_TAG: ${{ needs.build.outputs.image-tag }}
         run: |
+          # Ensure namespace and base deployment exist (idempotent).
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/deployment.yaml
+          # Patch to the exact sha image built in this run.
           kubectl set image deployment/cobalt-dingo \
             cobalt-dingo=${{ env.IMAGE }}:${IMAGE_TAG} \
             --namespace cobalt-dingo
