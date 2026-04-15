@@ -35,13 +35,19 @@ buildah --version | head -1 && ok "buildah ready"
 # ── 2. Task ──────────────────────────────────────────────────────────────────
 
 info "Installing Task..."
-if pacman -Qi go-task &>/dev/null; then
-  ok "go-task already installed via pacman"
-elif command -v task &>/dev/null; then
-  ok "task already in PATH"
-else
-  sudo pacman -S --noconfirm --needed go-task 2>/dev/null || \
+if ! command -v task &>/dev/null; then
+  if pacman -Qi go-task &>/dev/null; then
+    # Arch installs as 'go-task' binary on some versions — symlink to 'task'
+    GOTASK_BIN=$(pacman -Ql go-task | awk '{print $2}' | grep -E '/bin/[^/]+$' | head -1)
+    if [[ -n "$GOTASK_BIN" && -x "$GOTASK_BIN" ]]; then
+      sudo ln -sf "$GOTASK_BIN" /usr/local/bin/task
+      ok "symlinked ${GOTASK_BIN} → /usr/local/bin/task"
+    fi
+  fi
+  # Still not found? Install from upstream script
+  if ! command -v task &>/dev/null; then
     sudo sh -c "$(curl -fsSL https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin
+  fi
 fi
 task --version | head -1 && ok "task ready"
 
@@ -106,13 +112,16 @@ if [[ -f "${RUNNER_WORKDIR}/.runner" ]]; then
   ok "Runner already registered (.runner file exists) — skipping registration"
 else
   info "Registering runner with ${GITEA_INSTANCE}..."
-  act_runner register \
-    --no-interactive \
-    --instance "${GITEA_INSTANCE}" \
-    --token    "${GITEA_RUNNER_TOKEN}" \
-    --name     "${RUNNER_NAME}" \
-    --labels   "${RUNNER_LABELS}" \
-    --dir      "${RUNNER_WORKDIR}"
+  # act_runner writes .runner into the current directory — cd first
+  (
+    cd "${RUNNER_WORKDIR}"
+    act_runner register \
+      --no-interactive \
+      --instance "${GITEA_INSTANCE}" \
+      --token    "${GITEA_RUNNER_TOKEN}" \
+      --name     "${RUNNER_NAME}" \
+      --labels   "${RUNNER_LABELS}"
+  )
   ok "Runner registered"
 fi
 
