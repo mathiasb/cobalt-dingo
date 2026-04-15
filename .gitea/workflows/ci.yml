@@ -77,8 +77,9 @@ jobs:
       # keeps the named reference and does not GC it between steps.
       - name: Load image into k3s
         run: |
+          # Remove any root-owned leftover before writing (self-healing).
+          sudo rm -f /var/lib/rancher/k3s/agent/images/${{ env.IMAGE }}.tar
           # Push directly into the k3s agent images directory (owned by mathias).
-          # Avoids a tmp file + cp and eliminates any root-owned file conflicts.
           TARGET="/var/lib/rancher/k3s/agent/images/${{ env.IMAGE }}.tar"
           buildah push ${{ env.IMAGE }}:${{ steps.meta.outputs.sha-tag }} \
             oci-archive:${TARGET}:${{ env.IMAGE }}:${{ steps.meta.outputs.sha-tag }}

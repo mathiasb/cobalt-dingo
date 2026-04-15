@@ -5,10 +5,10 @@
 set -euo pipefail
 
 sudo tee /etc/sudoers.d/act_runner > /dev/null << 'EOF'
-# Allow act_runner to import images into k3s containerd
-# Both the PATH symlink and the versioned binary are listed for safety
+# Allow act_runner to work with k3s containerd and the agent images directory
 mathias ALL=(root) NOPASSWD: /usr/local/bin/k3s ctr *
 mathias ALL=(root) NOPASSWD: /var/lib/rancher/k3s/data/current/bin/k3s ctr *
+mathias ALL=(root) NOPASSWD: /bin/rm -f /var/lib/rancher/k3s/agent/images/cobalt-dingo.tar
 EOF
 
 sudo chmod 440 /etc/sudoers.d/act_runner
