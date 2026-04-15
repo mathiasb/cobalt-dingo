@@ -67,7 +67,7 @@ golangci-lint --version | head -1 && ok "golangci-lint ready"
 info "Installing govulncheck..."
 go install golang.org/x/vuln/cmd/govulncheck@latest
 sudo ln -sf "${HOME}/go/bin/govulncheck" /usr/local/bin/govulncheck
-govulncheck -version | head -1 && ok "govulncheck ready"
+command -v govulncheck && ok "govulncheck ready"
 
 # ── 5. act_runner ────────────────────────────────────────────────────────────
 
