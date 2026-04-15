@@ -76,9 +76,16 @@ jobs:
       - name: Import into k3s containerd
         run: |
           ARCHIVE="/tmp/${{ env.IMAGE }}-${{ steps.meta.outputs.sha-tag }}.tar"
+          echo "── pushing to OCI archive ──"
           buildah push ${{ env.IMAGE }}:${{ steps.meta.outputs.sha-tag }} \
             oci-archive:${ARCHIVE}
+          echo "── archive size ──"
+          ls -lh ${ARCHIVE}
+          echo "── archive index ──"
+          tar -xOf ${ARCHIVE} index.json 2>/dev/null || echo "(no index.json)"
+          echo "── importing into k3s containerd ──"
           sudo k3s ctr images import ${ARCHIVE}
+          echo "── import done ──"
           rm -f ${ARCHIVE}
 
       # Validation: confirm the image is present in k3s containerd.
