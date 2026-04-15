@@ -1,0 +1,27 @@
+version: "2"
+
+linters:
+  default: none
+  enable:
+    - errcheck       # unchecked errors
+    - govet          # suspicious constructs
+    - staticcheck    # broad static analysis
+    - unused         # unused code
+    - gofmt          # formatting
+    - misspell       # spelling
+    - revive         # idiomatic Go
+    - exhaustive     # exhaustive switch on enums
+
+linters-settings:
+  revive:
+    rules:
+      - name: exported
+        severity: warning
+      - name: var-naming
+        severity: warning
+
+issues:
+  exclude-rules:
+    # Test files: allow longer functions, unused params in step defs
+    - path: "_test\\.go"
+      linters: [revive, unused]

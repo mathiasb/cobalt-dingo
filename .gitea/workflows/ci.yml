@@ -1,0 +1,143 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: registry.d-ma.be
+  IMAGE: registry.d-ma.be/cobalt-dingo
+
+jobs:
+  # ── 1. Quality gate ─────────────────────────────────────────────────────────
+  check:
+    name: Lint / Test / Vet
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install Task
+        uses: arduino/setup-task@v2
+        with:
+          version: 3.x
+
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Run checks
+        run: task check
+
+      # Validation: task check exited 0 — if we reach here, it passed.
+      # The step itself fails the job on non-zero exit; no extra assertion needed.
+
+  # ── 2. Build & push image ───────────────────────────────────────────────────
+  build:
+    name: Docker Build & Push
+    needs: check
+    runs-on: self-hosted
+    # Only push on main branch or semver tags — not on PRs.
+    if: github.event_name != 'pull_request'
+    outputs:
+      image-tag: ${{ steps.meta.outputs.sha-tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Derive image tags
+        id: meta
+        run: |
+          SHA=$(git rev-parse --short HEAD)
+          echo "sha-tag=${SHA}" >> "$GITHUB_OUTPUT"
+          echo "Building image tags: ${IMAGE}:${SHA}, ${IMAGE}:latest"
+          # If this is a semver tag, also emit it.
+          REF="${{ github.ref }}"
+          if [[ "$REF" == refs/tags/v* ]]; then
+            VERSION="${REF#refs/tags/}"
+            echo "version-tag=${VERSION}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.REGISTRY_USER }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Build and push (SHA + latest)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.meta.outputs.sha-tag }}
+            ${{ env.IMAGE }}:latest
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.repositoryUrl }}
+
+      - name: Also tag semver (release tags only)
+        if: steps.meta.outputs.version-tag != ''
+        run: |
+          docker pull ${{ env.IMAGE }}:${{ steps.meta.outputs.sha-tag }}
+          docker tag  ${{ env.IMAGE }}:${{ steps.meta.outputs.sha-tag }} \
+                      ${{ env.IMAGE }}:${{ steps.meta.outputs.version-tag }}
+          docker push ${{ env.IMAGE }}:${{ steps.meta.outputs.version-tag }}
+
+      # Validation: pull the image back from the registry and confirm it runs.
+      - name: Smoke test image
+        run: |
+          docker pull ${{ env.IMAGE }}:${{ steps.meta.outputs.sha-tag }}
+          docker run --rm ${{ env.IMAGE }}:${{ steps.meta.outputs.sha-tag }} --version 2>&1 | grep -E "cobalt-dingo|starting" \
+            || docker run --rm ${{ env.IMAGE }}:${{ steps.meta.outputs.sha-tag }}
+
+  # ── 3. Deploy to k3s ────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to staging (k3s)
+    needs: build
+    runs-on: self-hosted
+    # Deploy only on pushes to main — not on tag-only pushes or PRs.
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update deployment image
+        env:
+          IMAGE_TAG: ${{ needs.build.outputs.image-tag }}
+        run: |
+          kubectl set image deployment/cobalt-dingo \
+            cobalt-dingo=${{ env.IMAGE }}:${IMAGE_TAG} \
+            --namespace cobalt-dingo
+
+      # Validation: wait for rollout to complete; kubectl exits non-zero on timeout.
+      - name: Verify rollout
+        run: |
+          kubectl rollout status deployment/cobalt-dingo \
+            --namespace cobalt-dingo \
+            --timeout=120s
+
+      # Validation: confirm at least one pod is Running with the new image.
+      - name: Confirm pod health
+        env:
+          IMAGE_TAG: ${{ needs.build.outputs.image-tag }}
+        run: |
+          kubectl get pods -n cobalt-dingo \
+            -l app=cobalt-dingo \
+            --field-selector=status.phase=Running \
+            -o jsonpath='{.items[*].spec.containers[0].image}' \
+          | grep -q "${IMAGE_TAG}" \
+          && echo "✓ Pod running new image" \
+          || (echo "✗ Pod image mismatch" && exit 1)
