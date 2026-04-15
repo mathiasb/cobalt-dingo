@@ -44,13 +44,21 @@ Record *why* things are the way they are. Future-you will thank present-you.
 
 **Consequences**: More operational complexity than Chroma, but isolation is non-negotiable for client work.
 
-## 2026-04-15 — cobalt-dingo holds PISP and AISP licenses directly
+## 2026-04-15 — cobalt-dingo is the tech provider; PISP partner bank holds the licenses
 
-**Context**: Initial design assumed a bank partner holding the PSD2 licenses with cobalt-dingo as a tech integrator. Clarified: cobalt-dingo holds both the PISP (payment initiation) and AISP (account information) licenses. No intermediary.
+**Context**: Two clarifications on the payment layer. (1) cobalt-dingo builds and supplies the payment technology stack, but the PISP partner bank operates it under their own PISP and AISP licenses and regulatory umbrella — cobalt-dingo is not the regulated entity. (2) The AISP capability comes via the same partner bank infrastructure.
 
-**Decision**: Direct PSD2 connections to target banks. Standard ISO 20022 PAIN.001 (no bank-specific profile variants for now). Payment status handling is dual-mode: webhook callbacks where banks support them, polling fallback otherwise.
+**Decision**: cobalt-dingo supplies the engine; the partner bank is the licensed operator. Standard ISO 20022 PAIN.001 (no bank-specific profile variants for now). Payment status handling is dual-mode: webhook callbacks where banks support them, polling fallback otherwise. AISP enables reading end-customer bank account data (balances, transactions) via the partner bank's infrastructure — closes the Camt.053/054 reconciliation gap.
 
-**Consequences**: AISP closes the Camt.053/054 gap from the Fortnox discovery — actual bank balances and transaction history are read directly via PSD2, enabling real-time cash position, automatic AR matching, and bank fee reconciliation without any Fortnox-side file import. PSD2 bank API conformance across ~20 target banks needs mapping before architecture is finalised.
+**Consequences**: The payment layer is a service cobalt-dingo builds and the partner bank deploys/operates. Real-time cash position, AR auto-matching, and bank fee reconciliation all flow from the AISP data feed. PSD2 bank API conformance across ~20 target banks needs mapping before architecture is finalised.
+
+## 2026-04-15 — ERP-agnostic core; Fortnox is an adapter
+
+**Context**: Fortnox is the MVP ERP integration. Future expansion to Visma Spcs/Spiris and other Nordic ERP systems is a stated requirement. If the internal domain model is Fortnox-shaped, that expansion becomes a rewrite. If Fortnox is an adapter, it becomes a new connector.
+
+**Decision**: The cobalt-dingo core defines a stable, ERP-agnostic domain model for all entities: invoices, suppliers, GL accounts, payment instructions, voucher write-backs. Each ERP is a connector implementing a shared interface. Fortnox is the first connector. All payment, AI, and reconciliation logic operates against the internal model, never against ERP-specific types.
+
+**Consequences**: Slightly more upfront design work for the domain model. Adding Visma Spcs/Spiris (or any other ERP) later requires only a new connector — no changes to the payment engine, AI bookkeeper, or reconciliation logic. This constraint must be enforced from the first line of code.
 
 ## 2026-04-15 — PAIN.001 generation is our responsibility, not Fortnox's
 

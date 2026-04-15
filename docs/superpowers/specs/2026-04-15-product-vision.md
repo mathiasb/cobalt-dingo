@@ -1,6 +1,6 @@
 # cobalt-dingo: Product Vision
 
-**Version**: 0.2.0
+**Version**: 0.3.0
 **Date**: 2026-04-15
 **Status**: Approved
 **Author**: Mathias Bergqvist
@@ -75,11 +75,11 @@ New tenants start smart (shared base), get smarter over time (fine-tune). Every 
 
 ### Layer 2 — The payment layer
 
-Validated, coded invoices are assembled into standard ISO 20022 PAIN.001 batches and submitted directly to bank PSD2 APIs. cobalt-dingo holds the PISP and AISP licenses — there is no intermediary bank partner. Coverage: top ~20 Nordic and Northern European banks under a single PSD2 signature.
+Validated, coded invoices are assembled into standard ISO 20022 PAIN.001 batches and submitted through the PISP partner bank's infrastructure. cobalt-dingo supplies the payment technology stack; the partner bank operates it under their PISP and AISP licenses and regulatory umbrella. Coverage: top ~20 Nordic and Northern European banks under a single PSD2 signature.
 
 **Payment status**: dual-mode — webhook callbacks where banks support them, polling fallback where they don't. Both paths converge on the same reconciliation flow.
 
-**AISP enables real-time bank data**: cobalt-dingo reads account balances and transaction history directly from banks (not via Fortnox, not via Camt file import). This powers:
+**AISP enables real-time bank data**: via the partner bank's AISP infrastructure, cobalt-dingo reads account balances and transaction history directly from end-customer banks (not via Fortnox, not via Camt file import). This powers:
 - Real-time cash position (actual bank balance, not projected from Fortnox)
 - Automatic AR matching: inbound transactions matched to open customer invoices
 - Bank fee reconciliation from actual bank statements
@@ -181,9 +181,27 @@ cobalt-dingo is not an accounting tool (Fortnox does that). It is not a bank (th
 
 ---
 
+## ERP abstraction
+
+cobalt-dingo's internal domain model is ERP-agnostic. Fortnox is the first connector implementation, not the core. The architecture defines a stable internal model for invoices, suppliers, GL accounts, payment instructions, and voucher write-backs — and each ERP is an adapter that maps to and from that model.
+
+```
+cobalt-dingo core
+    ├── ERPConnector interface
+    │     ├── FortnoxConnector      ← MVP: implemented
+    │     ├── VismaConnector        ← future
+    │     └── ...
+    ├── PaymentEngine              ← ERP-agnostic
+    ├── AIBookkeeper               ← ERP-agnostic
+    └── ReconciliationEngine       ← ERP-agnostic
+```
+
+Adding Visma Spcs/Spiris (or any other ERP) should require only a new connector implementation — no changes to the payment, AI, or reconciliation layers. This is a hard architectural constraint, not a future aspiration.
+
 ## Constraints and principles
 
-- **Multi-tenant from day one** — each tenant has isolated Fortnox OAuth2 credentials, isolated learning data, isolated payment flows
+- **ERP-agnostic core** — internal domain model is ERP-neutral; Fortnox is an adapter, not the foundation; swapping ERP is a new connector, not a rewrite
+- **Multi-tenant from day one** — each tenant has isolated ERP credentials, isolated learning data, isolated payment flows
 - **BDD/ATDD throughout** — acceptance criteria before implementation at every phase; test suite doubles as compliance record
 - **Graduated autonomy, never surprise autonomy** — money never moves in a new way without explicit owner opt-in
 - **Explain everything** — every AI decision must be explainable on demand; no black box coding or black box payments
