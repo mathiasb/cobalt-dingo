@@ -71,33 +71,29 @@ jobs:
               ${{ env.IMAGE }}:${{ steps.meta.outputs.sha-tag }} \
               ${{ env.IMAGE }}:${{ steps.meta.outputs.version-tag }} || true
 
-      # Export OCI archive and import directly into k3s containerd.
-      # Single-node: no registry needed; image is available to the kubelet immediately.
-      - name: Import into k3s containerd
+      # Load image via k3s agent images directory.
+      # Images placed in /var/lib/rancher/k3s/agent/images/ are ingested and
+      # tracked by the k3s agent itself — unlike k3s ctr import, the agent
+      # keeps the named reference and does not GC it between steps.
+      - name: Load image into k3s
         run: |
           ARCHIVE="/tmp/${{ env.IMAGE }}-${{ steps.meta.outputs.sha-tag }}.tar"
-          echo "── pushing to OCI archive ──"
-          # Append :<name>:<tag> so buildah embeds the reference in the OCI index.
-          # Without this k3s ctr imports by digest only and the image has no name.
+          # Embed the image reference in the OCI archive index.
           buildah push ${{ env.IMAGE }}:${{ steps.meta.outputs.sha-tag }} \
             oci-archive:${ARCHIVE}:${{ env.IMAGE }}:${{ steps.meta.outputs.sha-tag }}
-          echo "── archive size ──"
-          ls -lh ${ARCHIVE}
-          echo "── archive index ──"
-          tar -xOf ${ARCHIVE} index.json 2>/dev/null || echo "(no index.json)"
-          # Capture the manifest digest before importing so we can verify by digest,
-          # not by name. k3s may strip the named tag within milliseconds of import
-          # (kubelet reconciler), but the digest entry always persists.
-          DIGEST=$(tar -xOf ${ARCHIVE} index.json | python3 -c "import sys,json; m=json.load(sys.stdin)['manifests'][0]; print(m['digest'])")
-          echo "── importing into k3s containerd ──"
-          # Capture import output and verify inline — a separate step races the
-          # k3s kubelet GC which strips unrecognised image refs within milliseconds.
-          IMPORT_OUT=$(sudo k3s ctr images import ${ARCHIVE} 2>&1)
-          echo "${IMPORT_OUT}"
-          echo "${IMPORT_OUT}" | grep -q "saved" \
-            && echo "✓ Image imported into k3s containerd" \
-            || (echo "✗ Import output did not contain 'saved'" && exit 1)
+          # Copy into the agent-managed directory and wait for ingestion.
+          sudo mkdir -p /var/lib/rancher/k3s/agent/images
+          sudo cp ${ARCHIVE} /var/lib/rancher/k3s/agent/images/${{ env.IMAGE }}.tar
           rm -f ${ARCHIVE}
+          echo "── waiting for k3s agent to ingest image ──"
+          for i in $(seq 1 60); do
+            if sudo k3s ctr images ls | grep -q "${{ steps.meta.outputs.sha-tag }}"; then
+              echo "✓ Image available in k3s after ${i}s"
+              break
+            fi
+            [ $i -eq 60 ] && echo "✗ Timed out waiting for image ingestion" && exit 1
+            sleep 1
+          done
 
       # Smoke test: run the binary and check it starts cleanly.
       - name: Smoke test
