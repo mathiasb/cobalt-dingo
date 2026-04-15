@@ -115,7 +115,16 @@ jobs:
         run: |
           kubectl rollout status deployment/cobalt-dingo \
             --namespace cobalt-dingo \
-            --timeout=120s
+            --timeout=120s \
+          || {
+            echo "── pod status ──"
+            kubectl get pods -n cobalt-dingo -o wide
+            echo "── pod events ──"
+            kubectl get events -n cobalt-dingo --sort-by='.lastTimestamp' | tail -20
+            echo "── pod describe ──"
+            kubectl describe pods -n cobalt-dingo -l app=cobalt-dingo | tail -40
+            exit 1
+          }
 
       # Validation: running pod carries the expected image tag.
       - name: Confirm pod health
