@@ -21,7 +21,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-          cache: true
+          cache: false   # self-hosted runner: Go cache persists on disk between runs
 
       # Verify pre-installed toolchain on koala runner.
       # Fail fast here rather than silently mid-run.
