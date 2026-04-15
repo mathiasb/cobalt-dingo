@@ -19,21 +19,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Go is pre-installed on the runner; setup-go handles module cache.
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
           cache: true
 
-      - name: Install Task
-        uses: arduino/setup-task@v2
-        with:
-          version: 3.x
-
-      - name: Install golangci-lint
-        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-
-      - name: Install govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+      # Task, golangci-lint, and govulncheck are pre-installed on the runner.
+      # Verify they are reachable before running checks.
+      - name: Verify toolchain
+        run: |
+          go version
+          task --version
+          golangci-lint --version
+          govulncheck -version
 
       - name: Run checks
         run: task check
