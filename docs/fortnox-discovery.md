@@ -18,7 +18,7 @@
 | Assemble PAIN.001 batch | Gap | No payment-initiation API in Fortnox; PAIN.001 is our responsibility |
 | User review UI + single PSD2 approval | Gap | Entirely our product layer; single integration with PISP platform, covers top ~20 Nordic/N.European banks |
 | Submit to bank via PSD2 | Gap | Not in Fortnox scope |
-| Record bank confirmation + actual FX/fees | Partial | Payment write-back via API confirmed; Camt.053/054 import is UI-only |
+| Record bank confirmation + actual FX/fees | Confirmed | Payment write-back via API confirmed; actual FX/fees sourced from AISP bank data (cobalt-dingo holds AISP license) |
 | Book FX gain/loss to BAS account | Confirmed | `POST /3/vouchers` with account rows |
 | Book bank fees to BAS account | Confirmed | Same voucher API |
 | Mark invoice as paid | Confirmed | `POST /3/supplierinvoicepayments` + bookkeep action |

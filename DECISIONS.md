@@ -44,6 +44,14 @@ Record *why* things are the way they are. Future-you will thank present-you.
 
 **Consequences**: More operational complexity than Chroma, but isolation is non-negotiable for client work.
 
+## 2026-04-15 — cobalt-dingo holds PISP and AISP licenses directly
+
+**Context**: Initial design assumed a bank partner holding the PSD2 licenses with cobalt-dingo as a tech integrator. Clarified: cobalt-dingo holds both the PISP (payment initiation) and AISP (account information) licenses. No intermediary.
+
+**Decision**: Direct PSD2 connections to target banks. Standard ISO 20022 PAIN.001 (no bank-specific profile variants for now). Payment status handling is dual-mode: webhook callbacks where banks support them, polling fallback otherwise.
+
+**Consequences**: AISP closes the Camt.053/054 gap from the Fortnox discovery — actual bank balances and transaction history are read directly via PSD2, enabling real-time cash position, automatic AR matching, and bank fee reconciliation without any Fortnox-side file import. PSD2 bank API conformance across ~20 target banks needs mapping before architecture is finalised.
+
 ## 2026-04-15 — PAIN.001 generation is our responsibility, not Fortnox's
 
 **Context**: Fortnox has an internal bank payment module that generates PAIN.001 files (supporting SEB, Handelsbanken, Swedbank, Nordea, Danske Bank). Discovery confirmed this module is accessible only via the Fortnox UI — no API endpoint exposes it. The `supplierinvoicepayments` API records completed payments; it does not initiate them.

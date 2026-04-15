@@ -1,6 +1,6 @@
 # cobalt-dingo: Product Vision
 
-**Version**: 0.1.0
+**Version**: 0.2.0
 **Date**: 2026-04-15
 **Status**: Approved
 **Author**: Mathias Bergqvist
@@ -75,9 +75,17 @@ New tenants start smart (shared base), get smarter over time (fine-tune). Every 
 
 ### Layer 2 — The payment layer
 
-Validated, coded invoices are assembled into ISO 20022 PAIN.001 batches and submitted via the PISP bank partner, reaching ~20 Nordic and Northern European banks under a single PSD2 signature.
+Validated, coded invoices are assembled into standard ISO 20022 PAIN.001 batches and submitted directly to bank PSD2 APIs. cobalt-dingo holds the PISP and AISP licenses — there is no intermediary bank partner. Coverage: top ~20 Nordic and Northern European banks under a single PSD2 signature.
 
-Post-execution: actual FX rates and bank fees return from the PISP. The AI automatically posts:
+**Payment status**: dual-mode — webhook callbacks where banks support them, polling fallback where they don't. Both paths converge on the same reconciliation flow.
+
+**AISP enables real-time bank data**: cobalt-dingo reads account balances and transaction history directly from banks (not via Fortnox, not via Camt file import). This powers:
+- Real-time cash position (actual bank balance, not projected from Fortnox)
+- Automatic AR matching: inbound transactions matched to open customer invoices
+- Bank fee reconciliation from actual bank statements
+- Accurate cash flow forecasting from confirmed rather than projected data
+
+Post-execution: actual FX rates and bank fees sourced from AISP transaction data. The AI automatically posts:
 - FX gain (BAS 3960) or FX loss (BAS 7960): difference between invoice rate and execution rate
 - Bank charges (BAS 6570)
 
@@ -185,8 +193,8 @@ cobalt-dingo is not an accounting tool (Fortnox does that). It is not a bank (th
 
 ## Open questions (pre-architecture)
 
-1. Which PISP bank partner? Determines bank coverage at launch and SCA flow design.
-2. Mobile: native iOS/Android vs. PWA? Biometric approval requirements may favour native.
-3. LLM for conversational interface: local model via LiteLLM (koala) vs. cloud API? Cost and latency trade-off.
-4. SFT pipeline: where does per-tenant fine-tuning run? koala (GPU) is the natural target.
-5. Fortnox marketplace listing: timing relative to V1 launch?
+1. Mobile: native iOS/Android vs. PWA? Biometric approval and push notification requirements may favour native.
+2. LLM for conversational interface: local model via LiteLLM (koala) vs. cloud API? Cost and latency trade-off.
+3. SFT pipeline: where does per-tenant fine-tuning run? koala (GPU) is the natural target.
+4. Fortnox marketplace listing: timing relative to V1 launch?
+5. PSD2 bank API coverage: which of the ~20 target banks have conformant PSD2 APIs vs. requiring bilateral agreements?
