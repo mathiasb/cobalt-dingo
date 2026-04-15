@@ -30,7 +30,7 @@ jobs:
           go version
           task --version
           golangci-lint --version
-          govulncheck -version
+          govulncheck -version 2>&1 || true
 
       - name: Run checks
         run: task check
