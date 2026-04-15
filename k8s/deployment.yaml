@@ -17,8 +17,8 @@ spec:
     spec:
       containers:
         - name: cobalt-dingo
-          image: cobalt-dingo:latest
-          imagePullPolicy: Never
+          image: localhost:5000/cobalt-dingo:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8080
           env:

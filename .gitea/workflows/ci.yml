@@ -57,47 +57,32 @@ jobs:
             echo "version-tag=${REF#refs/tags/}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Build image with buildah
+      - name: Build and push to local registry
         run: |
+          REGISTRY="localhost:5000"
+          REF="${REGISTRY}/${{ env.IMAGE }}:${{ steps.meta.outputs.sha-tag }}"
           buildah build \
             --label "org.opencontainers.image.revision=${{ github.sha }}" \
             --label "org.opencontainers.image.source=${{ github.repositoryUrl }}" \
-            -t ${{ env.IMAGE }}:${{ steps.meta.outputs.sha-tag }} \
-            -t ${{ env.IMAGE }}:latest \
+            -t ${REF} \
+            -t ${REGISTRY}/${{ env.IMAGE }}:latest \
             .
+          buildah push --tls-verify=false ${REF}
+          buildah push --tls-verify=false ${REGISTRY}/${{ env.IMAGE }}:latest
           # Tag semver if this is a release
           [[ -n "${{ steps.meta.outputs.version-tag }}" ]] && \
-            buildah tag \
-              ${{ env.IMAGE }}:${{ steps.meta.outputs.sha-tag }} \
-              ${{ env.IMAGE }}:${{ steps.meta.outputs.version-tag }} || true
+            buildah push --tls-verify=false \
+              ${REF} \
+              ${REGISTRY}/${{ env.IMAGE }}:${{ steps.meta.outputs.version-tag }} || true
+          echo "✓ Image pushed to ${REF}"
 
-      # Load image via k3s agent images directory.
-      # Images placed in /var/lib/rancher/k3s/agent/images/ are ingested and
-      # tracked by the k3s agent itself — unlike k3s ctr import, the agent
-      # keeps the named reference and does not GC it between steps.
-      - name: Load image into k3s
-        run: |
-          # Remove any root-owned leftover before writing (self-healing).
-          sudo rm -f /var/lib/rancher/k3s/agent/images/${{ env.IMAGE }}.tar
-          # Push directly into the k3s agent images directory (owned by mathias).
-          TARGET="/var/lib/rancher/k3s/agent/images/${{ env.IMAGE }}.tar"
-          buildah push ${{ env.IMAGE }}:${{ steps.meta.outputs.sha-tag }} \
-            oci-archive:${TARGET}:${{ env.IMAGE }}:${{ steps.meta.outputs.sha-tag }}
-          echo "── waiting for k3s agent to ingest image ──"
-          for i in $(seq 1 60); do
-            if sudo k3s ctr images ls | grep -q "${{ steps.meta.outputs.sha-tag }}"; then
-              echo "✓ Image available in k3s after ${i}s"
-              break
-            fi
-            [ $i -eq 60 ] && echo "✗ Timed out waiting for image ingestion" && exit 1
-            sleep 1
-          done
-
-      # Smoke test: run the binary and check it starts cleanly.
+      # Smoke test: pull from registry and run the binary.
       - name: Smoke test
         run: |
-          sudo k3s ctr run --rm \
-            ${{ env.IMAGE }}:${{ steps.meta.outputs.sha-tag }} \
+          REGISTRY="localhost:5000"
+          REF="${REGISTRY}/${{ env.IMAGE }}:${{ steps.meta.outputs.sha-tag }}"
+          sudo k3s ctr images pull --plain-http ${REF}
+          sudo k3s ctr run --rm ${REF} \
             smoke-${{ steps.meta.outputs.sha-tag }} \
             /cobalt-dingo 2>&1 | grep -q "cobalt-dingo" \
             && echo "✓ Smoke test passed" \
@@ -122,7 +107,7 @@ jobs:
           kubectl apply -f k8s/deployment.yaml
           # Patch to the exact sha image built in this run.
           kubectl set image deployment/cobalt-dingo \
-            cobalt-dingo=${{ env.IMAGE }}:${IMAGE_TAG} \
+            cobalt-dingo=localhost:5000/${{ env.IMAGE }}:${IMAGE_TAG} \
             --namespace cobalt-dingo
 
       # Validation: rollout completes within 120s.
@@ -141,6 +126,6 @@ jobs:
             -l app=cobalt-dingo \
             --field-selector=status.phase=Running \
             -o jsonpath='{.items[*].spec.containers[0].image}' \
-          | grep -q "${IMAGE_TAG}" \
+          | grep -q "localhost:5000/${{ env.IMAGE }}:${IMAGE_TAG}" \
           && echo "✓ Pod running new image" \
           || (echo "✗ Pod image mismatch" && exit 1)
