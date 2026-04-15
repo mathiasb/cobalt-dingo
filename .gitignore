@@ -1,0 +1,33 @@
+# Binaries
+bin/
+*.exe
+
+# Go
+vendor/
+
+# ── Generated context files (adapter outputs) ──
+# Canonical sources: .context/PROJECT.md + .skills/*/SKILL.md
+# Everything below is disposable — regenerate with: task context:sync
+AGENTS.md
+CLAUDE.md
+.cursorrules
+.aider.conventions.md
+.aider.conf.yml
+.context/system-prompt.txt
+
+# ── Sensitive ──
+.env
+.env.*
+*.key
+*.pem
+secrets/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db

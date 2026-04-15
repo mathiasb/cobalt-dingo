@@ -1,0 +1,57 @@
+version: '3'
+
+vars:
+  PROJECT_NAME: '{{.PROJECT_NAME | default "myproject"}}'
+
+tasks:
+  context:sync:
+    desc: Regenerate all harness-specific context files
+    cmds:
+      - bash scripts/context-sync.sh
+    sources:
+      - .context/PROJECT.md
+      - .skills/*/SKILL.md
+
+  context:sync:claude:
+    cmds: [bash scripts/context-sync.sh claude]
+  context:sync:agents:
+    cmds: [bash scripts/context-sync.sh agents]
+  context:sync:cursor:
+    cmds: [bash scripts/context-sync.sh cursor]
+
+  dev:
+    desc: Start development server
+    cmds:
+      - go run ./cmd/server
+
+  build:
+    desc: Build the binary
+    cmds:
+      - go build -o bin/{{.PROJECT_NAME}} ./cmd/server
+
+  check:
+    desc: Run all checks (lint + test + vet)
+    cmds:
+      - task: lint
+      - task: test
+      - task: vet
+
+  lint:
+    cmds: [golangci-lint run ./...]
+  test:
+    cmds: [go test -race -count=1 ./...]
+  vet:
+    cmds:
+      - go vet ./...
+      - govulncheck ./... || true
+
+  up:
+    desc: Start containers
+    cmds: [docker compose up -d]
+  down:
+    cmds: [docker compose down]
+
+  init:
+    desc: Initialize a new project from this template
+    cmds:
+      - bash scripts/init.sh

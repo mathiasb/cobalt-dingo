@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "knowledge": {
+      "url": "http://localhost:3100/mcp",
+      "description": "Project knowledge base — vector + graph retrieval"
+    }
+  }
+}
