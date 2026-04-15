@@ -81,9 +81,8 @@ jobs:
           # Embed the image reference in the OCI archive index.
           buildah push ${{ env.IMAGE }}:${{ steps.meta.outputs.sha-tag }} \
             oci-archive:${ARCHIVE}:${{ env.IMAGE }}:${{ steps.meta.outputs.sha-tag }}
-          # Copy into the agent-managed directory and wait for ingestion.
-          sudo mkdir -p /var/lib/rancher/k3s/agent/images
-          sudo cp ${ARCHIVE} /var/lib/rancher/k3s/agent/images/${{ env.IMAGE }}.tar
+          # Copy into the agent-managed directory (owned by mathias — see fix-koala-images-dir.sh).
+          cp ${ARCHIVE} /var/lib/rancher/k3s/agent/images/${{ env.IMAGE }}.tar
           rm -f ${ARCHIVE}
           echo "── waiting for k3s agent to ingest image ──"
           for i in $(seq 1 60); do
