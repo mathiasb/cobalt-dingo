@@ -2,8 +2,6 @@ version: '3'
 
 vars:
   PROJECT_NAME: cobalt-dingo
-  REGISTRY: registry.d-ma.be
-  IMAGE: '{{.REGISTRY}}/{{.PROJECT_NAME}}'
   VERSION:
     sh: git describe --tags --always --dirty 2>/dev/null || echo "dev"
   SHORT_SHA:
@@ -53,33 +51,30 @@ tasks:
       - go vet ./...
       - govulncheck ./... || true
 
-  # ── Docker ──────────────────────────────────────────────────────────────────
+  # ── Image build (buildah + k3s containerd, no registry on single-node) ──────
 
-  docker:build:
-    desc: Build Docker image tagged with current version and SHA
+  image:build:
+    desc: Build OCI image with buildah
     cmds:
-      - docker build
+      - buildah build
           --label "org.opencontainers.image.revision={{.SHORT_SHA}}"
           --label "org.opencontainers.image.version={{.VERSION}}"
-          -t {{.IMAGE}}:{{.SHORT_SHA}}
-          -t {{.IMAGE}}:latest
+          -t {{.PROJECT_NAME}}:{{.SHORT_SHA}}
+          -t {{.PROJECT_NAME}}:latest
           .
-    vars:
-      VERSION:
-        sh: git describe --tags --always --dirty 2>/dev/null || echo "dev"
 
-  docker:push:
-    desc: Push Docker image to registry
-    deps: [docker:build]
+  image:import:
+    desc: Import built image directly into k3s containerd (single-node, no registry)
+    deps: [image:build]
     cmds:
-      - docker push {{.IMAGE}}:{{.SHORT_SHA}}
-      - docker push {{.IMAGE}}:latest
+      - buildah push {{.PROJECT_NAME}}:{{.SHORT_SHA}} oci-archive:/tmp/{{.PROJECT_NAME}}-{{.SHORT_SHA}}.tar
+      - sudo k3s ctr images import /tmp/{{.PROJECT_NAME}}-{{.SHORT_SHA}}.tar
+      - rm -f /tmp/{{.PROJECT_NAME}}-{{.SHORT_SHA}}.tar
 
-  docker:tag-release:
-    desc: Also tag image with semver when on a release tag
+  image:release:
+    desc: Also tag image with semver (usage — task image:release version=v1.2.3)
     cmds:
-      - docker tag {{.IMAGE}}:{{.SHORT_SHA}} {{.IMAGE}}:{{.VERSION}}
-      - docker push {{.IMAGE}}:{{.VERSION}}
+      - buildah tag {{.PROJECT_NAME}}:{{.SHORT_SHA}} {{.PROJECT_NAME}}:{{.version}}
 
   # ── Git / Release ───────────────────────────────────────────────────────────
 
