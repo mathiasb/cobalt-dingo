@@ -82,9 +82,11 @@ jobs:
           rm -f ${ARCHIVE}
 
       # Validation: confirm the image is present in k3s containerd.
+      # grep on sha-tag only: buildah may store the image as
+      # docker.io/library/cobalt-dingo:<sha> rather than the bare short name.
       - name: Verify image in containerd
         run: |
-          sudo k3s ctr images ls | grep -q "${{ env.IMAGE }}:${{ steps.meta.outputs.sha-tag }}" \
+          sudo k3s ctr images ls | grep -q "${{ steps.meta.outputs.sha-tag }}" \
             && echo "✓ Image present in k3s containerd" \
             || (echo "✗ Image not found in k3s containerd" && exit 1)
 
