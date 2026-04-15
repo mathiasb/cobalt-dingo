@@ -85,20 +85,26 @@ jobs:
           ls -lh ${ARCHIVE}
           echo "── archive index ──"
           tar -xOf ${ARCHIVE} index.json 2>/dev/null || echo "(no index.json)"
-          echo "── importing into k3s containerd ──"
+          # Capture the manifest digest before importing so we can verify by digest,
+          # not by name. k3s may strip the named tag within milliseconds of import
+          # (kubelet reconciler), but the digest entry always persists.
+          DIGEST=$(tar -xOf ${ARCHIVE} index.json | python3 -c "import sys,json; m=json.load(sys.stdin)['manifests'][0]; print(m['digest'])")
+          echo "── importing into k3s containerd (digest: ${DIGEST}) ──"
           sudo k3s ctr images import ${ARCHIVE}
+          echo "IMPORT_DIGEST=${DIGEST}" >> "${RUNNER_TEMP:-/tmp}/import.env"
           echo "── import done ──"
           rm -f ${ARCHIVE}
 
-      # Validation: confirm the image is present in k3s containerd.
+      # Validation: confirm the image digest is present in k3s containerd.
+      # We verify by digest because k3s may strip the named tag almost immediately
+      # after import (kubelet image reconciler), while the digest entry persists.
       - name: Verify image in containerd
         run: |
-          echo "── images in containerd ──"
-          sudo k3s ctr images ls
-          echo "── searching for ${{ steps.meta.outputs.sha-tag }} ──"
-          sudo k3s ctr images ls | grep -q "${{ steps.meta.outputs.sha-tag }}" \
+          DIGEST=$(grep IMPORT_DIGEST "${RUNNER_TEMP:-/tmp}/import.env" | cut -d= -f2-)
+          echo "── verifying digest ${DIGEST} ──"
+          sudo k3s ctr images ls | grep -q "${DIGEST}" \
             && echo "✓ Image present in k3s containerd" \
-            || (echo "✗ Image not found in k3s containerd" && exit 1)
+            || (echo "✗ Image digest not found in k3s containerd" && exit 1)
 
       # Smoke test: run the binary and check it starts cleanly.
       - name: Smoke test
