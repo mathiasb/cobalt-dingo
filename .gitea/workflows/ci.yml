@@ -168,14 +168,12 @@ jobs:
           FORTNOX_CLIENT_SECRET: ${{ secrets.FORTNOX_CLIENT_SECRET }}
           FORTNOX_INVOICE_INBOX: ${{ secrets.FORTNOX_INVOICE_INBOX }}
         run: |
-          cat > .env <<EOF
-          FORTNOX_CLIENT_ID=${FORTNOX_CLIENT_ID}
-          FORTNOX_CLIENT_SECRET=${FORTNOX_CLIENT_SECRET}
-          FORTNOX_REDIRECT_URI=http://localhost:8080/callback
-          FORTNOX_SCOPES="supplierinvoice supplier payment bookkeeping invoice inbox customer currency settings"
-          FORTNOX_ENV=sandbox
-          FORTNOX_INVOICE_INBOX=${FORTNOX_INVOICE_INBOX}
-          EOF
+          printf 'FORTNOX_CLIENT_ID=%s\n' "$FORTNOX_CLIENT_ID" > .env
+          printf 'FORTNOX_CLIENT_SECRET=%s\n' "$FORTNOX_CLIENT_SECRET" >> .env
+          printf 'FORTNOX_REDIRECT_URI=http://localhost:8080/callback\n' >> .env
+          printf 'FORTNOX_SCOPES="supplierinvoice supplier payment bookkeeping invoice inbox customer currency settings"\n' >> .env
+          printf 'FORTNOX_ENV=sandbox\n' >> .env
+          printf 'FORTNOX_INVOICE_INBOX=%s\n' "$FORTNOX_INVOICE_INBOX" >> .env
 
       # Write token file — runner needs a valid refresh token to operate without
       # interactive OAuth2 login. The access_token will be refreshed at runtime.
@@ -183,14 +181,8 @@ jobs:
         env:
           FORTNOX_REFRESH_TOKEN: ${{ secrets.FORTNOX_REFRESH_TOKEN }}
         run: |
-          cat > .fortnox-tokens.json <<EOF
-          {
-            "access_token": "",
-            "refresh_token": "${FORTNOX_REFRESH_TOKEN}",
-            "token_type": "bearer",
-            "expires_at": "2000-01-01T00:00:00Z"
-          }
-          EOF
+          printf '{"access_token":"","refresh_token":"%s","token_type":"bearer","expires_at":"2000-01-01T00:00:00Z"}\n' \
+            "$FORTNOX_REFRESH_TOKEN" > .fortnox-tokens.json
           chmod 600 .fortnox-tokens.json
 
       # Reset sandbox to a known state before seeding.
