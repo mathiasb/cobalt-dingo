@@ -24,6 +24,7 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
+	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 	ui.RegisterRoutes(mux)
 
 	if err := http.ListenAndServe(":"+port, mux); err != nil {

@@ -11,96 +11,196 @@ type PendingInvoice struct {
 	Overdue       bool
 }
 
+func formatAmount(currency string, amount float64) string {
+	// Format with thousands separator e.g. "EUR 2,450.00"
+	intPart := int(amount)
+	fracPart := int((amount - float64(intPart)) * 100)
+	s := fmt.Sprintf("%d", intPart)
+	if len(s) > 3 {
+		s = s[:len(s)-3] + "," + s[len(s)-3:]
+	}
+	return fmt.Sprintf("%s %s.%02d", currency, s, fracPart)
+}
+
 templ InvoicesPage(invoices []PendingInvoice) {
 	@Layout("Pending payments") {
-		<div class="flex items-center justify-between mb-6">
+		<style>
+			.cd-page-header {
+				display: flex;
+				align-items: flex-start;
+				justify-content: space-between;
+				margin-bottom: 1.5rem;
+			}
+			.cd-page-title {
+				font-size: 1.25rem;
+				font-weight: 500;
+				color: var(--gds-sys-color-base-900);
+				margin: 0 0 0.25rem 0;
+			}
+			.cd-page-sub {
+				font-size: 0.875rem;
+				color: var(--gds-sys-color-text-secondary);
+				margin: 0;
+			}
+			.cd-card {
+				background: var(--gds-sys-color-background-primary);
+				border: 1px solid var(--gds-sys-color-base-300);
+				border-radius: var(--gds-sys-shape-corner-medium);
+				overflow: hidden;
+			}
+			.cd-table {
+				width: 100%;
+				border-collapse: collapse;
+				font-size: 0.875rem;
+			}
+			.cd-table thead tr {
+				border-bottom: 1px solid var(--gds-sys-color-base-200);
+				background: var(--gds-sys-color-base-100);
+			}
+			.cd-table th {
+				text-align: left;
+				padding: 0.75rem 1rem;
+				font-weight: 500;
+				font-size: 0.8125rem;
+				color: var(--gds-sys-color-text-secondary);
+			}
+			.cd-table th.right { text-align: right; }
+			.cd-table tbody tr {
+				border-bottom: 1px solid var(--gds-sys-color-base-200);
+				transition: background 0.1s;
+			}
+			.cd-table tbody tr:last-child { border-bottom: none; }
+			.cd-table tbody tr:hover { background: var(--gds-sys-color-base-100); }
+			.cd-table tbody tr.overdue { border-left: 3px solid var(--gds-sys-color-red); }
+			.cd-table td {
+				padding: 0.875rem 1rem;
+				color: var(--gds-sys-color-text-primary);
+			}
+			.cd-table td.mono { font-family: monospace; color: var(--gds-sys-color-base-600); }
+			.cd-table td.right { text-align: right; font-family: monospace; }
+			.cd-batch-panel {
+				margin-top: 1.5rem;
+				background: var(--gds-sys-color-background-primary);
+				border: 1px solid var(--gds-sys-color-base-300);
+				border-radius: var(--gds-sys-shape-corner-medium);
+				padding: 1.5rem;
+			}
+			.cd-batch-header {
+				display: flex;
+				align-items: flex-start;
+				justify-content: space-between;
+				margin-bottom: 1rem;
+			}
+			.cd-batch-title {
+				font-size: 1rem;
+				font-weight: 500;
+				margin: 0 0 0.25rem 0;
+			}
+			.cd-batch-sub {
+				font-size: 0.875rem;
+				color: var(--gds-sys-color-text-secondary);
+				margin: 0;
+			}
+			.cd-batch-rows { border-top: 1px solid var(--gds-sys-color-base-200); margin-top: 1rem; }
+			.cd-batch-row {
+				display: flex;
+				justify-content: space-between;
+				padding: 0.625rem 0;
+				border-bottom: 1px solid var(--gds-sys-color-base-200);
+				font-size: 0.875rem;
+			}
+			.cd-batch-row:last-child { border-bottom: none; }
+			.cd-batch-actions { display: flex; gap: 0.75rem; margin-top: 1.25rem; align-items: center; }
+			.cd-hint { font-size: 0.75rem; color: var(--gds-sys-color-text-secondary); margin-top: 0.75rem; }
+		</style>
+		<div class="cd-page-header">
 			<div>
-				<h1 class="text-xl font-semibold text-slate-900">Pending payments</h1>
-				<p class="text-sm text-slate-500 mt-1">Foreign-currency invoices queued for PAIN.001 batch</p>
+				<h1 class="cd-page-title">Pending payments</h1>
+				<p class="cd-page-sub">Foreign-currency invoices queued for PAIN.001 batch</p>
 			</div>
 			<button
+				class="gds-button"
 				hx-post="/invoices/batch"
 				hx-target="#batch-panel"
 				hx-swap="innerHTML"
-				class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
 			>
 				Generate PAIN.001 batch
 			</button>
 		</div>
-		<div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
-			<table class="w-full text-sm">
+		<div class="cd-card">
+			<table class="cd-table">
 				<thead>
-					<tr class="border-b border-slate-100 bg-slate-50">
-						<th class="text-left px-4 py-3 text-slate-500 font-medium">Invoice</th>
-						<th class="text-left px-4 py-3 text-slate-500 font-medium">Supplier</th>
-						<th class="text-left px-4 py-3 text-slate-500 font-medium">Currency</th>
-						<th class="text-right px-4 py-3 text-slate-500 font-medium">Amount</th>
-						<th class="text-left px-4 py-3 text-slate-500 font-medium">Due date</th>
-						<th class="text-left px-4 py-3 text-slate-500 font-medium">Status</th>
+					<tr>
+						<th>Invoice</th>
+						<th>Supplier</th>
+						<th>Currency</th>
+						<th class="right">Amount</th>
+						<th>Due date</th>
+						<th>Status</th>
 					</tr>
 				</thead>
 				<tbody>
 					for _, inv := range invoices {
-						<tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
-							<td class="px-4 py-3 font-mono text-slate-600">{ fmt.Sprintf("#%d", inv.InvoiceNumber) }</td>
-							<td class="px-4 py-3 font-medium">{ inv.Supplier }</td>
-							<td class="px-4 py-3">
-								<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-50 text-blue-700">
-									{ inv.Currency }
-								</span>
-							</td>
-							<td class="px-4 py-3 text-right font-mono">{ fmt.Sprintf("%s %.2f", inv.Currency, inv.Amount) }</td>
-							<td class="px-4 py-3 text-slate-600">{ inv.DueDate }</td>
-							<td class="px-4 py-3">
-								if inv.Overdue {
-									<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-red-50 text-red-700">Overdue</span>
-								} else {
-									<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-700">Pending</span>
-								}
-							</td>
-						</tr>
+						if inv.Overdue {
+							<tr class="overdue">
+								<td class="mono">{ fmt.Sprintf("#%d", inv.InvoiceNumber) }</td>
+								<td>{ inv.Supplier }</td>
+								<td><span class="gds-badge info">{ inv.Currency }</span></td>
+								<td class="right">{ formatAmount(inv.Currency, inv.Amount) }</td>
+								<td>{ inv.DueDate }</td>
+								<td><span class="gds-badge danger">Overdue</span></td>
+							</tr>
+						} else {
+							<tr>
+								<td class="mono">{ fmt.Sprintf("#%d", inv.InvoiceNumber) }</td>
+								<td>{ inv.Supplier }</td>
+								<td><span class="gds-badge info">{ inv.Currency }</span></td>
+								<td class="right">{ formatAmount(inv.Currency, inv.Amount) }</td>
+								<td>{ inv.DueDate }</td>
+								<td><span class="gds-badge warning">Pending</span></td>
+							</tr>
+						}
 					}
 				</tbody>
 			</table>
 		</div>
-		<div id="batch-panel" class="mt-6"></div>
+		<div id="batch-panel"></div>
 	}
 }
 
 templ BatchPanel(invoices []PendingInvoice) {
-	<div class="bg-white rounded-xl border border-blue-200 p-6">
-		<div class="flex items-start justify-between">
+	<div class="cd-batch-panel">
+		<div class="cd-batch-header">
 			<div>
-				<h2 class="font-semibold text-slate-900">PAIN.001 batch ready</h2>
-				<p class="text-sm text-slate-500 mt-1">{ fmt.Sprintf("%d invoices — review and approve with PSD2 signature", len(invoices)) }</p>
+				<h2 class="cd-batch-title">PAIN.001 batch ready</h2>
+				<p class="cd-batch-sub">{ fmt.Sprintf("%d invoices — review and approve with PSD2 signature", len(invoices)) }</p>
 			</div>
-			<span class="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-1 rounded">draft</span>
+			<span class="gds-badge dark">draft</span>
 		</div>
-		<div class="mt-4 divide-y divide-slate-100">
+		<div class="cd-batch-rows">
 			for _, inv := range invoices {
-				<div class="flex items-center justify-between py-2 text-sm">
-					<span class="text-slate-600">{ inv.Supplier } <span class="font-mono text-slate-400">{ fmt.Sprintf("#%d", inv.InvoiceNumber) }</span></span>
-					<span class="font-mono font-medium">{ fmt.Sprintf("%s %.2f", inv.Currency, inv.Amount) }</span>
+				<div class="cd-batch-row">
+					<span>
+						{ inv.Supplier }
+						<span style="color: var(--gds-sys-color-text-secondary); font-family: monospace; font-size: 0.8125rem;">{ fmt.Sprintf(" #%d", inv.InvoiceNumber) }</span>
+					</span>
+					<span style="font-family: monospace; font-weight: 500;">{ formatAmount(inv.Currency, inv.Amount) }</span>
 				</div>
 			}
 		</div>
-		<div class="mt-5 flex gap-3">
-			<button
-				class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-				disabled
-				title="PSD2 approval not yet wired up"
-			>
+		<div class="cd-batch-actions">
+			<button class="gds-button" disabled title="PSD2 approval not yet wired up">
 				Approve &amp; submit via PSD2
 			</button>
 			<button
+				class="gds-button"
 				hx-get="/invoices"
 				hx-target="body"
 				hx-swap="outerHTML"
-				class="text-sm text-slate-500 hover:text-slate-700 px-4 py-2 rounded-lg transition-colors"
 			>
 				Cancel
 			</button>
 		</div>
-		<p class="mt-3 text-xs text-slate-400">PSD2 approval flow not yet implemented — this is a UI preview.</p>
+		<p class="cd-hint">PSD2 approval flow not yet implemented — this is a UI preview.</p>
 	</div>
 }
