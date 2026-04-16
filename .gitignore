@@ -5,9 +5,6 @@ bin/
 # Go
 vendor/
 
-# Generated (templ)
-*_templ.go
-
 # ── Generated context files (adapter outputs) ──
 # Canonical sources: .context/PROJECT.md + .skills/*/SKILL.md
 # Everything below is disposable — regenerate with: task context:sync
