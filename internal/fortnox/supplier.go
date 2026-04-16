@@ -9,7 +9,7 @@ import (
 // SupplierRow is the Fortnox JSON representation of a supplier's payment details.
 type SupplierRow struct {
 	SupplierNumber int    `json:"SupplierNumber"`
-	IBAN           string `json:"BankAccountIBAN"`
+	IBAN           string `json:"IBAN"`
 	BIC            string `json:"BIC"`
 }
 

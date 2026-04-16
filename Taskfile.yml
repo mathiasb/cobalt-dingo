@@ -105,6 +105,28 @@ tasks:
       - git tag -a {{.version}} -m "Release {{.version}}"
       - task: push
 
+  # ── Fortnox ─────────────────────────────────────────────────────────────────
+
+  fortnox:auth:
+    desc: "One-time OAuth2 flow — stop dev server first (both use :8080)"
+    cmds:
+      - source .env && go run ./cmd/fortnox-auth
+
+  fortnox:check:
+    desc: Verify Fortnox connection and confirm sandbox vs production
+    cmds:
+      - source .env && go run ./cmd/fortnox-check
+
+  e2e:seed:
+    desc: Seed sandbox with [E2E]-tagged test suppliers and FCY invoices
+    cmds:
+      - source .env && go run ./cmd/e2e-seed
+
+  e2e:teardown:
+    desc: Remove all [E2E]-tagged data from the Fortnox sandbox
+    cmds:
+      - source .env && go run ./cmd/e2e-teardown
+
   # ── Infrastructure ──────────────────────────────────────────────────────────
 
   up:
