@@ -53,7 +53,7 @@ func (c *Client) CreateSupplier(s SupplierCreate) (int, error) {
 		return 0, fmt.Errorf("POST supplier: status %d", resp.StatusCode)
 	}
 	var num int
-	fmt.Sscanf(envelope.Supplier.SupplierNumber, "%d", &num)
+	_, _ = fmt.Sscanf(envelope.Supplier.SupplierNumber, "%d", &num)
 	return num, nil
 }
 
@@ -201,7 +201,7 @@ func (c *Client) ListSuppliers(prefix string) ([]SupplierSummary, error) {
 	for _, s := range envelope.Suppliers {
 		if strings.HasPrefix(s.Name, prefix) {
 			var num int
-			fmt.Sscanf(s.SupplierNumber, "%d", &num)
+			_, _ = fmt.Sscanf(s.SupplierNumber, "%d", &num)
 			result = append(result, SupplierSummary{SupplierNumber: num, Name: s.Name, Active: s.Active})
 		}
 	}
