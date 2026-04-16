@@ -76,17 +76,19 @@ jobs:
               ${REGISTRY}/${{ env.IMAGE }}:${{ steps.meta.outputs.version-tag }} || true
           echo "✓ Image pushed to ${REF}"
 
-      # Smoke test: pull from registry and run the binary.
+      # Smoke test: pull from registry and run the binary briefly.
       - name: Smoke test
         run: |
           REGISTRY="localhost:5000"
           REF="${REGISTRY}/${{ env.IMAGE }}:${{ steps.meta.outputs.sha-tag }}"
+          CNAME="smoke-${{ steps.meta.outputs.sha-tag }}"
           sudo k3s ctr images pull --plain-http ${REF}
-          sudo k3s ctr run --rm ${REF} \
-            smoke-${{ steps.meta.outputs.sha-tag }} \
-            /cobalt-dingo 2>&1 | grep -q "cobalt-dingo" \
+          # Run with a 5s timeout; binary is a long-running server so timeout is expected.
+          OUTPUT=$(timeout 5 sudo k3s ctr run --rm ${REF} ${CNAME} /cobalt-dingo 2>&1 || true)
+          sudo k3s ctr containers delete ${CNAME} 2>/dev/null || true
+          echo "$OUTPUT" | grep -q "cobalt-dingo" \
             && echo "✓ Smoke test passed" \
-            || echo "⚠ Smoke test inconclusive (binary may not print on first run yet)"
+            || echo "⚠ Smoke test inconclusive: $OUTPUT"
 
   # ── 3. Deploy to k3s ────────────────────────────────────────────────────────
   deploy:
