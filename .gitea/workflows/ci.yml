@@ -162,20 +162,23 @@ jobs:
           cache: false
 
       # Write credentials from secrets — never stored in the repo.
-      # Secrets are inlined via ${{ }} expressions (act_runner evaluates these
-      # before passing the script to bash; they are redacted in logs).
+      # act_runner substitutes ${{ }} before passing the script to bash.
       - name: Write credentials
         run: |
-          printf 'FORTNOX_CLIENT_ID=%s\n'     '${{ secrets.FORTNOX_CLIENT_ID }}'     > .env
-          printf 'FORTNOX_CLIENT_SECRET=%s\n' '${{ secrets.FORTNOX_CLIENT_SECRET }}'  >> .env
-          printf 'FORTNOX_REDIRECT_URI=http://localhost:8080/callback\n'              >> .env
-          printf 'FORTNOX_SCOPES="supplierinvoice supplier payment bookkeeping invoice inbox customer currency settings"\n' >> .env
-          printf 'FORTNOX_ENV=sandbox\n'                                               >> .env
-          printf 'FORTNOX_INVOICE_INBOX=%s\n' '${{ secrets.FORTNOX_INVOICE_INBOX }}'  >> .env
-          printf '{"access_token":"","refresh_token":"%s","token_type":"bearer","expires_at":"2000-01-01T00:00:00Z"}\n' \
-            '${{ secrets.FORTNOX_REFRESH_TOKEN }}' > .fortnox-tokens.json
+          echo 'FORTNOX_CLIENT_ID=${{ secrets.FORTNOX_CLIENT_ID }}'     > .env
+          echo 'FORTNOX_CLIENT_SECRET=${{ secrets.FORTNOX_CLIENT_SECRET }}' >> .env
+          echo 'FORTNOX_REDIRECT_URI=http://localhost:8080/callback'         >> .env
+          echo 'FORTNOX_SCOPES="supplierinvoice supplier payment bookkeeping invoice inbox customer currency settings"' >> .env
+          echo 'FORTNOX_ENV=sandbox'                                          >> .env
+          echo 'FORTNOX_INVOICE_INBOX=${{ secrets.FORTNOX_INVOICE_INBOX }}'  >> .env
+          python3 -c "
+import json
+d = {'access_token': '', 'refresh_token': '${{ secrets.FORTNOX_REFRESH_TOKEN }}', 'token_type': 'bearer', 'expires_at': '2000-01-01T00:00:00Z'}
+open('.fortnox-tokens.json', 'w').write(json.dumps(d))
+"
           chmod 600 .fortnox-tokens.json
           echo ".env lines: $(wc -l < .env)  token bytes: $(wc -c < .fortnox-tokens.json)"
+          cat .fortnox-tokens.json
 
       # Reset sandbox to a known state before seeding.
       - name: Teardown E2E fixtures
