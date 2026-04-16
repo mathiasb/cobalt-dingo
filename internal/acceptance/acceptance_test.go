@@ -33,4 +33,5 @@ func TestFeatures(t *testing.T) {
 // Add a call here each time a new _steps_test.go file is created.
 func initializeScenario(sc *godog.ScenarioContext) {
 	initializeSupplierInvoiceSteps(sc)
+	initializeFortnoxConnectorSteps(sc)
 }
