@@ -171,11 +171,7 @@ jobs:
           echo 'FORTNOX_SCOPES="supplierinvoice supplier payment bookkeeping invoice inbox customer currency settings"' >> .env
           echo 'FORTNOX_ENV=sandbox'                                          >> .env
           echo 'FORTNOX_INVOICE_INBOX=${{ secrets.FORTNOX_INVOICE_INBOX }}'  >> .env
-          python3 -c "
-import json
-d = {'access_token': '', 'refresh_token': '${{ secrets.FORTNOX_REFRESH_TOKEN }}', 'token_type': 'bearer', 'expires_at': '2000-01-01T00:00:00Z'}
-open('.fortnox-tokens.json', 'w').write(json.dumps(d))
-"
+          python3 -c "import json; open('.fortnox-tokens.json','w').write(json.dumps({'access_token':'','refresh_token':'${{ secrets.FORTNOX_REFRESH_TOKEN }}','token_type':'bearer','expires_at':'2000-01-01T00:00:00Z'}))"
           chmod 600 .fortnox-tokens.json
           echo ".env lines: $(wc -l < .env)  token bytes: $(wc -c < .fortnox-tokens.json)"
           cat .fortnox-tokens.json
