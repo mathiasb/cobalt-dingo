@@ -11,6 +11,10 @@ linters:
     - revive         # idiomatic Go
     - exhaustive     # exhaustive switch on enums
 
+formatters:
+  enable:
+    - gofumpt
+
 linters-settings:
   revive:
     rules:
@@ -18,10 +22,6 @@ linters-settings:
         severity: warning
       - name: var-naming
         severity: warning
-
-formatters:
-  enable:
-    - gofumpt
 
 issues:
   exclude-rules:

@@ -29,8 +29,15 @@ jobs:
         run: |
           go version
           task --version
-          golangci-lint --version
           govulncheck -version 2>&1 || true
+
+      - name: Install golangci-lint
+        run: |
+          # Pin to v2 to match the config format used in this repo.
+          # Overrides whatever version is pre-installed on the runner.
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh \
+            | sh -s -- -b "$(go env GOPATH)/bin" v2.11.4
+          golangci-lint --version
 
       - name: Run checks
         run: task check
