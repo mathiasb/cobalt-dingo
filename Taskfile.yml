@@ -127,6 +127,18 @@ tasks:
     cmds:
       - source .env && go run ./cmd/e2e-teardown
 
+  # ── Database ────────────────────────────────────────────────────────────────
+
+  db:migrate:
+    desc: Apply all pending database migrations
+    cmds:
+      - source .env && go run ./cmd/migrate
+
+  db:migrate:down:
+    desc: Roll back one database migration
+    cmds:
+      - source .env && go run ./cmd/migrate down 1
+
   # ── Infrastructure ──────────────────────────────────────────────────────────
 
   up:

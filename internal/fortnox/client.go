@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/mathiasb/cobalt-dingo/internal/invoice"
+	"github.com/mathiasb/cobalt-dingo/internal/domain"
 )
 
 // Client is an authenticated Fortnox API client.
@@ -41,7 +41,7 @@ type SupplierInvoicesResponse struct {
 }
 
 // UnpaidSupplierInvoices fetches all unpaid supplier invoices from Fortnox.
-func (c *Client) UnpaidSupplierInvoices() ([]invoice.SupplierInvoice, error) {
+func (c *Client) UnpaidSupplierInvoices() ([]domain.SupplierInvoice, error) {
 	req, err := http.NewRequest(http.MethodGet, c.baseURL+"/3/supplierinvoices?filter=unpaid", nil)
 	if err != nil {
 		return nil, fmt.Errorf("build request: %w", err)
@@ -64,14 +64,13 @@ func (c *Client) UnpaidSupplierInvoices() ([]invoice.SupplierInvoice, error) {
 		return nil, fmt.Errorf("decode supplierinvoices: %w", err)
 	}
 
-	invoices := make([]invoice.SupplierInvoice, len(envelope.SupplierInvoices))
+	invoices := make([]domain.SupplierInvoice, len(envelope.SupplierInvoices))
 	for i, row := range envelope.SupplierInvoices {
-		invoices[i] = invoice.SupplierInvoice{
+		invoices[i] = domain.SupplierInvoice{
 			InvoiceNumber:  row.InvoiceNumber,
 			SupplierNumber: row.SupplierNumber,
 			SupplierName:   row.SupplierName,
-			Currency:       row.Currency,
-			Total:          row.TotalInvoiceCurrency,
+			Amount:         domain.MoneyFromFloat(row.TotalInvoiceCurrency, row.Currency),
 			DueDate:        row.DueDate,
 		}
 	}

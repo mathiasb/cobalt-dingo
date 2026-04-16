@@ -28,6 +28,24 @@ func (f Fortnox) IsSandbox() bool {
 	return f.Env != "production"
 }
 
+// App holds general application configuration.
+type App struct {
+	DatabaseURL string // PostgreSQL connection string; empty means no DB configured
+	Port        string
+}
+
+// LoadApp reads general application configuration from environment variables.
+func LoadApp() App {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	return App{
+		DatabaseURL: os.Getenv("DATABASE_URL"),
+		Port:        port,
+	}
+}
+
 // Debtor holds the paying entity's bank account details used in PAIN.001 batches.
 type Debtor struct {
 	Name string

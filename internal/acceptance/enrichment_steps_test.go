@@ -5,14 +5,14 @@ import (
 	"strconv"
 
 	"github.com/cucumber/godog"
-	"github.com/mathiasb/cobalt-dingo/internal/invoice"
+	"github.com/mathiasb/cobalt-dingo/internal/domain"
 )
 
 type enrichmentCtx struct {
-	invoices        []invoice.SupplierInvoice
+	invoices        []domain.SupplierInvoice
 	supplierDetails map[int][2]string // supplierNumber → [IBAN, BIC]
-	enriched        []invoice.EnrichedInvoice
-	skipped         []invoice.SupplierInvoice
+	enriched        []domain.EnrichedInvoice
+	skipped         []domain.SupplierInvoice
 }
 
 var enCtx enrichmentCtx
@@ -23,11 +23,10 @@ func fcyInvoicesForSuppliers(table *godog.Table) error {
 		invNum, _ := strconv.Atoi(row.Cells[0].Value)
 		supNum, _ := strconv.Atoi(row.Cells[1].Value)
 		total, _ := strconv.ParseFloat(row.Cells[3].Value, 64)
-		enCtx.invoices = append(enCtx.invoices, invoice.SupplierInvoice{
+		enCtx.invoices = append(enCtx.invoices, domain.SupplierInvoice{
 			InvoiceNumber:  invNum,
 			SupplierNumber: supNum,
-			Currency:       row.Cells[2].Value,
-			Total:          total,
+			Amount:         domain.MoneyFromFloat(total, row.Cells[2].Value),
 			DueDate:        row.Cells[4].Value,
 		})
 	}
@@ -60,7 +59,7 @@ func ibanBICEnrichmentRuns() error {
 	}
 
 	var err error
-	enCtx.enriched, err = invoice.Enrich(enCtx.invoices, lookup)
+	enCtx.enriched, err = domain.Enrich(enCtx.invoices, lookup)
 	return err
 }
 

@@ -7,12 +7,12 @@ import (
 	"time"
 
 	"github.com/cucumber/godog"
-	"github.com/mathiasb/cobalt-dingo/internal/invoice"
+	"github.com/mathiasb/cobalt-dingo/internal/domain"
 	"github.com/mathiasb/cobalt-dingo/internal/payment"
 )
 
 type paymentBatchCtx struct {
-	invoices []invoice.EnrichedInvoice
+	invoices []domain.EnrichedInvoice
 	debtor   payment.Debtor
 	xmlDoc   []byte
 }
@@ -29,12 +29,11 @@ func enrichedFCYInvoicesReadyForPayment(table *godog.Table) error {
 		dueDate := row.Cells[4].Value
 		iban := row.Cells[5].Value
 		bic := row.Cells[6].Value
-		pbCtx.invoices = append(pbCtx.invoices, invoice.EnrichedInvoice{
-			SupplierInvoice: invoice.SupplierInvoice{
+		pbCtx.invoices = append(pbCtx.invoices, domain.EnrichedInvoice{
+			SupplierInvoice: domain.SupplierInvoice{
 				InvoiceNumber: invNum,
 				SupplierName:  supplierName,
-				Currency:      currency,
-				Total:         total,
+				Amount:        domain.MoneyFromFloat(total, currency),
 				DueDate:       dueDate,
 			},
 			IBAN: iban,

@@ -9,13 +9,13 @@ import (
 	"strconv"
 
 	"github.com/cucumber/godog"
+	"github.com/mathiasb/cobalt-dingo/internal/domain"
 	"github.com/mathiasb/cobalt-dingo/internal/fortnox"
-	"github.com/mathiasb/cobalt-dingo/internal/invoice"
 )
 
 type fortnoxConnectorCtx struct {
 	stub    *httptest.Server
-	results []invoice.SupplierInvoice
+	results []domain.SupplierInvoice
 }
 
 var fcCtx fortnoxConnectorCtx
@@ -68,11 +68,11 @@ func nInvoicesAreReturned(n int) error {
 func invoiceHasCurrencyAndTotal(num int, currency string, total float64) error {
 	for _, inv := range fcCtx.results {
 		if inv.InvoiceNumber == num {
-			if inv.Currency != currency {
-				return fmt.Errorf("invoice %d: expected currency %s, got %s", num, currency, inv.Currency)
+			if inv.Amount.Currency != currency {
+				return fmt.Errorf("invoice %d: expected currency %s, got %s", num, currency, inv.Amount.Currency)
 			}
-			if inv.Total != total {
-				return fmt.Errorf("invoice %d: expected total %.2f, got %.2f", num, total, inv.Total)
+			if inv.Amount.Float() != total {
+				return fmt.Errorf("invoice %d: expected total %.2f, got %.2f", num, total, inv.Amount.Float())
 			}
 			return nil
 		}

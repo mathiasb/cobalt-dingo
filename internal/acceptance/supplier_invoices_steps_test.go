@@ -5,13 +5,13 @@ import (
 	"strconv"
 
 	"github.com/cucumber/godog"
-	"github.com/mathiasb/cobalt-dingo/internal/invoice"
+	"github.com/mathiasb/cobalt-dingo/internal/domain"
 )
 
 // supplierInvoicesCtx holds scenario-scoped state for supplier invoice steps.
 type supplierInvoicesCtx struct {
-	fortnoxInvoices []invoice.SupplierInvoice
-	queue           invoice.Queue
+	fortnoxInvoices []domain.SupplierInvoice
+	queue           domain.Queue
 }
 
 var siCtx supplierInvoicesCtx
@@ -27,10 +27,9 @@ func fortnoxHasTheFollowingUnpaidSupplierInvoices(table *godog.Table) error {
 		if err != nil {
 			return fmt.Errorf("parse Total: %w", err)
 		}
-		siCtx.fortnoxInvoices = append(siCtx.fortnoxInvoices, invoice.SupplierInvoice{
+		siCtx.fortnoxInvoices = append(siCtx.fortnoxInvoices, domain.SupplierInvoice{
 			InvoiceNumber: num,
-			Currency:      row.Cells[1].Value,
-			Total:         total,
+			Amount:        domain.MoneyFromFloat(total, row.Cells[1].Value),
 			DueDate:       row.Cells[3].Value,
 		})
 	}
@@ -38,7 +37,7 @@ func fortnoxHasTheFollowingUnpaidSupplierInvoices(table *godog.Table) error {
 }
 
 func theInvoiceSyncRuns() error {
-	invoice.Sync(siCtx.fortnoxInvoices, &siCtx.queue)
+	domain.Sync(siCtx.fortnoxInvoices, &siCtx.queue)
 	return nil
 }
 

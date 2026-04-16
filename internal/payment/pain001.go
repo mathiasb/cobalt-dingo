@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/mathiasb/cobalt-dingo/internal/invoice"
+	"github.com/mathiasb/cobalt-dingo/internal/domain"
 )
 
 // Debtor identifies the entity initiating the payment (the cobalt-dingo tenant).
@@ -122,19 +122,19 @@ type RmtInf struct {
 // Invoices are grouped by currency into separate PmtInf blocks; EUR blocks carry
 // a SEPA service level. msgID must be unique per submission (max 35 chars).
 // Production callers must ensure ReqdExctnDt is a valid future banking day.
-func GeneratePAIN001(invoices []invoice.EnrichedInvoice, debtor Debtor, msgID string, createdAt time.Time) ([]byte, error) {
+func GeneratePAIN001(invoices []domain.EnrichedInvoice, debtor Debtor, msgID string, createdAt time.Time) ([]byte, error) {
 	if len(invoices) == 0 {
 		return nil, fmt.Errorf("generate pain.001: no invoices provided")
 	}
 
 	// Group by currency, preserving first-seen order for deterministic output.
 	order := []string{}
-	grouped := map[string][]invoice.EnrichedInvoice{}
+	grouped := map[string][]domain.EnrichedInvoice{}
 	for _, inv := range invoices {
-		if _, seen := grouped[inv.Currency]; !seen {
-			order = append(order, inv.Currency)
+		if _, seen := grouped[inv.Amount.Currency]; !seen {
+			order = append(order, inv.Amount.Currency)
 		}
-		grouped[inv.Currency] = append(grouped[inv.Currency], inv)
+		grouped[inv.Amount.Currency] = append(grouped[inv.Amount.Currency], inv)
 	}
 
 	pmtInfs := make([]PmtInf, 0, len(order))
@@ -162,12 +162,12 @@ func GeneratePAIN001(invoices []invoice.EnrichedInvoice, debtor Debtor, msgID st
 	return append([]byte(xml.Header), out...), nil
 }
 
-func buildPmtInf(idx int, ccy string, invoices []invoice.EnrichedInvoice, debtor Debtor) PmtInf {
+func buildPmtInf(idx int, ccy string, invoices []domain.EnrichedInvoice, debtor Debtor) PmtInf {
 	txs := make([]CdtTrfTxInf, len(invoices))
 	for i, inv := range invoices {
 		txs[i] = CdtTrfTxInf{
 			PmtID:    TxID{EndToEndID: fmt.Sprintf("INV-%d", inv.InvoiceNumber)},
-			Amt:      Amt{InstdAmt: InstructedAmt{Ccy: inv.Currency, Value: fmtAmt(inv.Total)}},
+			Amt:      Amt{InstdAmt: InstructedAmt{Ccy: inv.Amount.Currency, Value: fmtAmt(inv.Amount.Float())}},
 			CdtrAgt:  Agent{FinInstnID: FinancialInstitution{BIC: inv.BIC}},
 			Cdtr:     Party{Nm: inv.SupplierName},
 			CdtrAcct: Account{ID: AccountID{IBAN: inv.IBAN}},
@@ -195,10 +195,10 @@ func buildPmtInf(idx int, ccy string, invoices []invoice.EnrichedInvoice, debtor
 	return pi
 }
 
-func sumAmounts(invoices []invoice.EnrichedInvoice) float64 {
+func sumAmounts(invoices []domain.EnrichedInvoice) float64 {
 	var sum float64
 	for _, inv := range invoices {
-		sum += inv.Total
+		sum += inv.Amount.Float()
 	}
 	return sum
 }

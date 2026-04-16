@@ -9,8 +9,8 @@ import (
 
 	"github.com/a-h/templ"
 	"github.com/mathiasb/cobalt-dingo/internal/config"
+	"github.com/mathiasb/cobalt-dingo/internal/domain"
 	"github.com/mathiasb/cobalt-dingo/internal/fortnox"
-	"github.com/mathiasb/cobalt-dingo/internal/invoice"
 	"github.com/mathiasb/cobalt-dingo/internal/payment"
 )
 
@@ -105,15 +105,15 @@ func (s *Server) loadPendingInvoices() ([]PendingInvoice, error) {
 		return nil, fmt.Errorf("fetch invoices: %w", err)
 	}
 
-	var queue invoice.Queue
-	invoice.Sync(all, &queue)
+	var queue domain.Queue
+	domain.Sync(all, &queue)
 	fcyInvoices := queue.All()
 
 	if len(fcyInvoices) == 0 {
 		return nil, nil
 	}
 
-	enriched, err := invoice.Enrich(fcyInvoices, cachedLookup(client))
+	enriched, err := domain.Enrich(fcyInvoices, cachedLookup(client))
 	if err != nil {
 		return nil, fmt.Errorf("enrich invoices: %w", err)
 	}
@@ -145,7 +145,7 @@ func (s *Server) fortnoxClient() (*fortnox.Client, error) {
 
 // cachedLookup returns a SupplierLookup that deduplicates API calls per supplier
 // within a single request.
-func cachedLookup(client *fortnox.Client) invoice.SupplierLookup {
+func cachedLookup(client *fortnox.Client) domain.SupplierLookup {
 	cache := map[int][2]string{}
 	return func(supplierNumber int) (string, string, error) {
 		if hit, ok := cache[supplierNumber]; ok {
@@ -160,12 +160,12 @@ func cachedLookup(client *fortnox.Client) invoice.SupplierLookup {
 	}
 }
 
-func toPendingInvoice(inv invoice.EnrichedInvoice) PendingInvoice {
+func toPendingInvoice(inv domain.EnrichedInvoice) PendingInvoice {
 	return PendingInvoice{
 		InvoiceNumber: inv.InvoiceNumber,
 		Supplier:      inv.SupplierName,
-		Currency:      inv.Currency,
-		Amount:        inv.Total,
+		Currency:      inv.Amount.Currency,
+		Amount:        inv.Amount.Float(),
 		DueDate:       inv.DueDate,
 		Overdue:       isOverdue(inv.DueDate),
 		IBAN:          inv.IBAN,
@@ -184,14 +184,13 @@ func isOverdue(dueDate string) bool {
 func buildBatchSummary(invoices []PendingInvoice, debtor payment.Debtor) (BatchSummary, error) {
 	msgID := fmt.Sprintf("COBALT-%s", time.Now().UTC().Format("20060102-150405"))
 
-	enriched := make([]invoice.EnrichedInvoice, len(invoices))
+	enriched := make([]domain.EnrichedInvoice, len(invoices))
 	for i, inv := range invoices {
-		enriched[i] = invoice.EnrichedInvoice{
-			SupplierInvoice: invoice.SupplierInvoice{
+		enriched[i] = domain.EnrichedInvoice{
+			SupplierInvoice: domain.SupplierInvoice{
 				InvoiceNumber: inv.InvoiceNumber,
 				SupplierName:  inv.Supplier,
-				Currency:      inv.Currency,
-				Total:         inv.Amount,
+				Amount:        domain.MoneyFromFloat(inv.Amount, inv.Currency),
 				DueDate:       inv.DueDate,
 			},
 			IBAN: inv.IBAN,
