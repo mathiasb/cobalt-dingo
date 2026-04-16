@@ -6,6 +6,11 @@ import (
 	"time"
 )
 
+// Valid reports whether the access token is present and not expiring within 30 seconds.
+func (t OAuthToken) Valid() bool {
+	return t.AccessToken != "" && time.Now().Before(t.ExpiresAt.Add(-30*time.Second))
+}
+
 // InvoiceSource retrieves unpaid supplier invoices for a tenant.
 // Implementations: internal/adapter/fortnox (future)
 type InvoiceSource interface {

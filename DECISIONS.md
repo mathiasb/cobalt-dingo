@@ -92,6 +92,22 @@ Record *why* things are the way they are. Future-you will thank present-you.
 
 **Consequences**: We need to store the original invoice CurrencyRate at scan time so we can compute the delta after execution. Do not rely on re-fetching from Fortnox (rate may have changed if a user edited the invoice).
 
+## 2026-04-16 — File-based TokenStore for dev; postgres TokenStore for production
+
+**Context**: Token refresh needs CAS semantics to prevent two concurrent requests from both detecting an expired token, both calling Fortnox, and the second refresh invalidating the first. A mutex gives in-process safety. For production (multiple server replicas), only a database-level CAS (`UPDATE ... WHERE refresh_token = $old RETURNING *`) is safe.
+
+**Decision**: `adapter/file.TokenStore` uses a mutex — safe for local dev and single-process deploys. `adapter/postgres.TokenStore` (next step) uses `UPDATE ... WHERE` CAS. `domain.ErrTokenConflict` is the sentinel for the race case; callers reload and retry with the winning token.
+
+**Consequences**: Single-process deployments use the file adapter with no DB dependency. Multi-replica production deployments must use the postgres adapter. The domain port is the same in both cases — swapping is a one-line change in `main.go`.
+
+## 2026-04-16 — Adapter/fortnox wraps internal/fortnox; not the reverse
+
+**Context**: The domain defines `InvoiceSource` and `SupplierEnricher` ports. The raw Fortnox HTTP client lives in `internal/fortnox/`. Two ways to bridge: (a) make the raw client implement the ports directly, or (b) introduce a thin adapter package.
+
+**Decision**: `internal/adapter/fortnox.Connector` wraps `*internal/fortnox.Client`. The raw client remains ignorant of domain types and interfaces — it maps JSON to domain types at the boundary, but carries no port implementation responsibility. The adapter owns token lifecycle (load, refresh, CAS conflict handling) and calls the raw client per-invocation.
+
+**Consequences**: The raw client stays testable without domain machinery. The adapter is the seam — mocking `InvoiceSource` in tests doesn't require any HTTP setup. Adding a second ERP (e.g. Visma) means a new adapter package, not changes to `internal/fortnox/`.
+
 ## 2026-04-08 — Mistral Vibe gets its own adapter
 
 **Context**: Vibe doesn't read `AGENTS.md` — it uses `~/.vibe/prompts/` and `~/.vibe/agents/` with TOML config.
