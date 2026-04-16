@@ -28,6 +28,25 @@ func (f Fortnox) IsSandbox() bool {
 	return f.Env != "production"
 }
 
+// Debtor holds the paying entity's bank account details used in PAIN.001 batches.
+type Debtor struct {
+	Name string
+	IBAN string
+	BIC  string
+}
+
+// LoadDebtor reads debtor config from COBALT_DEBTOR_NAME / _IBAN / _BIC.
+// Returns a placeholder when any value is absent (development mode).
+func LoadDebtor() Debtor {
+	name := os.Getenv("COBALT_DEBTOR_NAME")
+	iban := os.Getenv("COBALT_DEBTOR_IBAN")
+	bic := os.Getenv("COBALT_DEBTOR_BIC")
+	if name == "" || iban == "" || bic == "" {
+		return Debtor{Name: "Cobalt Dingo AB", IBAN: "SE4550000000058398257466", BIC: "ESSESESS"}
+	}
+	return Debtor{Name: name, IBAN: iban, BIC: bic}
+}
+
 // Load reads Fortnox configuration from environment variables.
 // Returns an error if any required variable is missing.
 func Load() (Fortnox, error) {
