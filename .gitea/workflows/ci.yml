@@ -148,10 +148,74 @@ jobs:
           && echo "✓ Pod running new image" \
           || (echo "✗ Pod image mismatch" && exit 1)
 
-  # ── 4. Mirror to GitHub ─────────────────────────────────────────────────────
+  # ── 4. E2E sandbox tests ─────────────────────────────────────────────────────
+  e2e:
+    name: E2E (Fortnox sandbox)
+    needs: check
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      # Write .env from secrets — never stored in the repo.
+      - name: Write .env
+        env:
+          FORTNOX_CLIENT_ID: ${{ secrets.FORTNOX_CLIENT_ID }}
+          FORTNOX_CLIENT_SECRET: ${{ secrets.FORTNOX_CLIENT_SECRET }}
+          FORTNOX_INVOICE_INBOX: ${{ secrets.FORTNOX_INVOICE_INBOX }}
+        run: |
+          cat > .env <<EOF
+          FORTNOX_CLIENT_ID=${FORTNOX_CLIENT_ID}
+          FORTNOX_CLIENT_SECRET=${FORTNOX_CLIENT_SECRET}
+          FORTNOX_REDIRECT_URI=http://localhost:8080/callback
+          FORTNOX_SCOPES="supplierinvoice supplier payment bookkeeping invoice inbox customer currency settings"
+          FORTNOX_ENV=sandbox
+          FORTNOX_INVOICE_INBOX=${FORTNOX_INVOICE_INBOX}
+          EOF
+
+      # Write token file — runner needs a valid refresh token to operate without
+      # interactive OAuth2 login. The access_token will be refreshed at runtime.
+      - name: Write token file
+        env:
+          FORTNOX_REFRESH_TOKEN: ${{ secrets.FORTNOX_REFRESH_TOKEN }}
+        run: |
+          cat > .fortnox-tokens.json <<EOF
+          {
+            "access_token": "",
+            "refresh_token": "${FORTNOX_REFRESH_TOKEN}",
+            "token_type": "bearer",
+            "expires_at": "2000-01-01T00:00:00Z"
+          }
+          EOF
+          chmod 600 .fortnox-tokens.json
+
+      # Reset sandbox to a known state before seeding.
+      - name: Teardown E2E fixtures
+        run: |
+          set -a && source .env && set +a
+          go run ./cmd/e2e-teardown
+
+      # Seed test suppliers and booked invoices.
+      - name: Seed E2E fixtures
+        run: |
+          set -a && source .env && set +a
+          go run ./cmd/e2e-seed
+
+      # Run acceptance tests against the seeded sandbox.
+      # Data is intentionally left in place after the run for manual inspection.
+      - name: Run acceptance tests
+        run: |
+          set -a && source .env && set +a
+          go test -race -count=1 -timeout=120s ./internal/acceptance/...
+
+  # ── 5. Mirror to GitHub ─────────────────────────────────────────────────────
   mirror:
     name: Mirror to GitHub
-    needs: deploy
+    needs: [deploy, e2e]
     runs-on: self-hosted
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
