@@ -17,6 +17,22 @@ type PendingInvoice struct {
 	Amount        float64
 	DueDate       string
 	Overdue       bool
+	IBAN          string
+	BIC           string
+}
+
+// BatchGroup holds invoices for a single currency within a batch.
+type BatchGroup struct {
+	Currency string
+	Invoices []PendingInvoice
+	Total    float64
+}
+
+// BatchSummary is the result of a PAIN.001 batch generation.
+type BatchSummary struct {
+	MsgID  string
+	Groups []BatchGroup
+	XML    []byte
 }
 
 func formatAmount(currency string, amount float64) string {
@@ -28,6 +44,14 @@ func formatAmount(currency string, amount float64) string {
 		s = s[:len(s)-3] + "," + s[len(s)-3:]
 	}
 	return fmt.Sprintf("%s %s.%02d", currency, s, fracPart)
+}
+
+func invoiceCount(groups []BatchGroup) int {
+	n := 0
+	for _, g := range groups {
+		n += len(g.Invoices)
+	}
+	return n
 }
 
 func InvoicesPage(invoices []PendingInvoice) templ.Component {
@@ -63,7 +87,7 @@ func InvoicesPage(invoices []PendingInvoice) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<style>\n\t\t\t.cd-page-header {\n\t\t\t\tdisplay: flex;\n\t\t\t\talign-items: flex-start;\n\t\t\t\tjustify-content: space-between;\n\t\t\t\tmargin-bottom: 1.5rem;\n\t\t\t}\n\t\t\t.cd-page-title {\n\t\t\t\tfont-size: 1.25rem;\n\t\t\t\tfont-weight: 500;\n\t\t\t\tcolor: var(--gds-sys-color-base-900);\n\t\t\t\tmargin: 0 0 0.25rem 0;\n\t\t\t}\n\t\t\t.cd-page-sub {\n\t\t\t\tfont-size: 0.875rem;\n\t\t\t\tcolor: var(--gds-sys-color-text-secondary);\n\t\t\t\tmargin: 0;\n\t\t\t}\n\t\t\t.cd-card {\n\t\t\t\tbackground: var(--gds-sys-color-background-primary);\n\t\t\t\tborder: 1px solid var(--gds-sys-color-base-300);\n\t\t\t\tborder-radius: var(--gds-sys-shape-corner-medium);\n\t\t\t\toverflow: hidden;\n\t\t\t}\n\t\t\t.cd-table {\n\t\t\t\twidth: 100%;\n\t\t\t\tborder-collapse: collapse;\n\t\t\t\tfont-size: 0.875rem;\n\t\t\t}\n\t\t\t.cd-table thead tr {\n\t\t\t\tborder-bottom: 1px solid var(--gds-sys-color-base-200);\n\t\t\t\tbackground: var(--gds-sys-color-base-100);\n\t\t\t}\n\t\t\t.cd-table th {\n\t\t\t\ttext-align: left;\n\t\t\t\tpadding: 0.75rem 1rem;\n\t\t\t\tfont-weight: 500;\n\t\t\t\tfont-size: 0.8125rem;\n\t\t\t\tcolor: var(--gds-sys-color-text-secondary);\n\t\t\t}\n\t\t\t.cd-table th.right { text-align: right; }\n\t\t\t.cd-table tbody tr {\n\t\t\t\tborder-bottom: 1px solid var(--gds-sys-color-base-200);\n\t\t\t\ttransition: background 0.1s;\n\t\t\t}\n\t\t\t.cd-table tbody tr:last-child { border-bottom: none; }\n\t\t\t.cd-table tbody tr:hover { background: var(--gds-sys-color-base-100); }\n\t\t\t.cd-table tbody tr.overdue { border-left: 3px solid var(--gds-sys-color-red); }\n\t\t\t.cd-table td {\n\t\t\t\tpadding: 0.875rem 1rem;\n\t\t\t\tcolor: var(--gds-sys-color-text-primary);\n\t\t\t}\n\t\t\t.cd-table td.mono { font-family: monospace; color: var(--gds-sys-color-base-600); }\n\t\t\t.cd-table td.right { text-align: right; font-family: monospace; }\n\t\t\t.cd-batch-panel {\n\t\t\t\tmargin-top: 1.5rem;\n\t\t\t\tbackground: var(--gds-sys-color-background-primary);\n\t\t\t\tborder: 1px solid var(--gds-sys-color-base-300);\n\t\t\t\tborder-radius: var(--gds-sys-shape-corner-medium);\n\t\t\t\tpadding: 1.5rem;\n\t\t\t}\n\t\t\t.cd-batch-header {\n\t\t\t\tdisplay: flex;\n\t\t\t\talign-items: flex-start;\n\t\t\t\tjustify-content: space-between;\n\t\t\t\tmargin-bottom: 1rem;\n\t\t\t}\n\t\t\t.cd-batch-title {\n\t\t\t\tfont-size: 1rem;\n\t\t\t\tfont-weight: 500;\n\t\t\t\tmargin: 0 0 0.25rem 0;\n\t\t\t}\n\t\t\t.cd-batch-sub {\n\t\t\t\tfont-size: 0.875rem;\n\t\t\t\tcolor: var(--gds-sys-color-text-secondary);\n\t\t\t\tmargin: 0;\n\t\t\t}\n\t\t\t.cd-batch-rows { border-top: 1px solid var(--gds-sys-color-base-200); margin-top: 1rem; }\n\t\t\t.cd-batch-row {\n\t\t\t\tdisplay: flex;\n\t\t\t\tjustify-content: space-between;\n\t\t\t\tpadding: 0.625rem 0;\n\t\t\t\tborder-bottom: 1px solid var(--gds-sys-color-base-200);\n\t\t\t\tfont-size: 0.875rem;\n\t\t\t}\n\t\t\t.cd-batch-row:last-child { border-bottom: none; }\n\t\t\t.cd-batch-actions { display: flex; gap: 0.75rem; margin-top: 1.25rem; align-items: center; }\n\t\t\t.cd-hint { font-size: 0.75rem; color: var(--gds-sys-color-text-secondary); margin-top: 0.75rem; }\n\t\t</style> <div class=\"cd-page-header\"><div><h1 class=\"cd-page-title\">Pending payments</h1><p class=\"cd-page-sub\">Foreign-currency invoices queued for PAIN.001 batch</p></div><button class=\"gds-button\" hx-post=\"/invoices/batch\" hx-target=\"#batch-panel\" hx-swap=\"innerHTML\">Generate PAIN.001 batch</button></div><div class=\"cd-card\"><table class=\"cd-table\"><thead><tr><th>Invoice</th><th>Supplier</th><th>Currency</th><th class=\"right\">Amount</th><th>Due date</th><th>Status</th></tr></thead> <tbody>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<style>\n\t\t\t.cd-page-header {\n\t\t\t\tdisplay: flex;\n\t\t\t\talign-items: flex-start;\n\t\t\t\tjustify-content: space-between;\n\t\t\t\tmargin-bottom: 1.5rem;\n\t\t\t}\n\t\t\t.cd-page-title {\n\t\t\t\tfont-size: 1.25rem;\n\t\t\t\tfont-weight: 500;\n\t\t\t\tcolor: var(--gds-sys-color-base-900);\n\t\t\t\tmargin: 0 0 0.25rem 0;\n\t\t\t}\n\t\t\t.cd-page-sub {\n\t\t\t\tfont-size: 0.875rem;\n\t\t\t\tcolor: var(--gds-sys-color-text-secondary);\n\t\t\t\tmargin: 0;\n\t\t\t}\n\t\t\t.cd-card {\n\t\t\t\tbackground: var(--gds-sys-color-background-primary);\n\t\t\t\tborder: 1px solid var(--gds-sys-color-base-300);\n\t\t\t\tborder-radius: var(--gds-sys-shape-corner-medium);\n\t\t\t\toverflow: hidden;\n\t\t\t}\n\t\t\t.cd-table {\n\t\t\t\twidth: 100%;\n\t\t\t\tborder-collapse: collapse;\n\t\t\t\tfont-size: 0.875rem;\n\t\t\t}\n\t\t\t.cd-table thead tr {\n\t\t\t\tborder-bottom: 1px solid var(--gds-sys-color-base-200);\n\t\t\t\tbackground: var(--gds-sys-color-base-100);\n\t\t\t}\n\t\t\t.cd-table th {\n\t\t\t\ttext-align: left;\n\t\t\t\tpadding: 0.75rem 1rem;\n\t\t\t\tfont-weight: 500;\n\t\t\t\tfont-size: 0.8125rem;\n\t\t\t\tcolor: var(--gds-sys-color-text-secondary);\n\t\t\t}\n\t\t\t.cd-table th.right { text-align: right; }\n\t\t\t.cd-table tbody tr {\n\t\t\t\tborder-bottom: 1px solid var(--gds-sys-color-base-200);\n\t\t\t\ttransition: background 0.1s;\n\t\t\t}\n\t\t\t.cd-table tbody tr:last-child { border-bottom: none; }\n\t\t\t.cd-table tbody tr:hover { background: var(--gds-sys-color-base-100); }\n\t\t\t.cd-table tbody tr.overdue { border-left: 3px solid var(--gds-sys-color-red); }\n\t\t\t.cd-table td {\n\t\t\t\tpadding: 0.875rem 1rem;\n\t\t\t\tcolor: var(--gds-sys-color-text-primary);\n\t\t\t}\n\t\t\t.cd-table td.mono { font-family: monospace; color: var(--gds-sys-color-base-600); }\n\t\t\t.cd-table td.right { text-align: right; font-family: monospace; }\n\t\t\t.cd-batch-panel {\n\t\t\t\tmargin-top: 1.5rem;\n\t\t\t\tbackground: var(--gds-sys-color-background-primary);\n\t\t\t\tborder: 1px solid var(--gds-sys-color-base-300);\n\t\t\t\tborder-radius: var(--gds-sys-shape-corner-medium);\n\t\t\t\tpadding: 1.5rem;\n\t\t\t}\n\t\t\t.cd-batch-header {\n\t\t\t\tdisplay: flex;\n\t\t\t\talign-items: flex-start;\n\t\t\t\tjustify-content: space-between;\n\t\t\t\tmargin-bottom: 1rem;\n\t\t\t}\n\t\t\t.cd-batch-title {\n\t\t\t\tfont-size: 1rem;\n\t\t\t\tfont-weight: 500;\n\t\t\t\tmargin: 0 0 0.25rem 0;\n\t\t\t}\n\t\t\t.cd-batch-sub {\n\t\t\t\tfont-size: 0.875rem;\n\t\t\t\tcolor: var(--gds-sys-color-text-secondary);\n\t\t\t\tmargin: 0;\n\t\t\t}\n\t\t\t.cd-batch-groups { border-top: 1px solid var(--gds-sys-color-base-200); margin-top: 1rem; }\n\t\t\t.cd-batch-group-header {\n\t\t\t\tdisplay: flex;\n\t\t\t\tjustify-content: space-between;\n\t\t\t\talign-items: center;\n\t\t\t\tpadding: 0.625rem 0;\n\t\t\t\tborder-bottom: 1px solid var(--gds-sys-color-base-200);\n\t\t\t\tfont-size: 0.8125rem;\n\t\t\t\tfont-weight: 500;\n\t\t\t\tcolor: var(--gds-sys-color-text-secondary);\n\t\t\t}\n\t\t\t.cd-batch-row {\n\t\t\t\tdisplay: flex;\n\t\t\t\tjustify-content: space-between;\n\t\t\t\tpadding: 0.625rem 0 0.625rem 1rem;\n\t\t\t\tborder-bottom: 1px solid var(--gds-sys-color-base-200);\n\t\t\t\tfont-size: 0.875rem;\n\t\t\t}\n\t\t\t.cd-batch-row:last-child { border-bottom: none; }\n\t\t\t.cd-batch-xml {\n\t\t\t\tmargin-top: 1.25rem;\n\t\t\t\tborder: 1px solid var(--gds-sys-color-base-200);\n\t\t\t\tborder-radius: var(--gds-sys-shape-corner-small);\n\t\t\t}\n\t\t\t.cd-batch-xml summary {\n\t\t\t\tpadding: 0.625rem 0.875rem;\n\t\t\t\tfont-size: 0.8125rem;\n\t\t\t\tcolor: var(--gds-sys-color-text-secondary);\n\t\t\t\tcursor: pointer;\n\t\t\t\tuser-select: none;\n\t\t\t}\n\t\t\t.cd-batch-xml summary:hover { color: var(--gds-sys-color-text-primary); }\n\t\t\t.cd-batch-xml pre {\n\t\t\t\tmargin: 0;\n\t\t\t\tpadding: 1rem;\n\t\t\t\tfont-size: 0.75rem;\n\t\t\t\tfont-family: monospace;\n\t\t\t\toverflow-x: auto;\n\t\t\t\tborder-top: 1px solid var(--gds-sys-color-base-200);\n\t\t\t\tbackground: var(--gds-sys-color-base-100);\n\t\t\t\tcolor: var(--gds-sys-color-base-700);\n\t\t\t\tborder-radius: 0 0 var(--gds-sys-shape-corner-small) var(--gds-sys-shape-corner-small);\n\t\t\t\tmax-height: 320px;\n\t\t\t\toverflow-y: auto;\n\t\t\t}\n\t\t\t.cd-batch-actions { display: flex; gap: 0.75rem; margin-top: 1.25rem; align-items: center; }\n\t\t\t.cd-hint { font-size: 0.75rem; color: var(--gds-sys-color-text-secondary); margin-top: 0.75rem; }\n\t\t</style> <div class=\"cd-page-header\"><div><h1 class=\"cd-page-title\">Pending payments</h1><p class=\"cd-page-sub\">Foreign-currency invoices queued for PAIN.001 batch</p></div><button class=\"gds-button\" hx-post=\"/invoices/batch\" hx-target=\"#batch-panel\" hx-swap=\"innerHTML\">Generate PAIN.001 batch</button></div><div class=\"cd-card\"><table class=\"cd-table\"><thead><tr><th>Invoice</th><th>Supplier</th><th>Currency</th><th class=\"right\">Amount</th><th>Due date</th><th>Status</th></tr></thead> <tbody>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -76,7 +100,7 @@ func InvoicesPage(invoices []PendingInvoice) templ.Component {
 					var templ_7745c5c3_Var3 string
 					templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("#%d", inv.InvoiceNumber))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/invoices.templ`, Line: 146, Col: 64}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/invoices.templ`, Line: 206, Col: 64}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 					if templ_7745c5c3_Err != nil {
@@ -89,7 +113,7 @@ func InvoicesPage(invoices []PendingInvoice) templ.Component {
 					var templ_7745c5c3_Var4 string
 					templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(inv.Supplier)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/invoices.templ`, Line: 147, Col: 26}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/invoices.templ`, Line: 207, Col: 26}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 					if templ_7745c5c3_Err != nil {
@@ -102,7 +126,7 @@ func InvoicesPage(invoices []PendingInvoice) templ.Component {
 					var templ_7745c5c3_Var5 string
 					templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(inv.Currency)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/invoices.templ`, Line: 148, Col: 55}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/invoices.templ`, Line: 208, Col: 55}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 					if templ_7745c5c3_Err != nil {
@@ -115,7 +139,7 @@ func InvoicesPage(invoices []PendingInvoice) templ.Component {
 					var templ_7745c5c3_Var6 string
 					templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(formatAmount(inv.Currency, inv.Amount))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/invoices.templ`, Line: 149, Col: 66}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/invoices.templ`, Line: 209, Col: 66}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 					if templ_7745c5c3_Err != nil {
@@ -128,7 +152,7 @@ func InvoicesPage(invoices []PendingInvoice) templ.Component {
 					var templ_7745c5c3_Var7 string
 					templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(inv.DueDate)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/invoices.templ`, Line: 150, Col: 25}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/invoices.templ`, Line: 210, Col: 25}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 					if templ_7745c5c3_Err != nil {
@@ -146,7 +170,7 @@ func InvoicesPage(invoices []PendingInvoice) templ.Component {
 					var templ_7745c5c3_Var8 string
 					templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("#%d", inv.InvoiceNumber))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/invoices.templ`, Line: 155, Col: 64}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/invoices.templ`, Line: 215, Col: 64}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 					if templ_7745c5c3_Err != nil {
@@ -159,7 +183,7 @@ func InvoicesPage(invoices []PendingInvoice) templ.Component {
 					var templ_7745c5c3_Var9 string
 					templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(inv.Supplier)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/invoices.templ`, Line: 156, Col: 26}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/invoices.templ`, Line: 216, Col: 26}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 					if templ_7745c5c3_Err != nil {
@@ -172,7 +196,7 @@ func InvoicesPage(invoices []PendingInvoice) templ.Component {
 					var templ_7745c5c3_Var10 string
 					templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(inv.Currency)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/invoices.templ`, Line: 157, Col: 55}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/invoices.templ`, Line: 217, Col: 55}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 					if templ_7745c5c3_Err != nil {
@@ -185,7 +209,7 @@ func InvoicesPage(invoices []PendingInvoice) templ.Component {
 					var templ_7745c5c3_Var11 string
 					templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(formatAmount(inv.Currency, inv.Amount))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/invoices.templ`, Line: 158, Col: 66}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/invoices.templ`, Line: 218, Col: 66}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 					if templ_7745c5c3_Err != nil {
@@ -198,7 +222,7 @@ func InvoicesPage(invoices []PendingInvoice) templ.Component {
 					var templ_7745c5c3_Var12 string
 					templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(inv.DueDate)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/invoices.templ`, Line: 159, Col: 25}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/invoices.templ`, Line: 219, Col: 25}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 					if templ_7745c5c3_Err != nil {
@@ -224,7 +248,7 @@ func InvoicesPage(invoices []PendingInvoice) templ.Component {
 	})
 }
 
-func BatchPanel(invoices []PendingInvoice) templ.Component {
+func BatchPanel(summary BatchSummary) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -250,64 +274,158 @@ func BatchPanel(invoices []PendingInvoice) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var14 string
-		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d invoices — review and approve with PSD2 signature", len(invoices)))
+		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d invoices across %d currencies — review and approve with PSD2 signature", invoiceCount(summary.Groups), len(summary.Groups)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/invoices.templ`, Line: 176, Col: 114}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/invoices.templ`, Line: 237, Col: 148}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</p></div><span class=\"gds-badge dark\">draft</span></div><div class=\"cd-batch-rows\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</p></div><span class=\"gds-badge dark\">draft</span></div><div class=\"cd-batch-groups\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		for _, inv := range invoices {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<div class=\"cd-batch-row\"><span>")
+		for _, group := range summary.Groups {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<div class=\"cd-batch-group-header\"><span><span class=\"gds-badge info\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var15 string
-			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(inv.Supplier)
+			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(group.Currency)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/invoices.templ`, Line: 184, Col: 20}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/invoices.templ`, Line: 246, Col: 51}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, " <span style=\"color: var(--gds-sys-color-text-secondary); font-family: monospace; font-size: 0.8125rem;\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</span> &nbsp;")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var16 string
-			templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf(" #%d", inv.InvoiceNumber))
+			templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d invoice", len(group.Invoices)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/invoices.templ`, Line: 185, Col: 150}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/invoices.templ`, Line: 247, Col: 60}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</span></span> <span style=\"font-family: monospace; font-weight: 500;\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, " ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			if len(group.Invoices) != 1 {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "s")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</span> <span style=\"font-family: monospace;\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var17 string
-			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(formatAmount(inv.Currency, inv.Amount))
+			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(formatAmount(group.Currency, group.Total))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/invoices.templ`, Line: 187, Col: 101}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/invoices.templ`, Line: 252, Col: 86}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "</span></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "</span></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
+			for _, inv := range group.Invoices {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "<div class=\"cd-batch-row\"><span>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var18 string
+				templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(inv.Supplier)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/invoices.templ`, Line: 257, Col: 21}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, " <span style=\"color: var(--gds-sys-color-text-secondary); font-family: monospace; font-size: 0.8125rem;\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var19 string
+				templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf(" #%d", inv.InvoiceNumber))
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/invoices.templ`, Line: 258, Col: 151}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "</span></span> <span style=\"font-family: monospace; font-weight: 500;\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var20 string
+				templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(formatAmount(inv.Currency, inv.Amount))
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/invoices.templ`, Line: 260, Col: 102}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</span></div>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</div><div class=\"cd-batch-actions\"><button class=\"gds-button\" disabled title=\"PSD2 approval not yet wired up\">Approve &amp; submit via PSD2</button> <button class=\"gds-button\" hx-get=\"/invoices\" hx-target=\"body\" hx-swap=\"outerHTML\">Cancel</button></div><p class=\"cd-hint\">PSD2 approval flow not yet implemented — this is a UI preview.</p></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "</div><details class=\"cd-batch-xml\"><summary>View XML (")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var21 string
+		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%.1f KB", float64(len(summary.XML))/1024))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/invoices.templ`, Line: 266, Col: 78}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, ")</summary><pre>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var22 string
+		templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(string(summary.XML))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/invoices.templ`, Line: 267, Col: 29}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</pre></details><div class=\"cd-batch-actions\"><button class=\"gds-button\" disabled title=\"PSD2 approval not yet wired up\">Approve &amp; submit via PSD2</button> <a class=\"gds-button\" href=\"/invoices/batch/download\" download=\"payment-batch.xml\">Download XML</a> <button class=\"gds-button\" hx-get=\"/invoices\" hx-target=\"body\" hx-swap=\"outerHTML\">Cancel</button></div><p class=\"cd-hint\">Message ID: ")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var23 string
+		templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(summary.MsgID)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/invoices.templ`, Line: 285, Col: 48}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "</p></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
