@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+
+	"github.com/mathiasb/cobalt-dingo/internal/ui"
 )
 
 func main() {
@@ -17,12 +19,14 @@ func main() {
 
 	log.Info("cobalt-dingo starting", "port", port)
 
-	http.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
+	ui.RegisterRoutes(mux)
 
-	if err := http.ListenAndServe(":"+port, nil); err != nil {
+	if err := http.ListenAndServe(":"+port, mux); err != nil {
 		log.Error("server failed", "err", err)
 		os.Exit(1)
 	}

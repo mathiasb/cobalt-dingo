@@ -10,13 +10,20 @@ vars:
 tasks:
   # ── Development ────────────────────────────────────────────────────────────
 
+  generate:
+    desc: Generate code from templ templates
+    cmds:
+      - templ generate ./...
+
   dev:
-    desc: Start development server
+    desc: Start development server (generates templates first)
+    deps: [generate]
     cmds:
       - go run ./cmd/server
 
   build:
     desc: Build the binary
+    deps: [generate]
     cmds:
       - go build -trimpath -ldflags="-s -w" -o bin/{{.PROJECT_NAME}} ./cmd/server
 
