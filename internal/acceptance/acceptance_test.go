@@ -20,6 +20,7 @@ func TestFeatures(t *testing.T) {
 			Format:   "pretty",
 			Paths:    []string{"../../features"},
 			TestingT: t,
+			Strict:   true,
 		},
 	}
 
@@ -31,6 +32,5 @@ func TestFeatures(t *testing.T) {
 // initializeScenario wires all step definition packages.
 // Add a call here each time a new _steps_test.go file is created.
 func initializeScenario(sc *godog.ScenarioContext) {
-	// step packages register themselves here as the project grows
-	_ = sc
+	initializeSupplierInvoiceSteps(sc)
 }

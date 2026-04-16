@@ -1,11 +1,12 @@
+version: "2"
+
 linters:
-  disable-all: true
+  default: none
   enable:
     - errcheck       # unchecked errors
     - govet          # suspicious constructs
     - staticcheck    # broad static analysis
     - unused         # unused code
-    - gofmt          # formatting
     - misspell       # spelling
     - revive         # idiomatic Go
     - exhaustive     # exhaustive switch on enums
@@ -17,6 +18,10 @@ linters-settings:
         severity: warning
       - name: var-naming
         severity: warning
+
+formatters:
+  enable:
+    - gofumpt
 
 issues:
   exclude-rules:

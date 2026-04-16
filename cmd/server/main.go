@@ -1,3 +1,4 @@
+// Package main is the cobalt-dingo server entry point.
 package main
 
 import (
@@ -16,7 +17,7 @@ func main() {
 
 	log.Info("cobalt-dingo starting", "port", port)
 
-	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
