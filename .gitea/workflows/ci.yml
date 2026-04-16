@@ -161,29 +161,21 @@ jobs:
           go-version-file: go.mod
           cache: false
 
-      # Write .env from secrets — never stored in the repo.
-      - name: Write .env
-        env:
-          FORTNOX_CLIENT_ID: ${{ secrets.FORTNOX_CLIENT_ID }}
-          FORTNOX_CLIENT_SECRET: ${{ secrets.FORTNOX_CLIENT_SECRET }}
-          FORTNOX_INVOICE_INBOX: ${{ secrets.FORTNOX_INVOICE_INBOX }}
+      # Write credentials from secrets — never stored in the repo.
+      # Secrets are inlined via ${{ }} expressions (act_runner evaluates these
+      # before passing the script to bash; they are redacted in logs).
+      - name: Write credentials
         run: |
-          printf 'FORTNOX_CLIENT_ID=%s\n' "$FORTNOX_CLIENT_ID" > .env
-          printf 'FORTNOX_CLIENT_SECRET=%s\n' "$FORTNOX_CLIENT_SECRET" >> .env
-          printf 'FORTNOX_REDIRECT_URI=http://localhost:8080/callback\n' >> .env
+          printf 'FORTNOX_CLIENT_ID=%s\n'     '${{ secrets.FORTNOX_CLIENT_ID }}'     > .env
+          printf 'FORTNOX_CLIENT_SECRET=%s\n' '${{ secrets.FORTNOX_CLIENT_SECRET }}'  >> .env
+          printf 'FORTNOX_REDIRECT_URI=http://localhost:8080/callback\n'              >> .env
           printf 'FORTNOX_SCOPES="supplierinvoice supplier payment bookkeeping invoice inbox customer currency settings"\n' >> .env
-          printf 'FORTNOX_ENV=sandbox\n' >> .env
-          printf 'FORTNOX_INVOICE_INBOX=%s\n' "$FORTNOX_INVOICE_INBOX" >> .env
-
-      # Write token file — runner needs a valid refresh token to operate without
-      # interactive OAuth2 login. The access_token will be refreshed at runtime.
-      - name: Write token file
-        env:
-          FORTNOX_REFRESH_TOKEN: ${{ secrets.FORTNOX_REFRESH_TOKEN }}
-        run: |
+          printf 'FORTNOX_ENV=sandbox\n'                                               >> .env
+          printf 'FORTNOX_INVOICE_INBOX=%s\n' '${{ secrets.FORTNOX_INVOICE_INBOX }}'  >> .env
           printf '{"access_token":"","refresh_token":"%s","token_type":"bearer","expires_at":"2000-01-01T00:00:00Z"}\n' \
-            "$FORTNOX_REFRESH_TOKEN" > .fortnox-tokens.json
+            '${{ secrets.FORTNOX_REFRESH_TOKEN }}' > .fortnox-tokens.json
           chmod 600 .fortnox-tokens.json
+          echo ".env lines: $(wc -l < .env)  token bytes: $(wc -c < .fortnox-tokens.json)"
 
       # Reset sandbox to a known state before seeding.
       - name: Teardown E2E fixtures
