@@ -147,3 +147,27 @@ jobs:
           | grep -q "localhost:5000/${{ env.IMAGE }}:${IMAGE_TAG}" \
           && echo "✓ Pod running new image" \
           || (echo "✗ Pod image mismatch" && exit 1)
+
+  # ── 4. Mirror to GitHub ─────────────────────────────────────────────────────
+  mirror:
+    name: Mirror to GitHub
+    needs: deploy
+    runs-on: self-hosted
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to GitHub
+        env:
+          GH_DEPLOY_KEY: ${{ secrets.GH_DEPLOY_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$GH_DEPLOY_KEY" > ~/.ssh/id_rsa_gh_mirror
+          chmod 600 ~/.ssh/id_rsa_gh_mirror
+          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+          GIT_SSH_COMMAND="ssh -i ~/.ssh/id_rsa_gh_mirror -o IdentitiesOnly=yes" \
+            git push git@github.com:mathiasb/cobalt-dingo.git HEAD:main
+          rm ~/.ssh/id_rsa_gh_mirror
+          echo "✓ Mirrored to GitHub"
