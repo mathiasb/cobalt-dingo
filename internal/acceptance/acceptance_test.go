@@ -35,4 +35,5 @@ func initializeScenario(sc *godog.ScenarioContext) {
 	initializeSupplierInvoiceSteps(sc)
 	initializeFortnoxConnectorSteps(sc)
 	initializeEnrichmentSteps(sc)
+	initializePaymentBatchSteps(sc)
 }

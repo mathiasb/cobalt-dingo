@@ -5,6 +5,7 @@ package invoice
 type SupplierInvoice struct {
 	InvoiceNumber  int
 	SupplierNumber int
+	SupplierName   string
 	Currency       string
 	Total          float64
 	DueDate        string

@@ -29,6 +29,7 @@ func NewClient(baseURL, token string) *Client {
 type SupplierInvoiceRow struct {
 	InvoiceNumber        int     `json:"InvoiceNumber"`
 	SupplierNumber       int     `json:"SupplierNumber"`
+	SupplierName         string  `json:"SupplierName"`
 	Currency             string  `json:"Currency"`
 	TotalInvoiceCurrency float64 `json:"TotalInvoiceCurrency"`
 	DueDate              string  `json:"DueDate"`
@@ -68,6 +69,7 @@ func (c *Client) UnpaidSupplierInvoices() ([]invoice.SupplierInvoice, error) {
 		invoices[i] = invoice.SupplierInvoice{
 			InvoiceNumber:  row.InvoiceNumber,
 			SupplierNumber: row.SupplierNumber,
+			SupplierName:   row.SupplierName,
 			Currency:       row.Currency,
 			Total:          row.TotalInvoiceCurrency,
 			DueDate:        row.DueDate,
