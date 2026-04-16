@@ -28,6 +28,7 @@ func NewClient(baseURL, token string) *Client {
 // SupplierInvoiceRow is the Fortnox JSON representation of a supplier invoice.
 type SupplierInvoiceRow struct {
 	InvoiceNumber        int     `json:"InvoiceNumber"`
+	SupplierNumber       int     `json:"SupplierNumber"`
 	Currency             string  `json:"Currency"`
 	TotalInvoiceCurrency float64 `json:"TotalInvoiceCurrency"`
 	DueDate              string  `json:"DueDate"`
@@ -65,10 +66,11 @@ func (c *Client) UnpaidSupplierInvoices() ([]invoice.SupplierInvoice, error) {
 	invoices := make([]invoice.SupplierInvoice, len(envelope.SupplierInvoices))
 	for i, row := range envelope.SupplierInvoices {
 		invoices[i] = invoice.SupplierInvoice{
-			InvoiceNumber: row.InvoiceNumber,
-			Currency:      row.Currency,
-			Total:         row.TotalInvoiceCurrency,
-			DueDate:       row.DueDate,
+			InvoiceNumber:  row.InvoiceNumber,
+			SupplierNumber: row.SupplierNumber,
+			Currency:       row.Currency,
+			Total:          row.TotalInvoiceCurrency,
+			DueDate:        row.DueDate,
 		}
 	}
 	return invoices, nil

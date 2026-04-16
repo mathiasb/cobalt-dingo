@@ -34,4 +34,5 @@ func TestFeatures(t *testing.T) {
 func initializeScenario(sc *godog.ScenarioContext) {
 	initializeSupplierInvoiceSteps(sc)
 	initializeFortnoxConnectorSteps(sc)
+	initializeEnrichmentSteps(sc)
 }
