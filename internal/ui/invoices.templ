@@ -22,9 +22,10 @@ type BatchGroup struct {
 
 // BatchSummary is the result of a PAIN.001 batch generation.
 type BatchSummary struct {
-	MsgID  string
-	Groups []BatchGroup
-	XML    []byte
+	BatchID string // empty when DB is not configured (download-only mode)
+	MsgID   string
+	Groups  []BatchGroup
+	XML     []byte
 }
 
 func formatAmount(currency string, amount float64) string {
@@ -267,9 +268,21 @@ templ BatchPanel(summary BatchSummary) {
 			<pre>{ string(summary.XML) }</pre>
 		</details>
 		<div class="cd-batch-actions">
-			<button class="gds-button" disabled title="PSD2 approval not yet wired up">
-				Approve &amp; submit via PSD2
-			</button>
+			if summary.BatchID != "" {
+				<button
+					class="gds-button"
+					hx-post="/invoices/batch/submit"
+					hx-vals={ fmt.Sprintf(`{"batch_id":"%s"}`, summary.BatchID) }
+					hx-target="#batch-panel"
+					hx-swap="outerHTML"
+				>
+					Approve &amp; submit via PSD2
+				</button>
+			} else {
+				<button class="gds-button" disabled title="Set DATABASE_URL to enable submission">
+					Approve &amp; submit via PSD2
+				</button>
+			}
 			<a class="gds-button" href="/invoices/batch/download" download="payment-batch.xml">
 				Download XML
 			</a>
@@ -283,5 +296,29 @@ templ BatchPanel(summary BatchSummary) {
 			</button>
 		</div>
 		<p class="cd-hint">Message ID: { summary.MsgID }</p>
+	</div>
+}
+
+
+// SubmitConfirmation is rendered after a successful PISP submission.
+templ SubmitConfirmation(batchID, ref string) {
+	<div id="batch-panel" class="cd-batch-panel">
+		<h2 class="cd-batch-title">Payment submitted</h2>
+		<p>
+			Batch <span style="font-family: monospace;">{ batchID }</span> has been sent to the bank.
+		</p>
+		<p>
+			Reference: <span style="font-family: monospace; font-weight: 600;">{ ref }</span>
+		</p>
+		<div class="cd-batch-actions">
+			<button
+				class="gds-button"
+				hx-get="/invoices"
+				hx-target="body"
+				hx-swap="outerHTML"
+			>
+				Back to invoices
+			</button>
+		</div>
 	</div>
 }

@@ -20,15 +20,18 @@ type Server struct {
 	debtor   config.Debtor
 	invoices domain.InvoiceSource
 	enricher domain.SupplierEnricher
+	batches  *domain.BatchService // nil when DB is not configured
 	log      *slog.Logger
 }
 
 // NewServer constructs a Server wired to the given domain ports.
+// batches may be nil; submission endpoints return 503 when it is absent.
 func NewServer(
 	tenantID domain.TenantID,
 	debtor config.Debtor,
 	invoices domain.InvoiceSource,
 	enricher domain.SupplierEnricher,
+	batches *domain.BatchService,
 	log *slog.Logger,
 ) *Server {
 	return &Server{
@@ -36,6 +39,7 @@ func NewServer(
 		debtor:   debtor,
 		invoices: invoices,
 		enricher: enricher,
+		batches:  batches,
 		log:      log,
 	}
 }
@@ -46,6 +50,7 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /", s.invoicesHandler)
 	mux.HandleFunc("POST /invoices/batch", s.batchHandler)
 	mux.HandleFunc("GET /invoices/batch/download", s.downloadHandler)
+	mux.HandleFunc("POST /invoices/batch/submit", s.submitHandler)
 }
 
 func (s *Server) invoicesHandler(w http.ResponseWriter, r *http.Request) {
@@ -66,13 +71,32 @@ func (s *Server) batchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	debtor := payment.Debtor{Name: s.debtor.Name, IBAN: s.debtor.IBAN, BIC: s.debtor.BIC}
-	summary, err := buildBatchSummary(invoices, debtor)
+	summary, err := buildBatchSummary(r.Context(), invoices, debtor, s.tenantID, s.batches)
 	if err != nil {
 		s.log.Error("build batch", "err", err)
 		http.Error(w, fmt.Sprintf("batch generation failed: %v", err), http.StatusInternalServerError)
 		return
 	}
 	render(w, r, BatchPanel(summary))
+}
+
+func (s *Server) submitHandler(w http.ResponseWriter, r *http.Request) {
+	if s.batches == nil {
+		http.Error(w, "batch submission requires database — set DATABASE_URL", http.StatusServiceUnavailable)
+		return
+	}
+	batchID := domain.BatchID(r.FormValue("batch_id"))
+	if batchID == "" {
+		http.Error(w, "batch_id required", http.StatusBadRequest)
+		return
+	}
+	ref, err := s.batches.Submit(r.Context(), s.tenantID, batchID)
+	if err != nil {
+		s.log.Error("submit batch", "batch_id", batchID, "err", err)
+		http.Error(w, fmt.Sprintf("submit failed: %v", err), http.StatusInternalServerError)
+		return
+	}
+	render(w, r, SubmitConfirmation(string(batchID), string(ref)))
 }
 
 func (s *Server) downloadHandler(w http.ResponseWriter, r *http.Request) {
@@ -83,7 +107,7 @@ func (s *Server) downloadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	debtor := payment.Debtor{Name: s.debtor.Name, IBAN: s.debtor.IBAN, BIC: s.debtor.BIC}
-	summary, err := buildBatchSummary(invoices, debtor)
+	summary, err := buildBatchSummary(r.Context(), invoices, debtor, s.tenantID, s.batches)
 	if err != nil {
 		s.log.Error("build batch for download", "err", err)
 		http.Error(w, fmt.Sprintf("batch generation failed: %v", err), http.StatusInternalServerError)
@@ -159,7 +183,10 @@ func isOverdue(dueDate string) bool {
 	return time.Now().After(d)
 }
 
-func buildBatchSummary(invoices []PendingInvoice, debtor payment.Debtor) (BatchSummary, error) {
+// buildBatchSummary generates the PAIN.001 XML, groups invoices by currency,
+// and — when batchSvc is non-nil — persists the batch as a draft in the DB,
+// populating BatchSummary.BatchID to enable the submit button.
+func buildBatchSummary(ctx context.Context, invoices []PendingInvoice, debtor payment.Debtor, tenantID domain.TenantID, batchSvc *domain.BatchService) (BatchSummary, error) {
 	msgID := fmt.Sprintf("COBALT-%s", time.Now().UTC().Format("20060102-150405"))
 
 	enriched := make([]domain.EnrichedInvoice, len(invoices))
@@ -204,7 +231,29 @@ func buildBatchSummary(invoices []PendingInvoice, debtor payment.Debtor) (BatchS
 		})
 	}
 
-	return BatchSummary{MsgID: msgID, Groups: groups, XML: xmlBytes}, nil
+	summary := BatchSummary{MsgID: msgID, Groups: groups, XML: xmlBytes}
+
+	// Persist as draft when DB is configured; enables the submit button.
+	if batchSvc != nil {
+		items := make([]domain.BatchItem, len(enriched))
+		for i, inv := range enriched {
+			items[i] = domain.BatchItem{
+				FortnoxInvoiceNumber: inv.InvoiceNumber,
+				SupplierName:         inv.SupplierName,
+				SupplierIBAN:         inv.IBAN,
+				SupplierBIC:          inv.BIC,
+				Amount:               inv.Amount,
+				DueDate:              inv.DueDate,
+			}
+		}
+		saved, saveErr := batchSvc.SaveDraft(ctx, tenantID, msgID, items, xmlBytes)
+		if saveErr == nil {
+			summary.BatchID = string(saved.ID)
+		}
+		// Non-fatal: batch still generated, submit button just won't appear.
+	}
+
+	return summary, nil
 }
 
 func render(w http.ResponseWriter, r *http.Request, c templ.Component) {

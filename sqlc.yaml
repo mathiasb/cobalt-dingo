@@ -1,0 +1,27 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    queries: "internal/adapter/postgres/queries"
+    schema: "migrations"
+    gen:
+      go:
+        package: "pgstore"
+        out: "internal/adapter/postgres/pgstore"
+        sql_package: "database/sql"
+        emit_json_tags: false
+        emit_prepared_queries: false
+        emit_interface: false
+        emit_exact_table_names: false
+        overrides:
+          - db_type: "uuid"
+            go_type: "string"
+          - db_type: "numeric"
+            nullable: true
+            go_type:
+              import: "database/sql"
+              type: "NullFloat64"
+          - db_type: "timestamptz"
+            nullable: true
+            go_type:
+              import: "database/sql"
+              type: "NullTime"

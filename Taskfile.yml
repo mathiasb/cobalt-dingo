@@ -139,6 +139,11 @@ tasks:
     cmds:
       - source .env && go run ./cmd/migrate down 1
 
+  db:sqlc:
+    desc: Regenerate sqlc query code from SQL files in internal/adapter/postgres/queries
+    cmds:
+      - sqlc generate
+
   # ── Infrastructure ──────────────────────────────────────────────────────────
 
   up:
