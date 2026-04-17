@@ -14,6 +14,40 @@ the domain model or port interfaces will be called out explicitly.
 
 ---
 
+## [0.4.0] — 2026-04-17
+
+Full pipeline milestone. The payment lifecycle is now end-to-end: detect → enrich
+(cached) → generate → persist → submit → confirm → write-back.
+
+### Added
+- **A — PostgreSQL adapter** (`internal/adapter/postgres/`)
+  - `Store` — shared pool, sqlc `Queries` wrapper
+  - `TokenStore` — `AtomicRefresh` via `UPDATE WHERE refresh_token = $old`; zero rows → `ErrTokenConflict`
+  - `BatchRepo` — transactional batch + items insert; `Get` loads items, `List` does not
+  - `TenantRepo` — `Get` + `DefaultDebtorAccount`
+  - `internal/adapter/postgres/pgstore/` — sqlc-generated query code; regenerate with `task db:sqlc`
+  - `sqlc.yaml` config; `task db:sqlc` added to Taskfile
+- **D — Supplier IBAN cache** (`adapter/fortnox/supplier_cache.go`)
+  - `CachingEnricher` wraps any `SupplierEnricher` with per-(tenant, supplier) TTL map
+  - `Invalidate()` for WebSocket `supplier-updated-v1` event-driven invalidation
+  - Wired at 5-min TTL in `main.go`; per-request dedup in handler still present
+- **B — PISP submission**
+  - `domain.BatchService` — `SaveDraft`, `Submit` orchestrate draft → submitted lifecycle
+  - `adapter/pisp.Stub` — no-op PaymentSubmitter that logs and returns a fake ref
+  - `POST /invoices/batch/submit` handler + `SubmitConfirmation` templ component
+  - Submit button live when `DATABASE_URL` is set; gracefully disabled otherwise
+- **C — FX delta and ERP write-back**
+  - `domain.CalculateFXDelta` — computes `(execRate − invRate) × minorUnits` in öre
+  - `domain.BatchService.ConfirmExecution` — per-item ERPWriter calls; partial failure collection
+  - `domain.ERPWriter` interface + `adapter/fortnox.ERPWriter` — `POST /3/supplierinvoicepayments` + `PUT .../bookkeep`
+  - `fortnox.RecordPayment` + `BookkeepPayment` raw client methods
+
+### Changed
+- `cmd/server/main.go` — wires postgres adapters when `DATABASE_URL` is set; supplier cache in all live configurations
+- `lib/pq` promoted from indirect to direct dependency
+
+---
+
 ## [0.3.0] — 2026-04-16
 
 Hexagonal architecture milestone. The domain layer is now fully decoupled from
