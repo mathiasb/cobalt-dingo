@@ -25,5 +25,10 @@ func NewServer(deps Deps) *server.MCPServer {
 		server.WithToolCapabilities(true),
 	)
 	registerAPTools(s, deps)
+	registerARTools(s, deps)
+	registerGLTools(s, deps)
+	registerProjectTools(s, deps)
+	registerCostCtrTools(s, deps)
+	registerAssetTools(s, deps)
 	return s
 }
