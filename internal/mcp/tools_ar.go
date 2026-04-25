@@ -64,7 +64,7 @@ type arSummaryResult struct {
 }
 
 func arSummaryHandler(deps Deps) server.ToolHandlerFunc {
-	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return func(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		invoices, err := deps.CustomerLdg.UnpaidInvoices(ctx, deps.TenantID)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("fetch invoices: %v", err)), nil
@@ -213,7 +213,7 @@ func arByCustomerHandler(deps Deps) server.ToolHandlerFunc {
 // --- ar_aging ---
 
 func arAgingHandler(deps Deps) server.ToolHandlerFunc {
-	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return func(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		invoices, err := deps.CustomerLdg.UnpaidInvoices(ctx, deps.TenantID)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("fetch invoices: %v", err)), nil
@@ -232,7 +232,7 @@ func arAgingHandler(deps Deps) server.ToolHandlerFunc {
 // --- ar_customer_history ---
 
 type customerHistoryResult struct {
-	Customer domain.Customer         `json:"customer"`
+	Customer domain.Customer          `json:"customer"`
 	Invoices []domain.CustomerInvoice `json:"invoices"`
 }
 
@@ -321,7 +321,7 @@ type arUnpaidEntry struct {
 }
 
 func arUnpaidReportHandler(deps Deps) server.ToolHandlerFunc {
-	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return func(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		invoices, err := deps.CustomerLdg.UnpaidInvoices(ctx, deps.TenantID)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("fetch invoices: %v", err)), nil

@@ -23,15 +23,15 @@ func TestAssetRegister_Assets(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"Assets": []map[string]any{
 				{
-					"Id":                       1,
-					"Number":                   "A001",
-					"Description":              "MacBook Pro",
-					"AcquisitionDate":          "2024-01-15",
-					"AcquisitionValue":         25000.0,
-					"DepreciationMethod":       "Straight-line",
+					"Id":                        1,
+					"Number":                    "A001",
+					"Description":               "MacBook Pro",
+					"AcquisitionDate":           "2024-01-15",
+					"AcquisitionValue":          25000.0,
+					"DepreciationMethod":        "Straight-line",
 					"DepreciateToResidualValue": 5.0,
-					"BookValue":                20000.0,
-					"AccumulatedDepreciation":  5000.0,
+					"BookValue":                 20000.0,
+					"AccumulatedDepreciation":   5000.0,
 				},
 			},
 		})
@@ -59,15 +59,15 @@ func TestAssetRegister_AssetDetail(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"Asset": map[string]any{
-				"Id":                       1,
-				"Number":                   "A001",
-				"Description":              "MacBook Pro",
-				"AcquisitionDate":          "2024-01-15",
-				"AcquisitionValue":         25000.0,
-				"DepreciationMethod":       "Straight-line",
+				"Id":                        1,
+				"Number":                    "A001",
+				"Description":               "MacBook Pro",
+				"AcquisitionDate":           "2024-01-15",
+				"AcquisitionValue":          25000.0,
+				"DepreciationMethod":        "Straight-line",
 				"DepreciateToResidualValue": 5.0,
-				"BookValue":                20000.0,
-				"AccumulatedDepreciation":  5000.0,
+				"BookValue":                 20000.0,
+				"AccumulatedDepreciation":   5000.0,
 			},
 		})
 	}))

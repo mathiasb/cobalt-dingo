@@ -22,18 +22,18 @@ func TestGeneralLedger_ChartOfAccounts(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"Accounts": []map[string]any{
 				{
-					"Number":               1930,
-					"Description":          "Företagskonto",
-					"SRU":                  0,
-					"Active":               true,
+					"Number":                1930,
+					"Description":           "Företagskonto",
+					"SRU":                   0,
+					"Active":                true,
 					"BalanceBroughtForward": 50000.0,
 					"BalanceCarriedForward": 55000.0,
 				},
 				{
-					"Number":               2440,
-					"Description":          "Leverantörsskulder",
-					"SRU":                  0,
-					"Active":               true,
+					"Number":                2440,
+					"Description":           "Leverantörsskulder",
+					"SRU":                   0,
+					"Active":                true,
 					"BalanceBroughtForward": -10000.0,
 					"BalanceCarriedForward": -8000.0,
 				},

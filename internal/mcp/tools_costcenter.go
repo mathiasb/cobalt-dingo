@@ -43,7 +43,7 @@ func registerCostCtrTools(s *server.MCPServer, deps Deps) {
 // --- costcenter_list ---
 
 func costCenterListHandler(deps Deps) server.ToolHandlerFunc {
-	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return func(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		centers, err := deps.CostCtrLdg.CostCenters(ctx, deps.TenantID)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("fetch cost centers: %v", err)), nil

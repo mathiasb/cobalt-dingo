@@ -267,7 +267,7 @@ func glVoucherDetailHandler(deps Deps) server.ToolHandlerFunc {
 // --- gl_predefined_accounts ---
 
 func glPredefinedAccountsHandler(deps Deps) server.ToolHandlerFunc {
-	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return func(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		accounts, err := deps.GeneralLdg.PredefinedAccounts(ctx, deps.TenantID)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("fetch predefined accounts: %v", err)), nil
@@ -280,7 +280,7 @@ func glPredefinedAccountsHandler(deps Deps) server.ToolHandlerFunc {
 // --- gl_financial_years ---
 
 func glFinancialYearsHandler(deps Deps) server.ToolHandlerFunc {
-	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return func(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		years, err := deps.GeneralLdg.FinancialYears(ctx, deps.TenantID)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("fetch financial years: %v", err)), nil

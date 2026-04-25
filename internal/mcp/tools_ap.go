@@ -81,7 +81,7 @@ type apSummaryResult struct {
 }
 
 func apSummaryHandler(deps Deps) server.ToolHandlerFunc {
-	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return func(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		invoices, err := deps.SupplierLdg.UnpaidInvoices(ctx, deps.TenantID)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("fetch invoices: %v", err)), nil
@@ -168,10 +168,10 @@ func apOverdueHandler(deps Deps) server.ToolHandlerFunc {
 // --- ap_by_supplier ---
 
 type supplierGroup struct {
-	SupplierNumber int     `json:"supplier_number"`
-	SupplierName   string  `json:"supplier_name"`
-	Count          int     `json:"count"`
-	TotalSEK       float64 `json:"total_sek,omitempty"`
+	SupplierNumber int      `json:"supplier_number"`
+	SupplierName   string   `json:"supplier_name"`
+	Count          int      `json:"count"`
+	TotalSEK       float64  `json:"total_sek,omitempty"`
 	Currencies     []string `json:"currencies"`
 }
 
@@ -236,7 +236,7 @@ type currencyGroup struct {
 }
 
 func apByCurrencyHandler(deps Deps) server.ToolHandlerFunc {
-	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return func(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		invoices, err := deps.SupplierLdg.UnpaidInvoices(ctx, deps.TenantID)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("fetch invoices: %v", err)), nil
@@ -269,7 +269,7 @@ func apByCurrencyHandler(deps Deps) server.ToolHandlerFunc {
 // --- ap_aging ---
 
 func apAgingHandler(deps Deps) server.ToolHandlerFunc {
-	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return func(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		invoices, err := deps.SupplierLdg.UnpaidInvoices(ctx, deps.TenantID)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("fetch invoices: %v", err)), nil

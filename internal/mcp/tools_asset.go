@@ -25,7 +25,7 @@ func registerAssetTools(s *server.MCPServer, deps Deps) {
 // --- asset_list ---
 
 func assetListHandler(deps Deps) server.ToolHandlerFunc {
-	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return func(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		assets, err := deps.AssetReg.Assets(ctx, deps.TenantID)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("fetch assets: %v", err)), nil

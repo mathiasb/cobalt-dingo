@@ -7,12 +7,12 @@ import (
 
 // VoucherRowJSON is a single line in a Fortnox journal entry.
 type VoucherRowJSON struct {
-	Account                 int     `json:"Account"`
-	Debit                   float64 `json:"Debit"`
-	Credit                  float64 `json:"Credit"`
-	TransactionInformation  string  `json:"TransactionInformation"`
-	CostCenter              string  `json:"CostCenter"`
-	Project                 string  `json:"Project"`
+	Account                int     `json:"Account"`
+	Debit                  float64 `json:"Debit"`
+	Credit                 float64 `json:"Credit"`
+	TransactionInformation string  `json:"TransactionInformation"`
+	CostCenter             string  `json:"CostCenter"`
+	Project                string  `json:"Project"`
 }
 
 // VoucherJSON is the Fortnox JSON representation of a complete journal entry.

@@ -40,7 +40,7 @@ func registerProjectTools(s *server.MCPServer, deps Deps) {
 // --- project_list ---
 
 func projectListHandler(deps Deps) server.ToolHandlerFunc {
-	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return func(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		projects, err := deps.ProjectLdg.Projects(ctx, deps.TenantID)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("fetch projects: %v", err)), nil
@@ -91,11 +91,11 @@ func projectTransactionsHandler(deps Deps) server.ToolHandlerFunc {
 // --- project_profitability ---
 
 type projectProfitabilityResult struct {
-	ProjectID    string  `json:"project_id"`
-	TotalDebit   float64 `json:"total_debit"`
-	TotalCredit  float64 `json:"total_credit"`
-	NetResult    float64 `json:"net_result"`
-	RowCount     int     `json:"row_count"`
+	ProjectID   string  `json:"project_id"`
+	TotalDebit  float64 `json:"total_debit"`
+	TotalCredit float64 `json:"total_credit"`
+	NetResult   float64 `json:"net_result"`
+	RowCount    int     `json:"row_count"`
 }
 
 func projectProfitabilityHandler(deps Deps) server.ToolHandlerFunc {
@@ -131,4 +131,3 @@ func projectProfitabilityHandler(deps Deps) server.ToolHandlerFunc {
 		return jsonResult(result)
 	}
 }
-

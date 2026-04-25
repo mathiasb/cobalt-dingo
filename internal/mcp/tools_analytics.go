@@ -222,8 +222,8 @@ func cashFlowForecastHandler(deps Deps) server.ToolHandlerFunc {
 // --- expense_analysis ---
 
 type expenseRow struct {
-	Account     int     `json:"account"`
-	Total       float64 `json:"total"`
+	Account int     `json:"account"`
+	Total   float64 `json:"total"`
 }
 
 func expenseAnalysisHandler(deps Deps) server.ToolHandlerFunc {
@@ -337,8 +337,8 @@ func periodComparisonHandler(deps Deps) server.ToolHandlerFunc {
 // --- yearly_comparison ---
 
 type yearlyComparisonResult struct {
-	Year1     int              `json:"year1"`
-	Year2     int              `json:"year2"`
+	Year1     int                     `json:"year1"`
+	Year2     int                     `json:"year2"`
 	Balances1 []domain.AccountBalance `json:"balances_year1"`
 	Balances2 []domain.AccountBalance `json:"balances_year2"`
 }
@@ -557,11 +557,11 @@ func topSuppliersHandler(deps Deps) server.ToolHandlerFunc {
 // --- sales_vs_purchases ---
 
 type salesVsPurchasesResult struct {
-	Revenue  float64 `json:"revenue"`
-	COGS     float64 `json:"cogs"`
-	Net      float64 `json:"net"`
-	From     string  `json:"from"`
-	To       string  `json:"to"`
+	Revenue float64 `json:"revenue"`
+	COGS    float64 `json:"cogs"`
+	Net     float64 `json:"net"`
+	From    string  `json:"from"`
+	To      string  `json:"to"`
 }
 
 func salesVsPurchasesHandler(deps Deps) server.ToolHandlerFunc {
@@ -603,7 +603,7 @@ func salesVsPurchasesHandler(deps Deps) server.ToolHandlerFunc {
 // --- company_info ---
 
 func companyInfoHandler(deps Deps) server.ToolHandlerFunc {
-	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return func(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		company, err := deps.CompanyInf.Info(ctx, deps.TenantID)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("fetch company info: %v", err)), nil

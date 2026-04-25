@@ -174,7 +174,7 @@ func (h *ChatHandler) callClaude(ctx context.Context, req claudeRequest) (*claud
 	if err != nil {
 		return nil, fmt.Errorf("http request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -226,7 +226,7 @@ func (h *ChatHandler) MessageHandler(w http.ResponseWriter, r *http.Request) {
 	flusher, canFlush := w.(http.Flusher)
 
 	sseWrite := func(data string) {
-		fmt.Fprintf(w, "data: %s\n\n", data)
+		_, _ = fmt.Fprintf(w, "data: %s\n\n", data)
 		if canFlush {
 			flusher.Flush()
 		}
@@ -256,9 +256,10 @@ func (h *ChatHandler) MessageHandler(w http.ResponseWriter, r *http.Request) {
 		assistantContent := make([]map[string]any, 0, len(cr.Content))
 		for _, block := range cr.Content {
 			b := map[string]any{"type": block.Type}
-			if block.Type == "text" {
+			switch block.Type {
+			case "text":
 				b["text"] = block.Text
-			} else if block.Type == "tool_use" {
+			case "tool_use":
 				b["id"] = block.ID
 				b["name"] = block.Name
 				b["input"] = block.Input

@@ -1,3 +1,4 @@
+// Package main is the cobalt-dingo MCP server entry point.
 package main
 
 import (

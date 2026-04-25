@@ -254,13 +254,13 @@ func (c *Client) UnpaidCustomerInvoices() ([]CustomerInvoiceRow, error) {
 
 // CustomerInvoicePaymentRow is the Fortnox JSON for a customer invoice payment.
 type CustomerInvoicePaymentRow struct {
-	Number        int     `json:"Number"`
-	InvoiceNumber int     `json:"InvoiceNumber"`
-	Amount        float64 `json:"Amount"`
+	Number         int     `json:"Number"`
+	InvoiceNumber  int     `json:"InvoiceNumber"`
+	Amount         float64 `json:"Amount"`
 	AmountCurrency float64 `json:"AmountCurrency"`
-	Currency      string  `json:"Currency"`
-	PaymentDate   string  `json:"PaymentDate"`
-	Booked        bool    `json:"Booked"`
+	Currency       string  `json:"Currency"`
+	PaymentDate    string  `json:"PaymentDate"`
+	Booked         bool    `json:"Booked"`
 }
 
 // customerInvoicePaymentsResponse is the envelope for GET /3/invoicepayments.
@@ -314,10 +314,10 @@ func (c *Client) GetFullCustomer(customerNumber int) (FullCustomerRow, error) {
 
 // AccountRow is the Fortnox JSON for a GL account from GET /3/accounts.
 type AccountRow struct {
-	Number               int     `json:"Number"`
-	Description          string  `json:"Description"`
-	SRU                  int     `json:"SRU"`
-	Active               bool    `json:"Active"`
+	Number                int     `json:"Number"`
+	Description           string  `json:"Description"`
+	SRU                   int     `json:"SRU"`
+	Active                bool    `json:"Active"`
 	BalanceBroughtForward float64 `json:"BalanceBroughtForward"`
 	BalanceCarriedForward float64 `json:"BalanceCarriedForward"`
 }

@@ -1,3 +1,4 @@
+// Package mcp provides the MCP server and tool handlers for cobalt-dingo.
 package mcp
 
 import (
@@ -26,13 +27,13 @@ func DispatchTool(name string, deps Deps) server.ToolHandlerFunc {
 		"ar_invoice_detail":   arInvoiceDetailHandler(deps),
 		"ar_unpaid_report":    arUnpaidReportHandler(deps),
 		// GL
-		"gl_chart_of_accounts":  glChartOfAccountsHandler(deps),
-		"gl_account_balance":    glAccountBalanceHandler(deps),
-		"gl_account_activity":   glAccountActivityHandler(deps),
-		"gl_vouchers":           glVouchersHandler(deps),
-		"gl_voucher_detail":     glVoucherDetailHandler(deps),
+		"gl_chart_of_accounts":   glChartOfAccountsHandler(deps),
+		"gl_account_balance":     glAccountBalanceHandler(deps),
+		"gl_account_activity":    glAccountActivityHandler(deps),
+		"gl_vouchers":            glVouchersHandler(deps),
+		"gl_voucher_detail":      glVoucherDetailHandler(deps),
 		"gl_predefined_accounts": glPredefinedAccountsHandler(deps),
-		"gl_financial_years":    glFinancialYearsHandler(deps),
+		"gl_financial_years":     glFinancialYearsHandler(deps),
 		// Projects
 		"project_list":          projectListHandler(deps),
 		"project_transactions":  projectTransactionsHandler(deps),
@@ -83,5 +84,6 @@ func NewServer(deps Deps) *server.MCPServer {
 	registerProjectTools(s, deps)
 	registerCostCtrTools(s, deps)
 	registerAssetTools(s, deps)
+	registerAnalyticsTools(s, deps)
 	return s
 }

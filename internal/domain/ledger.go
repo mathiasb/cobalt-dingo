@@ -18,12 +18,12 @@ type CustomerInvoice struct {
 
 // SupplierPayment is a payment made against a supplier invoice.
 type SupplierPayment struct {
-	PaymentNumber  int
-	InvoiceNumber  int
-	Amount         Money
-	CurrencyRate   float64
-	PaymentDate    string
-	Booked         bool
+	PaymentNumber int
+	InvoiceNumber int
+	Amount        Money
+	CurrencyRate  float64
+	PaymentDate   string
+	Booked        bool
 }
 
 // CustomerPayment is a payment received against a customer invoice.
@@ -124,28 +124,28 @@ type CostCenter struct {
 
 // Asset is a fixed asset.
 type Asset struct {
-	ID                   int
-	Number               string
-	Description          string
-	AcquisitionDate      string
-	AcquisitionValue     Money
-	DepreciationMethod   string
-	DepreciationPercent  float64
-	BookValue            Money
-	AccumulatedDepr      Money
+	ID                  int
+	Number              string
+	Description         string
+	AcquisitionDate     string
+	AcquisitionValue    Money
+	DepreciationMethod  string
+	DepreciationPercent float64
+	BookValue           Money
+	AccumulatedDepr     Money
 }
 
 // Company holds the company profile.
 type Company struct {
-	Name          string
-	OrgNumber     string
-	Address       string
-	City          string
-	ZipCode       string
-	Country       string
-	Email         string
-	Phone         string
-	VisitAddress  string
-	VisitCity     string
-	VisitZipCode  string
+	Name         string
+	OrgNumber    string
+	Address      string
+	City         string
+	ZipCode      string
+	Country      string
+	Email        string
+	Phone        string
+	VisitAddress string
+	VisitCity    string
+	VisitZipCode string
 }
