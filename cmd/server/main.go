@@ -14,6 +14,7 @@ import (
 	"github.com/mathiasb/cobalt-dingo/internal/adapter/postgres"
 	"github.com/mathiasb/cobalt-dingo/internal/config"
 	"github.com/mathiasb/cobalt-dingo/internal/domain"
+	mcpserver "github.com/mathiasb/cobalt-dingo/internal/mcp"
 	"github.com/mathiasb/cobalt-dingo/internal/ui"
 )
 
@@ -94,6 +95,35 @@ func main() {
 
 	srv := ui.NewServer(defaultTenantID, debtor, invoiceSource, enricher, batchSvc, log)
 	srv.RegisterRoutes(mux)
+
+	claudeCfg := config.LoadClaude()
+	if claudeCfg.APIKey != "" {
+		var tokenStore domain.TokenStore
+		if appCfg.DatabaseURL != "" {
+			store, _ := postgres.NewStore(appCfg.DatabaseURL)
+			tokenStore = postgres.NewTokenStore(store)
+		} else {
+			tokenStore = file.NewTokenStore()
+		}
+		baseURL := cfg.BaseURL()
+		gl := adapterfortnox.NewGeneralLedgerAdapter(baseURL, tokenStore)
+		mcpDeps := mcpserver.Deps{
+			TenantID:    defaultTenantID,
+			SupplierLdg: adapterfortnox.NewSupplierLedgerAdapter(baseURL, tokenStore),
+			CustomerLdg: adapterfortnox.NewCustomerLedgerAdapter(baseURL, tokenStore),
+			GeneralLdg:  gl,
+			ProjectLdg:  adapterfortnox.NewProjectLedgerAdapter(baseURL, tokenStore, gl),
+			CostCtrLdg:  adapterfortnox.NewCostCenterLedgerAdapter(baseURL, tokenStore, gl),
+			AssetReg:    adapterfortnox.NewAssetRegisterAdapter(baseURL, tokenStore),
+			CompanyInf:  adapterfortnox.NewCompanyInfoAdapter(baseURL, tokenStore),
+		}
+		chatHandler := ui.NewChatHandler(mcpDeps, claudeCfg, log)
+		mux.HandleFunc("GET /chat", chatHandler.PageHandler)
+		mux.HandleFunc("POST /chat", chatHandler.MessageHandler)
+		log.Info("chat handler registered")
+	} else {
+		log.Info("chat handler disabled — set ANTHROPIC_API_KEY to enable")
+	}
 
 	if err := http.ListenAndServe(":"+port, mux); err != nil {
 		log.Error("server failed", "err", err)

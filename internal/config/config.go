@@ -65,6 +65,24 @@ func LoadDebtor() Debtor {
 	return Debtor{Name: name, IBAN: iban, BIC: bic}
 }
 
+// Claude holds Claude API configuration for the chat interface.
+type Claude struct {
+	APIKey string
+	Model  string
+}
+
+// LoadClaude reads Claude config from environment variables.
+func LoadClaude() Claude {
+	model := os.Getenv("CLAUDE_MODEL")
+	if model == "" {
+		model = "claude-sonnet-4-6"
+	}
+	return Claude{
+		APIKey: os.Getenv("ANTHROPIC_API_KEY"),
+		Model:  model,
+	}
+}
+
 // Load reads Fortnox configuration from environment variables.
 // Returns an error if any required variable is missing.
 func Load() (Fortnox, error) {
