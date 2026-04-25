@@ -154,6 +154,221 @@ func (c *Client) Get(requestURL string) (json.RawMessage, error) {
 	return json.RawMessage(body), nil
 }
 
+// SupplierInvoicePaymentRow is the Fortnox JSON for a single supplier invoice payment.
+type SupplierInvoicePaymentRow struct {
+	Number         int     `json:"Number"`
+	InvoiceNumber  int     `json:"InvoiceNumber"`
+	Amount         float64 `json:"Amount"`
+	AmountCurrency float64 `json:"AmountCurrency"`
+	Currency       string  `json:"Currency"`
+	CurrencyRate   float64 `json:"CurrencyRate"`
+	PaymentDate    string  `json:"PaymentDate"`
+	Booked         bool    `json:"Booked"`
+}
+
+// supplierInvoicePaymentsResponse is the envelope for GET /3/supplierinvoicepayments.
+type supplierInvoicePaymentsResponse struct {
+	SupplierInvoicePayments []SupplierInvoicePaymentRow `json:"SupplierInvoicePayments"`
+}
+
+// ListSupplierInvoicePayments returns all payments recorded against the given invoice number.
+// Calls GET /3/supplierinvoicepayments?invoicenumber={n}.
+func (c *Client) ListSupplierInvoicePayments(invoiceNumber int) ([]SupplierInvoicePaymentRow, error) {
+	u := fmt.Sprintf("%s/3/supplierinvoicepayments?invoicenumber=%d", c.baseURL, invoiceNumber)
+	raw, err := c.Get(u)
+	if err != nil {
+		return nil, fmt.Errorf("list supplier invoice payments: %w", err)
+	}
+	var envelope supplierInvoicePaymentsResponse
+	if err := json.Unmarshal(raw, &envelope); err != nil {
+		return nil, fmt.Errorf("decode supplier invoice payments: %w", err)
+	}
+	return envelope.SupplierInvoicePayments, nil
+}
+
+// FullSupplierRow contains all fields relevant for supplier analysis.
+type FullSupplierRow struct {
+	SupplierNumber int    `json:"SupplierNumber"`
+	Name           string `json:"Name"`
+	Email          string `json:"Email"`
+	Phone          string `json:"Phone1"`
+	IBAN           string `json:"IBAN"`
+	BIC            string `json:"BIC"`
+	Active         bool   `json:"Active"`
+}
+
+// fullSupplierResponse is the envelope for GET /3/suppliers/{n}.
+type fullSupplierResponse struct {
+	Supplier FullSupplierRow `json:"Supplier"`
+}
+
+// GetFullSupplier fetches complete supplier master data for the given supplier number.
+// Calls GET /3/suppliers/{n}.
+func (c *Client) GetFullSupplier(supplierNumber int) (FullSupplierRow, error) {
+	u := fmt.Sprintf("%s/3/suppliers/%d", c.baseURL, supplierNumber)
+	raw, err := c.Get(u)
+	if err != nil {
+		return FullSupplierRow{}, fmt.Errorf("get full supplier: %w", err)
+	}
+	var envelope fullSupplierResponse
+	if err := json.Unmarshal(raw, &envelope); err != nil {
+		return FullSupplierRow{}, fmt.Errorf("decode supplier: %w", err)
+	}
+	return envelope.Supplier, nil
+}
+
+// CustomerInvoiceRow is the Fortnox JSON for a customer invoice from GET /3/invoices.
+type CustomerInvoiceRow struct {
+	DocumentNumber int     `json:"DocumentNumber"`
+	CustomerNumber string  `json:"CustomerNumber"` // Fortnox returns this as a string
+	CustomerName   string  `json:"CustomerName"`
+	Currency       string  `json:"Currency"`
+	Total          float64 `json:"Total"`
+	Balance        float64 `json:"Balance"`
+	DueDate        string  `json:"DueDate"`
+	InvoiceDate    string  `json:"InvoiceDate"`
+	Booked         bool    `json:"Booked"`
+	Cancelled      bool    `json:"Cancelled"`
+	Sent           bool    `json:"Sent"`
+}
+
+// customerInvoicesResponse is the envelope for GET /3/invoices.
+type customerInvoicesResponse struct {
+	Invoices []CustomerInvoiceRow `json:"Invoices"`
+}
+
+// UnpaidCustomerInvoices fetches all unpaid customer invoices.
+// Calls GET /3/invoices?filter=unpaid.
+func (c *Client) UnpaidCustomerInvoices() ([]CustomerInvoiceRow, error) {
+	u := c.baseURL + "/3/invoices?filter=unpaid"
+	raw, err := c.Get(u)
+	if err != nil {
+		return nil, fmt.Errorf("unpaid customer invoices: %w", err)
+	}
+	var envelope customerInvoicesResponse
+	if err := json.Unmarshal(raw, &envelope); err != nil {
+		return nil, fmt.Errorf("decode customer invoices: %w", err)
+	}
+	return envelope.Invoices, nil
+}
+
+// CustomerInvoicePaymentRow is the Fortnox JSON for a customer invoice payment.
+type CustomerInvoicePaymentRow struct {
+	Number        int     `json:"Number"`
+	InvoiceNumber int     `json:"InvoiceNumber"`
+	Amount        float64 `json:"Amount"`
+	AmountCurrency float64 `json:"AmountCurrency"`
+	Currency      string  `json:"Currency"`
+	PaymentDate   string  `json:"PaymentDate"`
+	Booked        bool    `json:"Booked"`
+}
+
+// customerInvoicePaymentsResponse is the envelope for GET /3/invoicepayments.
+type customerInvoicePaymentsResponse struct {
+	InvoicePayments []CustomerInvoicePaymentRow `json:"InvoicePayments"`
+}
+
+// ListCustomerInvoicePayments returns all payments received against the given invoice number.
+// Calls GET /3/invoicepayments?invoicenumber={n}.
+func (c *Client) ListCustomerInvoicePayments(invoiceNumber int) ([]CustomerInvoicePaymentRow, error) {
+	u := fmt.Sprintf("%s/3/invoicepayments?invoicenumber=%d", c.baseURL, invoiceNumber)
+	raw, err := c.Get(u)
+	if err != nil {
+		return nil, fmt.Errorf("list customer invoice payments: %w", err)
+	}
+	var envelope customerInvoicePaymentsResponse
+	if err := json.Unmarshal(raw, &envelope); err != nil {
+		return nil, fmt.Errorf("decode customer invoice payments: %w", err)
+	}
+	return envelope.InvoicePayments, nil
+}
+
+// FullCustomerRow contains all fields relevant for customer analysis.
+type FullCustomerRow struct {
+	CustomerNumber string `json:"CustomerNumber"` // Fortnox returns this as a string
+	Name           string `json:"Name"`
+	Email          string `json:"Email"`
+	Phone          string `json:"Phone1"`
+	Active         bool   `json:"Active"`
+}
+
+// fullCustomerResponse is the envelope for GET /3/customers/{n}.
+type fullCustomerResponse struct {
+	Customer FullCustomerRow `json:"Customer"`
+}
+
+// GetFullCustomer fetches complete customer master data for the given customer number.
+// Calls GET /3/customers/{n}.
+func (c *Client) GetFullCustomer(customerNumber int) (FullCustomerRow, error) {
+	u := fmt.Sprintf("%s/3/customers/%d", c.baseURL, customerNumber)
+	raw, err := c.Get(u)
+	if err != nil {
+		return FullCustomerRow{}, fmt.Errorf("get full customer: %w", err)
+	}
+	var envelope fullCustomerResponse
+	if err := json.Unmarshal(raw, &envelope); err != nil {
+		return FullCustomerRow{}, fmt.Errorf("decode customer: %w", err)
+	}
+	return envelope.Customer, nil
+}
+
+// AccountRow is the Fortnox JSON for a GL account from GET /3/accounts.
+type AccountRow struct {
+	Number               int     `json:"Number"`
+	Description          string  `json:"Description"`
+	SRU                  int     `json:"SRU"`
+	Active               bool    `json:"Active"`
+	BalanceBroughtForward float64 `json:"BalanceBroughtForward"`
+	BalanceCarriedForward float64 `json:"BalanceCarriedForward"`
+}
+
+// accountsResponse is the envelope for GET /3/accounts.
+type accountsResponse struct {
+	Accounts []AccountRow `json:"Accounts"`
+}
+
+// ListAccounts fetches the chart of accounts for a financial year.
+// Calls GET /3/accounts?financialyear={yearID}.
+func (c *Client) ListAccounts(yearID int) ([]AccountRow, error) {
+	u := fmt.Sprintf("%s/3/accounts?financialyear=%d", c.baseURL, yearID)
+	raw, err := c.Get(u)
+	if err != nil {
+		return nil, fmt.Errorf("list accounts: %w", err)
+	}
+	var envelope accountsResponse
+	if err := json.Unmarshal(raw, &envelope); err != nil {
+		return nil, fmt.Errorf("decode accounts: %w", err)
+	}
+	return envelope.Accounts, nil
+}
+
+// FinancialYearRow is the Fortnox JSON for a financial year from GET /3/financialyears.
+type FinancialYearRow struct {
+	ID       int    `json:"Id"`
+	FromDate string `json:"FromDate"`
+	ToDate   string `json:"ToDate"`
+}
+
+// financialYearsResponse is the envelope for GET /3/financialyears.
+type financialYearsResponse struct {
+	FinancialYears []FinancialYearRow `json:"FinancialYears"`
+}
+
+// ListFinancialYears returns all financial years for the company.
+// Calls GET /3/financialyears.
+func (c *Client) ListFinancialYears() ([]FinancialYearRow, error) {
+	u := c.baseURL + "/3/financialyears"
+	raw, err := c.Get(u)
+	if err != nil {
+		return nil, fmt.Errorf("list financial years: %w", err)
+	}
+	var envelope financialYearsResponse
+	if err := json.Unmarshal(raw, &envelope); err != nil {
+		return nil, fmt.Errorf("decode financial years: %w", err)
+	}
+	return envelope.FinancialYears, nil
+}
+
 // GetAllPages fetches every page from a paginated Fortnox endpoint. It sets
 // the `page` query parameter on successive requests and reads MetaInformation
 // from each response to determine when to stop. One json.RawMessage per page
