@@ -170,6 +170,18 @@ tasks:
   context:sync:cursor:
     cmds: [bash scripts/context-sync.sh cursor]
 
+  # ── MCP ────────────────────────────────────────────────────────────────────
+
+  mcp:
+    desc: Start MCP server (stdio)
+    cmds:
+      - source .env && go run ./cmd/mcp
+
+  mcp:build:
+    desc: Build MCP server binary
+    cmds:
+      - go build -trimpath -ldflags="-s -w" -o bin/cobalt-dingo-mcp ./cmd/mcp
+
   # ── Init ────────────────────────────────────────────────────────────────────
 
   init:
