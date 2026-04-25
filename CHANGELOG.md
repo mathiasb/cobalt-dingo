@@ -14,6 +14,45 @@ the domain model or port interfaces will be called out explicitly.
 
 ---
 
+## [0.5.0] — 2026-04-25
+
+Financial command center milestone. Conversational analytics layer across six
+Fortnox ledgers, exposed via MCP (38 tools) and an HTMX chat fallback UI.
+
+### Added
+- **Domain layer** — 15 new types (`CustomerInvoice`, `Account`, `Voucher`, `Project`,
+  `CostCenter`, `Asset`, `Company`, etc.) and 7 port interfaces (`SupplierLedger`,
+  `CustomerLedger`, `GeneralLedger`, `ProjectLedger`, `CostCenterLedger`,
+  `AssetRegister`, `CompanyInfo`)
+- **Aggregation library** (`internal/analyst/`) — `AgingBuckets`, `GroupBy`,
+  `SumMinorUnits`, `DaysOverdue`, `OrderedKeys` with 13 table-driven tests
+- **Fortnox client extensions** — generic `Get()` with rate limiting (25 req/5s),
+  `GetAllPages()` for automatic pagination
+- **7 Fortnox adapters** — supplier ledger, customer ledger, general ledger,
+  project ledger, cost center ledger, asset register, company info; all tested
+  with `httptest`
+- **MCP server** (`cmd/mcp/`) — stdio transport, 38 tools:
+  - 7 AP tools (summary, overdue, by-supplier, by-currency, aging, history, detail)
+  - 7 AR tools (mirrors AP for customer invoices)
+  - 7 GL tools (chart of accounts, balances, activity, vouchers, detail,
+    predefined accounts, financial years)
+  - 3 project tools (list, transactions, profitability)
+  - 3 cost center tools (list, transactions, analysis)
+  - 2 asset tools (list, detail)
+  - 9 analytics tools (cash flow forecast, expense analysis, period comparison,
+    yearly comparison, gross margin trend, top customers/suppliers,
+    sales vs purchases, company info)
+- **HTMX chat UI** (`GET /chat`) — Claude API with tool use, SSE streaming,
+  Chart.js visualisations, conversation history
+- **Taskfile** — `task mcp` and `task mcp:build` commands
+
+### Changed
+- `cmd/server/main.go` — wires chat handler when `ANTHROPIC_API_KEY` is set
+- `internal/config/config.go` — added `Claude` config struct
+- `go.mod` — added `mark3labs/mcp-go`, `stretchr/testify`
+
+---
+
 ## [0.4.0] — 2026-04-17
 
 Full pipeline milestone. The payment lifecycle is now end-to-end: detect → enrich
