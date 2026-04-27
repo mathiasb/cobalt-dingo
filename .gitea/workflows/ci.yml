@@ -97,56 +97,113 @@ jobs:
             && echo "✓ Smoke test passed" \
             || echo "⚠ Smoke test inconclusive: $OUTPUT"
 
-  # ── 3. Deploy to k3s ────────────────────────────────────────────────────────
+  # ── 3. Deploy via infra repo + Flux ─────────────────────────────────────────
   deploy:
-    name: Deploy to staging (k3s)
+    name: Deploy via GitOps
     needs: build
     runs-on: self-hosted
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     environment: staging
     steps:
-      - uses: actions/checkout@v4
+      - name: Update image tag in infra repo
+        env:
+          IMAGE_TAG: ${{ needs.build.outputs.image-tag }}
+          DEPLOY_KEY: ${{ secrets.INFRA_DEPLOY_KEY }}
+        run: |
+          set -euo pipefail
 
-      - name: Apply manifests and update image
+          # SSH key for write access to gitea.d-ma.be/mathias/infra.
+          # INFRA_DEPLOY_KEY is a Gitea org secret (mathias org), already
+          # configured per docs/cd-pipeline.md in the infra repo.
+          mkdir -p ~/.ssh
+          echo "$DEPLOY_KEY" > ~/.ssh/id_infra
+          chmod 600 ~/.ssh/id_infra
+          ssh-keyscan -p 30022 10.0.1.20 >> ~/.ssh/known_hosts 2>/dev/null
+
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/id_infra -o IdentitiesOnly=yes"
+          rm -rf /tmp/infra
+          git clone -b main ssh://git@10.0.1.20:30022/mathias/infra.git /tmp/infra
+          cd /tmp/infra
+
+          DEPLOYMENT="k3s/apps/cobalt-dingo/deployment.yaml"
+          # In-place update of the image tag. Use sed (not yq) so we don't
+          # depend on additional tooling on the runner.
+          sed -i "s|image: localhost:5000/cobalt-dingo:.*|image: localhost:5000/cobalt-dingo:${IMAGE_TAG}|" "$DEPLOYMENT"
+
+          # Verify the patch took effect.
+          grep -q "localhost:5000/cobalt-dingo:${IMAGE_TAG}" "$DEPLOYMENT" \
+            || { echo "✗ image tag patch failed"; exit 1; }
+
+          if git diff --quiet "$DEPLOYMENT"; then
+            echo "ℹ image tag unchanged — skipping push"
+          else
+            git -c user.name="cobalt-dingo CI" \
+                -c user.email="ci@cobalt-dingo.local" \
+                commit -m "chore(deploy): cobalt-dingo → ${IMAGE_TAG}" "$DEPLOYMENT"
+            git push origin main
+            echo "✓ pushed to infra repo"
+          fi
+
+          shred -u ~/.ssh/id_infra
+
+      - name: Trigger Flux reconcile (immediate)
+        run: |
+          # Without these annotations, Flux would still pick up the change
+          # within 30s (the apps Kustomization interval). The annotations
+          # cut latency to ~1s.
+          sudo k3s kubectl -n flux-system annotate gitrepository flux-system \
+            reconcile.fluxcd.io/requestedAt="$(date +%s)" --overwrite
+          sudo k3s kubectl -n flux-system annotate kustomization apps \
+            reconcile.fluxcd.io/requestedAt="$(date +%s)" --overwrite
+
+      - name: Wait for Flux to apply new image
         env:
           IMAGE_TAG: ${{ needs.build.outputs.image-tag }}
         run: |
-          # Ensure namespace and base deployment exist (idempotent).
-          kubectl apply -f k8s/namespace.yaml
-          kubectl apply -f k8s/deployment.yaml
-          # Patch to the exact sha image built in this run.
-          kubectl set image deployment/cobalt-dingo \
-            cobalt-dingo=localhost:5000/${{ env.IMAGE }}:${IMAGE_TAG} \
-            --namespace cobalt-dingo
+          # Poll the Deployment spec until it reflects the new tag.
+          # Bound to 60s so a stuck Flux doesn't hang CI.
+          EXPECTED="localhost:5000/cobalt-dingo:${IMAGE_TAG}"
+          for i in $(seq 1 60); do
+            CURRENT=$(sudo k3s kubectl get deploy cobalt-dingo -n cobalt-dingo \
+              -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || echo "")
+            if [ "$CURRENT" = "$EXPECTED" ]; then
+              echo "✓ Flux applied new image after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+          # Final assertion (in case the loop exited without matching).
+          sudo k3s kubectl get deploy cobalt-dingo -n cobalt-dingo \
+            -o jsonpath='{.spec.template.spec.containers[0].image}' \
+            | grep -qx "$EXPECTED" \
+            || { echo "✗ Flux did not apply new image within 60s"; exit 1; }
 
-      # Validation: rollout completes within 120s.
       - name: Verify rollout
         run: |
-          kubectl rollout status deployment/cobalt-dingo \
+          sudo k3s kubectl rollout status deployment/cobalt-dingo \
             --namespace cobalt-dingo \
             --timeout=120s \
           || {
             echo "── pod status ──"
-            kubectl get pods -n cobalt-dingo -o wide
-            echo "── pod events ──"
-            kubectl get events -n cobalt-dingo --sort-by='.lastTimestamp' | tail -20
-            echo "── pod describe ──"
-            kubectl describe pods -n cobalt-dingo -l app=cobalt-dingo | tail -40
+            sudo k3s kubectl get pods -n cobalt-dingo -o wide
+            echo "── events ──"
+            sudo k3s kubectl get events -n cobalt-dingo --sort-by='.lastTimestamp' | tail -20
+            echo "── describe ──"
+            sudo k3s kubectl describe pods -n cobalt-dingo -l app=cobalt-dingo | tail -40
             exit 1
           }
 
-      # Validation: running pod carries the expected image tag.
-      - name: Confirm pod health
+      - name: Confirm pod running new image
         env:
           IMAGE_TAG: ${{ needs.build.outputs.image-tag }}
         run: |
-          kubectl get pods -n cobalt-dingo \
+          sudo k3s kubectl get pods -n cobalt-dingo \
             -l app=cobalt-dingo \
             --field-selector=status.phase=Running \
             -o jsonpath='{.items[*].spec.containers[0].image}' \
-          | grep -q "localhost:5000/${{ env.IMAGE }}:${IMAGE_TAG}" \
-          && echo "✓ Pod running new image" \
-          || (echo "✗ Pod image mismatch" && exit 1)
+          | grep -q "localhost:5000/cobalt-dingo:${IMAGE_TAG}" \
+          && echo "✓ pod running new image" \
+          || { echo "✗ pod image mismatch"; exit 1; }
 
   # ── 4. E2E sandbox tests ─────────────────────────────────────────────────────
   e2e:

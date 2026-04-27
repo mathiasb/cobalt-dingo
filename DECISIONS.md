@@ -4,6 +4,14 @@ Record *why* things are the way they are. Future-you will thank present-you.
 
 ---
 
+## 2026-04-27 — Deploy via infra repo + Flux instead of kubectl direct
+
+**Context**: Pre-v0.5.x the deploy job ran `kubectl apply -f k8s/...` and `kubectl set image` directly. This bypasses Flux, so the cluster state diverged from the infra repo's declared state. With cobalt-dingo growing in significance, divergence becomes a real audit/drift problem.
+
+**Decision**: The deploy job now (a) clones `gitea.d-ma.be/mathias/infra`, (b) updates `k3s/apps/cobalt-dingo/deployment.yaml` with the new image tag, (c) commits and pushes to infra, (d) annotates the Flux GitRepository and apps Kustomization to trigger immediate reconciliation. Total deploy latency: ~5–10s (vs ~5s for direct kubectl).
+
+**Consequences**: Cluster state is now reflected in the infra repo. Flux auto-corrects manual drift. The local `localhost:5000` registry remains the build target — no change to the build flow. The `k8s/registry/` directory and `scripts/setup-koala-registry.sh` are deleted; the registry is now declared in `infra/k3s/apps/registry/`. The `k8s/namespace.yaml` and `k8s/deployment.yaml` files are also deleted to avoid being mistaken for the source of truth.
+
 ## 2026-04-08 — AGENTS.md as cross-tool standard, not CLAUDE.md
 
 **Context**: Multiple tools (Crush, Pi, Antigravity) read `AGENTS.md` natively. Claude Code reads `CLAUDE.md`. Building on `CLAUDE.md` as the primary format locks into one vendor.
