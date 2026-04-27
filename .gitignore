@@ -2,6 +2,8 @@
 bin/
 *.exe
 /server
+/mcp
+/probe-sandbox
 
 # Go
 vendor/
@@ -29,6 +31,9 @@ secrets/
 .vscode/
 *.swp
 *~
+
+# Local Claude Code config
+.mcp.json
 
 # OS
 .DS_Store
