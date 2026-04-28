@@ -151,9 +151,9 @@ jobs:
           # Without these annotations, Flux would still pick up the change
           # within 30s (the apps Kustomization interval). The annotations
           # cut latency to ~1s.
-          sudo k3s kubectl -n flux-system annotate gitrepository flux-system \
+          kubectl -n flux-system annotate gitrepository flux-system \
             reconcile.fluxcd.io/requestedAt="$(date +%s)" --overwrite
-          sudo k3s kubectl -n flux-system annotate kustomization apps \
+          kubectl -n flux-system annotate kustomization apps \
             reconcile.fluxcd.io/requestedAt="$(date +%s)" --overwrite
 
       - name: Wait for Flux to apply new image
@@ -164,7 +164,7 @@ jobs:
           # Bound to 60s so a stuck Flux doesn't hang CI.
           EXPECTED="localhost:5000/cobalt-dingo:${IMAGE_TAG}"
           for i in $(seq 1 60); do
-            CURRENT=$(sudo k3s kubectl get deploy cobalt-dingo -n cobalt-dingo \
+            CURRENT=$(kubectl get deploy cobalt-dingo -n cobalt-dingo \
               -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || echo "")
             if [ "$CURRENT" = "$EXPECTED" ]; then
               echo "✓ Flux applied new image after ${i}s"
@@ -173,23 +173,23 @@ jobs:
             sleep 1
           done
           # Final assertion (in case the loop exited without matching).
-          sudo k3s kubectl get deploy cobalt-dingo -n cobalt-dingo \
+          kubectl get deploy cobalt-dingo -n cobalt-dingo \
             -o jsonpath='{.spec.template.spec.containers[0].image}' \
             | grep -qx "$EXPECTED" \
             || { echo "✗ Flux did not apply new image within 60s"; exit 1; }
 
       - name: Verify rollout
         run: |
-          sudo k3s kubectl rollout status deployment/cobalt-dingo \
+          kubectl rollout status deployment/cobalt-dingo \
             --namespace cobalt-dingo \
             --timeout=120s \
           || {
             echo "── pod status ──"
-            sudo k3s kubectl get pods -n cobalt-dingo -o wide
+            kubectl get pods -n cobalt-dingo -o wide
             echo "── events ──"
-            sudo k3s kubectl get events -n cobalt-dingo --sort-by='.lastTimestamp' | tail -20
+            kubectl get events -n cobalt-dingo --sort-by='.lastTimestamp' | tail -20
             echo "── describe ──"
-            sudo k3s kubectl describe pods -n cobalt-dingo -l app=cobalt-dingo | tail -40
+            kubectl describe pods -n cobalt-dingo -l app=cobalt-dingo | tail -40
             exit 1
           }
 
@@ -197,7 +197,7 @@ jobs:
         env:
           IMAGE_TAG: ${{ needs.build.outputs.image-tag }}
         run: |
-          sudo k3s kubectl get pods -n cobalt-dingo \
+          kubectl get pods -n cobalt-dingo \
             -l app=cobalt-dingo \
             --field-selector=status.phase=Running \
             -o jsonpath='{.items[*].spec.containers[0].image}' \
