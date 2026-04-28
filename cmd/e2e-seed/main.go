@@ -1,15 +1,21 @@
-// Command e2e-seed creates realistic test suppliers and FCY supplier invoices
-// in the Fortnox sandbox for end-to-end testing.
+// Command e2e-seed creates realistic test data in the Fortnox sandbox covering
+// the AP, AR, project, cost-center and asset surfaces of the v0.5.0 financial
+// command center.
 //
-// All records are tagged with the [E2E] prefix in their name so e2e-teardown
+// All records are tagged with the E2E- prefix in their name so e2e-teardown
 // can identify and remove them cleanly.
 //
-// Seed covers four scenarios:
+// AP scenarios (suppliers + supplier invoices):
 //
 //	Müller GmbH      — EUR invoice, IBAN set    → should be enriched and batched
 //	Van der Berg BV  — EUR invoice, IBAN set    → should be enriched and batched (overdue)
 //	Nordic AB        — SEK invoice, no IBAN     → should be filtered (domestic SEK)
 //	No-IBAN Corp     — USD invoice, no IBAN     → should be skipped (foreign, missing IBAN)
+//
+// AR scenarios (customers + customer invoices):
+//
+//	5 customers across NO/DE/FI/SE
+//	10 invoices spanning every aging bucket (paid, current, 1-30, 31-60, 90+)
 //
 // Usage:
 //
@@ -72,6 +78,83 @@ var suppliers = []seedSupplier{
 		currency: "USD",
 		iban:     "", // foreign FCY but no IBAN — enrichment skip test
 		bic:      "",
+	},
+}
+
+type seedCustomer struct {
+	name     string
+	country  string
+	currency string
+}
+
+type seedCustomerInvoice struct {
+	customerName string
+	currency     string
+	total        float64
+	invoiceDate  string
+	dueDate      string
+	description  string
+	paid         bool   // if true, register a full payment after bookkeeping
+	paymentDate  string // only used when paid=true
+}
+
+var customers = []seedCustomer{
+	{name: e2ePrefix + "Acme Norge AS", country: "NO", currency: "NOK"},
+	{name: e2ePrefix + "Berlin Digital GmbH", country: "DE", currency: "EUR"},
+	{name: e2ePrefix + "Helsinki Holdings Oy", country: "FI", currency: "EUR"},
+	{name: e2ePrefix + "Stockholm Stadsbolag AB", country: "SE", currency: "SEK"},
+	{name: e2ePrefix + "Göteborg Maskin AB", country: "SE", currency: "SEK"},
+}
+
+// Customer invoices — dates relative to 2026-04-28 baseline.
+// Aging buckets exercised: paid (×2), current (×3), 1–30 (×2), 31–60 (×2), 90+ (×1).
+var customerInvoices = []seedCustomerInvoice{
+	// paid (×2)
+	{
+		customerName: e2ePrefix + "Berlin Digital GmbH", currency: "EUR", total: 4500.00,
+		invoiceDate: "2026-02-01", dueDate: "2026-03-03", description: e2ePrefix + "Q1 retainer",
+		paid: true, paymentDate: "2026-02-28",
+	},
+	{
+		customerName: e2ePrefix + "Helsinki Holdings Oy", currency: "EUR", total: 2200.00,
+		invoiceDate: "2026-02-15", dueDate: "2026-03-17", description: e2ePrefix + "Discovery sprint",
+		paid: true, paymentDate: "2026-03-10",
+	},
+	// current (×3) — due in the future
+	{
+		customerName: e2ePrefix + "Acme Norge AS", currency: "NOK", total: 18500.00,
+		invoiceDate: "2026-04-15", dueDate: "2026-05-15", description: e2ePrefix + "Platform build",
+	},
+	{
+		customerName: e2ePrefix + "Berlin Digital GmbH", currency: "EUR", total: 3200.00,
+		invoiceDate: "2026-04-10", dueDate: "2026-05-10", description: e2ePrefix + "Q2 retainer",
+	},
+	{
+		customerName: e2ePrefix + "Stockholm Stadsbolag AB", currency: "SEK", total: 45000.00,
+		invoiceDate: "2026-04-05", dueDate: "2026-05-05", description: e2ePrefix + "Migration phase 2",
+	},
+	// overdue 1–30 (×2)
+	{
+		customerName: e2ePrefix + "Berlin Digital GmbH", currency: "EUR", total: 1850.00,
+		invoiceDate: "2026-03-15", dueDate: "2026-04-14", description: e2ePrefix + "Audit follow-up",
+	},
+	{
+		customerName: e2ePrefix + "Göteborg Maskin AB", currency: "SEK", total: 12500.00,
+		invoiceDate: "2026-03-20", dueDate: "2026-04-19", description: e2ePrefix + "Maintenance window",
+	},
+	// overdue 31–60 (×2)
+	{
+		customerName: e2ePrefix + "Helsinki Holdings Oy", currency: "EUR", total: 3400.00,
+		invoiceDate: "2026-02-15", dueDate: "2026-03-17", description: e2ePrefix + "Workshop fees",
+	},
+	{
+		customerName: e2ePrefix + "Stockholm Stadsbolag AB", currency: "SEK", total: 22000.00,
+		invoiceDate: "2026-02-10", dueDate: "2026-03-12", description: e2ePrefix + "Architecture review",
+	},
+	// overdue 90+ (×1) — collection-risk worst case
+	{
+		customerName: e2ePrefix + "Göteborg Maskin AB", currency: "SEK", total: 8500.00,
+		invoiceDate: "2026-01-10", dueDate: "2026-01-25", description: e2ePrefix + "On-call support Dec",
 	},
 }
 
@@ -192,6 +275,75 @@ func main() {
 		}
 		fmt.Printf("  ✓ %-35s %s %8.2f  due %s  → invoice %s (booked)\n",
 			inv.supplierName, inv.currency, inv.total, inv.dueDate, givenNumber)
+	}
+
+	// AR side: customers + customer invoices.
+	customerNumbers := make(map[string]int, len(customers))
+	existingCustomers, err := client.ListCustomers(e2ePrefix)
+	if err != nil {
+		log.Error("list existing customers", "err", err)
+		os.Exit(1)
+	}
+	for _, cu := range existingCustomers {
+		customerNumbers[cu.Name] = cu.CustomerNumber
+	}
+
+	fmt.Println("\nSetting up customers...")
+	for _, cu := range customers {
+		if num, found := customerNumbers[cu.name]; found {
+			if err := client.SetCustomerActive(num, true); err != nil {
+				log.Error("reactivate customer", "name", cu.name, "err", err)
+				os.Exit(1)
+			}
+			fmt.Printf("  ↺ %-40s → customer #%d (reactivated)\n", cu.name, num)
+		} else {
+			num, err := client.CreateCustomer(fortnox.CustomerCreate{
+				Name:        cu.name,
+				CountryCode: cu.country,
+				Currency:    cu.currency,
+			})
+			if err != nil {
+				log.Error("create customer", "name", cu.name, "err", err)
+				os.Exit(1)
+			}
+			customerNumbers[cu.name] = num
+			fmt.Printf("  ✓ %-40s → customer #%d (created)\n", cu.name, num)
+		}
+	}
+
+	fmt.Println("\nCreating customer invoices...")
+	for _, inv := range customerInvoices {
+		cnum, ok := customerNumbers[inv.customerName]
+		if !ok {
+			log.Error("unknown customer", "name", inv.customerName)
+			os.Exit(1)
+		}
+		docNumber, err := client.CreateCustomerInvoice(fortnox.CustomerInvoiceCreate{
+			CustomerNumber: cnum,
+			InvoiceDate:    inv.invoiceDate,
+			DueDate:        inv.dueDate,
+			Currency:       inv.currency,
+			Description:    inv.description,
+			Total:          inv.total,
+		})
+		if err != nil {
+			log.Error("create customer invoice", "customer", inv.customerName, "err", err)
+			os.Exit(1)
+		}
+		if err := client.BookkeepCustomerInvoice(docNumber); err != nil {
+			log.Error("bookkeep customer invoice", "doc", docNumber, "err", err)
+			os.Exit(1)
+		}
+		state := "unpaid"
+		if inv.paid {
+			if err := client.FullyPayCustomerInvoice(docNumber, inv.paymentDate); err != nil {
+				log.Error("pay customer invoice", "doc", docNumber, "err", err)
+				os.Exit(1)
+			}
+			state = "paid " + inv.paymentDate
+		}
+		fmt.Printf("  ✓ %-40s %s %9.2f  due %s  → invoice %s (%s)\n",
+			inv.customerName, inv.currency, inv.total, inv.dueDate, docNumber, state)
 	}
 
 	fmt.Println("\nSeed complete. Run: source .env && go run ./cmd/e2e-teardown")

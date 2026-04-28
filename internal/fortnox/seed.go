@@ -263,6 +263,329 @@ func (c *Client) BookkeepSupplierInvoice(givenNumber string) error {
 	return nil
 }
 
+// CustomerCreate holds the fields needed to create a new customer.
+type CustomerCreate struct {
+	Name        string
+	CountryCode string
+	Currency    string
+}
+
+// CreateCustomer creates a new customer and returns its assigned CustomerNumber.
+func (c *Client) CreateCustomer(cu CustomerCreate) (int, error) {
+	body := map[string]any{
+		"Customer": map[string]any{
+			"Name":        cu.Name,
+			"CountryCode": cu.CountryCode,
+			"Currency":    cu.Currency,
+		},
+	}
+	b, _ := json.Marshal(body)
+	req, err := http.NewRequest(http.MethodPost, c.baseURL+"/3/customers", bytes.NewReader(b))
+	if err != nil {
+		return 0, fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return 0, fmt.Errorf("POST customer: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	var envelope struct {
+		Customer struct {
+			CustomerNumber string `json:"CustomerNumber"`
+		} `json:"Customer"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
+		return 0, fmt.Errorf("decode customer response: %w", err)
+	}
+	if envelope.Customer.CustomerNumber == "" {
+		return 0, fmt.Errorf("POST customer: status %d", resp.StatusCode)
+	}
+	var num int
+	_, _ = fmt.Sscanf(envelope.Customer.CustomerNumber, "%d", &num)
+	return num, nil
+}
+
+// SetCustomerActive toggles a customer's Active flag. Used by teardown.
+func (c *Client) SetCustomerActive(customerNumber int, active bool) error {
+	url := fmt.Sprintf("%s/3/customers/%d", c.baseURL, customerNumber)
+	b, _ := json.Marshal(map[string]any{"Customer": map[string]any{"Active": active}})
+	req, err := http.NewRequest(http.MethodPut, url, bytes.NewReader(b))
+	if err != nil {
+		return fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("set customer %d active=%v: %w", customerNumber, active, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("set customer %d active=%v: status %d", customerNumber, active, resp.StatusCode)
+	}
+	return nil
+}
+
+// CustomerSummary is a minimal customer record returned by list operations.
+type CustomerSummary struct {
+	CustomerNumber int
+	Name           string
+	Active         bool
+}
+
+// ListCustomers returns active customers whose names start with prefix.
+// Note: Fortnox's /3/customers does not support listing inactive customers via
+// query parameters — for full coverage, list active separately and accept that
+// inactive customers are invisible until explicitly reactivated.
+func (c *Client) ListCustomers(prefix string) ([]CustomerSummary, error) {
+	req, err := http.NewRequest(http.MethodGet, c.baseURL+"/3/customers", nil)
+	if err != nil {
+		return nil, fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("GET customers: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	var envelope struct {
+		Customers []struct {
+			CustomerNumber string `json:"CustomerNumber"`
+			Name           string `json:"Name"`
+			Active         bool   `json:"Active"`
+		} `json:"Customers"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
+		return nil, fmt.Errorf("decode customers: %w", err)
+	}
+
+	var result []CustomerSummary
+	for _, cu := range envelope.Customers {
+		if strings.HasPrefix(cu.Name, prefix) {
+			var num int
+			_, _ = fmt.Sscanf(cu.CustomerNumber, "%d", &num)
+			result = append(result, CustomerSummary{CustomerNumber: num, Name: cu.Name, Active: cu.Active})
+		}
+	}
+	return result, nil
+}
+
+// CustomerInvoiceCreate holds the fields needed to create a customer invoice.
+type CustomerInvoiceCreate struct {
+	CustomerNumber int
+	InvoiceDate    string // YYYY-MM-DD
+	DueDate        string // YYYY-MM-DD
+	Currency       string
+	Description    string
+	Total          float64
+}
+
+// CreateCustomerInvoice creates a customer invoice and returns its DocumentNumber.
+func (c *Client) CreateCustomerInvoice(inv CustomerInvoiceCreate) (string, error) {
+	body := map[string]any{
+		"Invoice": map[string]any{
+			"CustomerNumber": fmt.Sprintf("%d", inv.CustomerNumber),
+			"InvoiceDate":    inv.InvoiceDate,
+			"DueDate":        inv.DueDate,
+			"Currency":       inv.Currency,
+			"Comments":       inv.Description,
+			"InvoiceRows": []map[string]any{
+				{
+					"Description":       inv.Description,
+					"AccountNumber":     3001, // sales — service revenue
+					"DeliveredQuantity": 1,
+					"Price":             inv.Total,
+				},
+			},
+		},
+	}
+	b, _ := json.Marshal(body)
+	req, err := http.NewRequest(http.MethodPost, c.baseURL+"/3/invoices", bytes.NewReader(b))
+	if err != nil {
+		return "", fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("POST invoice: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	var envelope struct {
+		Invoice struct {
+			DocumentNumber string `json:"DocumentNumber"`
+		} `json:"Invoice"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
+		return "", fmt.Errorf("decode invoice response: %w", err)
+	}
+	if envelope.Invoice.DocumentNumber == "" {
+		return "", fmt.Errorf("POST invoice: status %d", resp.StatusCode)
+	}
+	return envelope.Invoice.DocumentNumber, nil
+}
+
+// BookkeepCustomerInvoice posts a customer invoice to the general ledger.
+func (c *Client) BookkeepCustomerInvoice(documentNumber string) error {
+	url := fmt.Sprintf("%s/3/invoices/%s/bookkeep", c.baseURL, documentNumber)
+	req, err := http.NewRequest(http.MethodPut, url, nil)
+	if err != nil {
+		return fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("bookkeep invoice %s: %w", documentNumber, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("bookkeep invoice %s: status %d", documentNumber, resp.StatusCode)
+	}
+	return nil
+}
+
+// CancelCustomerInvoice cancels a customer invoice (Fortnox does not allow delete).
+func (c *Client) CancelCustomerInvoice(documentNumber string) error {
+	url := fmt.Sprintf("%s/3/invoices/%s/cancel", c.baseURL, documentNumber)
+	req, err := http.NewRequest(http.MethodPut, url, nil)
+	if err != nil {
+		return fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("cancel invoice %s: %w", documentNumber, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("cancel invoice %s: status %d", documentNumber, resp.StatusCode)
+	}
+	return nil
+}
+
+// FullyPayCustomerInvoice creates a full payment for a customer invoice.
+func (c *Client) FullyPayCustomerInvoice(documentNumber string, paymentDate string) error {
+	url := fmt.Sprintf("%s/3/invoices/%s", c.baseURL, documentNumber)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("GET invoice %s: %w", documentNumber, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	var inv struct {
+		Invoice struct {
+			Balance      json.Number `json:"Balance"`
+			Total        json.Number `json:"Total"`
+			Currency     string      `json:"Currency"`
+			CurrencyRate json.Number `json:"CurrencyRate"`
+			CurrencyUnit json.Number `json:"CurrencyUnit"`
+		} `json:"Invoice"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&inv); err != nil {
+		return fmt.Errorf("decode invoice %s: %w", documentNumber, err)
+	}
+
+	// Customer-invoice Balance is in invoice currency (unlike supplier invoices
+	// where Balance is in SEK base). Convert to SEK for the Amount field.
+	balanceInCurrency, _ := inv.Invoice.Balance.Float64()
+	if balanceInCurrency == 0 {
+		return nil // already paid
+	}
+
+	rate, _ := inv.Invoice.CurrencyRate.Float64()
+	unit, _ := inv.Invoice.CurrencyUnit.Float64()
+	amountSEK := balanceInCurrency
+	if rate > 0 && unit > 0 && inv.Invoice.Currency != "SEK" {
+		amountSEK = balanceInCurrency * rate / unit
+	}
+
+	payment := map[string]any{
+		"InvoicePayment": map[string]any{
+			"InvoiceNumber":  documentNumber,
+			"Amount":         amountSEK,
+			"AmountCurrency": balanceInCurrency,
+			"PaymentDate":    paymentDate,
+			"ModeOfPayment":  "BG", // Bankgiro — present in standard sandbox setup
+		},
+	}
+	b, _ := json.Marshal(payment)
+	req2, err := http.NewRequest(http.MethodPost, c.baseURL+"/3/invoicepayments", bytes.NewReader(b))
+	if err != nil {
+		return fmt.Errorf("build payment request: %w", err)
+	}
+	req2.Header.Set("Authorization", "Bearer "+c.token)
+	req2.Header.Set("Content-Type", "application/json")
+	req2.Header.Set("Accept", "application/json")
+
+	resp2, err := c.httpClient.Do(req2)
+	if err != nil {
+		return fmt.Errorf("POST customer invoice payment %s: %w", documentNumber, err)
+	}
+	defer func() { _ = resp2.Body.Close() }()
+
+	if resp2.StatusCode != http.StatusCreated && resp2.StatusCode != http.StatusOK {
+		return fmt.Errorf("POST customer invoice payment %s: status %d", documentNumber, resp2.StatusCode)
+	}
+
+	var payResp struct {
+		InvoicePayment struct {
+			Number json.Number `json:"Number"`
+		} `json:"InvoicePayment"`
+	}
+	if err := json.NewDecoder(resp2.Body).Decode(&payResp); err != nil {
+		return fmt.Errorf("decode payment response %s: %w", documentNumber, err)
+	}
+	paymentNumber := payResp.InvoicePayment.Number.String()
+	if paymentNumber == "" {
+		return fmt.Errorf("payment registered for invoice %s but no Number in response", documentNumber)
+	}
+
+	// Bookkeep the payment so it reduces the invoice balance.
+	bookkeepURL := fmt.Sprintf("%s/3/invoicepayments/%s/bookkeep", c.baseURL, paymentNumber)
+	req3, err := http.NewRequest(http.MethodPut, bookkeepURL, nil)
+	if err != nil {
+		return fmt.Errorf("build bookkeep request: %w", err)
+	}
+	req3.Header.Set("Authorization", "Bearer "+c.token)
+	req3.Header.Set("Accept", "application/json")
+	resp3, err := c.httpClient.Do(req3)
+	if err != nil {
+		return fmt.Errorf("bookkeep payment %s: %w", paymentNumber, err)
+	}
+	defer func() { _ = resp3.Body.Close() }()
+	if resp3.StatusCode != http.StatusOK {
+		return fmt.Errorf("bookkeep payment %s: status %d", paymentNumber, resp3.StatusCode)
+	}
+	return nil
+}
+
 // FullyPaySupplierInvoice creates a full payment for a supplier invoice so that
 // the invoice is considered paid and the supplier can be deleted during teardown.
 func (c *Client) FullyPaySupplierInvoice(givenNumber string) error {

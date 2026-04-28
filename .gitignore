@@ -4,6 +4,8 @@ bin/
 /server
 /mcp
 /probe-sandbox
+/e2e-seed
+/e2e-teardown
 
 # Go
 vendor/
