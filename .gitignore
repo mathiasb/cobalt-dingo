@@ -7,6 +7,9 @@ bin/
 /e2e-seed
 /e2e-teardown
 
+# Reference data (not source-of-truth, available via vendor docs)
+fortnox-openapi.json
+
 # Go
 vendor/
 

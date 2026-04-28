@@ -885,27 +885,32 @@ func (c *Client) ListCostCentersByPrefix(prefix string) ([]CostCenterSummary, er
 }
 
 // AssetCreate holds the fields needed to create a fixed asset.
-// Sandbox-friendly minimum: description + acquisition value + dates +
-// depreciation accounts. Real usage would also need DepreciationFinal,
-// AssetType, etc.
+//
+// Required by Fortnox: Number (asset number, free string), Description,
+// TypeId (numeric ID from /3/assets/types — e.g. "10" = Datorer/Computers),
+// AcquisitionDate, AcquisitionStart (must be the 1st of a month — this is
+// the depreciation-start date, mistranslated by Fortnox as "Avskrivningsstart"
+// in error messages), AcquisitionValue, DepreciationFinal.
 type AssetCreate struct {
+	Number            string // user-supplied asset number
 	Description       string
-	AcquisitionValue  float64
-	AcquisitionDate   string // YYYY-MM-DD
-	DepreciationFinal string // YYYY-MM-DD — when fully depreciated
-	TypeID            string // asset type ID; sandbox usually has "1"
+	TypeID            string  // ID from /3/assets/types
+	AcquisitionDate   string  // YYYY-MM-DD
+	AcquisitionStart  string  // YYYY-MM-01 (depreciation start, must be 1st of month)
+	AcquisitionValue  float64 // SEK
+	DepreciationFinal string  // YYYY-MM-DD — when fully depreciated
 }
 
 // CreateAsset creates a fixed asset and returns its assigned Number.
 func (c *Client) CreateAsset(a AssetCreate) (string, error) {
 	fields := map[string]any{
+		"Number":            a.Number,
 		"Description":       a.Description,
-		"AcquisitionValue":  a.AcquisitionValue,
+		"TypeId":            a.TypeID,
 		"AcquisitionDate":   a.AcquisitionDate,
+		"AcquisitionStart":  a.AcquisitionStart,
+		"AcquisitionValue":  a.AcquisitionValue,
 		"DepreciationFinal": a.DepreciationFinal,
-	}
-	if a.TypeID != "" {
-		fields["TypeID"] = a.TypeID
 	}
 	b, _ := json.Marshal(map[string]any{"Asset": fields})
 	req, err := http.NewRequest(http.MethodPost, c.baseURL+"/3/assets", bytes.NewReader(b))
@@ -922,18 +927,20 @@ func (c *Client) CreateAsset(a AssetCreate) (string, error) {
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	// Fortnox quirk: the request wrapper is "Asset" (singular) but the
+	// response wrapper for POST /3/assets is "Assets" (plural).
 	var envelope struct {
-		Asset struct {
+		Assets struct {
 			Number string `json:"Number"`
-		} `json:"Asset"`
+		} `json:"Assets"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
 		return "", fmt.Errorf("decode asset response: %w", err)
 	}
-	if envelope.Asset.Number == "" {
+	if envelope.Assets.Number == "" {
 		return "", fmt.Errorf("POST asset: status %d", resp.StatusCode)
 	}
-	return envelope.Asset.Number, nil
+	return envelope.Assets.Number, nil
 }
 
 // AssetSummary is a minimal asset record returned by list operations.

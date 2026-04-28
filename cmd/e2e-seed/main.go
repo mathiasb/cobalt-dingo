@@ -21,11 +21,7 @@
 //
 //	3 projects: ongoing, near-completion, closed
 //	2 cost centers: SALES and ENG
-//
-// Asset seeding is deferred until Fortnox /3/assets POST field-naming is
-// established (the depreciation-start field rejects every common candidate).
-// CreateAsset / ListAssetsByPrefix in internal/fortnox/seed.go remain ready
-// to re-enable. See DECISIONS.md for the full investigation trail.
+//	1 asset: capital equipment partway through its depreciation schedule
 //
 // Usage:
 //
@@ -120,6 +116,16 @@ type seedCostCenter struct {
 	description string
 }
 
+type seedAsset struct {
+	number            string // unique asset number; we prefix with E2E-
+	description       string
+	typeID            string // ID from /3/assets/types
+	acquisitionDate   string // YYYY-MM-DD
+	acquisitionStart  string // YYYY-MM-01 — depreciation start, must be 1st of month
+	acquisitionValue  float64
+	depreciationFinal string // YYYY-MM-DD
+}
+
 var projects = []seedProject{
 	{description: e2ePrefix + "Aurora Platform", startDate: "2026-01-15", status: "ONGOING"},
 	{description: e2ePrefix + "Borealis Migration", startDate: "2026-02-01", endDate: "2026-05-31", status: "ONGOING"},
@@ -132,6 +138,22 @@ var projects = []seedProject{
 var costCenters = []seedCostCenter{
 	{code: "ENG", description: e2ePrefix + "Engineering"},
 	{code: "SALES", description: e2ePrefix + "Sales"},
+}
+
+// Asset Number is free-form text, so the E2E- prefix lives there.
+// TypeId "10" is "Datorer" (Computers, account 1250) in the standard sandbox.
+// AcquisitionStart must be the 1st of a month — Fortnox's depreciation
+// engine refuses any other date.
+var assets = []seedAsset{
+	{
+		number:            e2ePrefix + "001",
+		description:       e2ePrefix + "MacBook Pro M3",
+		typeID:            "10",
+		acquisitionDate:   "2026-01-10",
+		acquisitionStart:  "2026-02-01",
+		acquisitionValue:  35000.00,
+		depreciationFinal: "2029-02-01",
+	},
 }
 
 var customers = []seedCustomer{
@@ -443,6 +465,38 @@ func main() {
 			os.Exit(1)
 		}
 		fmt.Printf("  ✓ %-40s (created)\n", cc.code)
+	}
+
+	// Asset.
+	existingAssets, err := client.ListAssetsByPrefix(e2ePrefix)
+	if err != nil {
+		log.Error("list assets", "err", err)
+		os.Exit(1)
+	}
+	assetByDesc := make(map[string]string, len(existingAssets))
+	for _, a := range existingAssets {
+		assetByDesc[a.Description] = a.Number
+	}
+	fmt.Println("\nSetting up assets...")
+	for _, a := range assets {
+		if num, found := assetByDesc[a.description]; found {
+			fmt.Printf("  ↺ %-40s → asset %s (already present)\n", a.description, num)
+			continue
+		}
+		num, err := client.CreateAsset(fortnox.AssetCreate{
+			Number:            a.number,
+			Description:       a.description,
+			TypeID:            a.typeID,
+			AcquisitionDate:   a.acquisitionDate,
+			AcquisitionStart:  a.acquisitionStart,
+			AcquisitionValue:  a.acquisitionValue,
+			DepreciationFinal: a.depreciationFinal,
+		})
+		if err != nil {
+			log.Error("create asset", "desc", a.description, "err", err)
+			os.Exit(1)
+		}
+		fmt.Printf("  ✓ %-40s → asset %s (created)\n", a.description, num)
 	}
 
 	fmt.Println("\nSeed complete. Run: source .env && go run ./cmd/e2e-teardown")

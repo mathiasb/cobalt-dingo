@@ -14,6 +14,56 @@ the domain model or port interfaces will be called out explicitly.
 
 ---
 
+## [0.5.1] — 2026-04-28
+
+GitOps deploy + sandbox seed buildout. No user-facing behavior change;
+release covers infra and test-data plumbing for the v0.5.0 surfaces.
+
+### Changed
+
+- **CI deploy** runs through Flux instead of direct `kubectl apply` /
+  `set image`. Job clones `gitea.d-ma.be/mathias/infra`, sed-patches
+  `k3s/apps/cobalt-dingo/deployment.yaml`, commits and pushes; Flux
+  reconciles within ~10s. Cluster state is now declared in the infra
+  repo and auto-corrects manual drift. See `DECISIONS.md` 2026-04-27.
+- **Fortnox OAuth scopes** extended to cover the v0.5.0 surfaces:
+  `companyinformation`, `bookkeeping`, `customer`, `invoice`, `supplier`,
+  `supplierinvoice`, `payment`, `currency`, `project`, `costcenter`,
+  `assets`, `settings`. Drops `inbox` (unused).
+- **Fortnox client rate limiter** moved from per-method opt-in to a
+  `Client.do(req)` wrapper used by every request. Cap dialled to
+  18 req/5 s — Fortnox's documented 25/5 s appears to use a sliding
+  window that 429s under bursts.
+- **Deploy verification** dropped `sudo k3s kubectl` in favour of plain
+  `kubectl` (the runner has a working `~/.kube/config`).
+
+### Added
+
+- `cmd/probe-sandbox` — checks all 18 Fortnox endpoints we care about
+  and reports record counts.
+- `cmd/e2e-seed` extended with five customers (NO/DE/FI/SE), ten
+  customer invoices spanning every aging bucket (paid ×2, current ×3,
+  overdue 1–30/31–60/90+), three projects (ongoing ×2, completed),
+  two cost centers (ENG, SALES), one fixed asset (computer, mid-
+  depreciation).
+- New `internal/fortnox` CRUD: `CreateCustomer`, `SetCustomerActive`,
+  `ListCustomers`, `CreateCustomerInvoice`, `BookkeepCustomerInvoice`,
+  `CancelCustomerInvoice`, `FullyPayCustomerInvoice`, `CreateProject`,
+  `SetProjectStatus`, `ListProjectsByPrefix`, `CreateCostCenter`,
+  `SetCostCenterActive`, `ListCostCentersByPrefix`, `CreateAsset`,
+  `ListAssetsByPrefix`.
+
+### Notes for next session
+
+- `cmd/e2e-teardown` still only deactivates suppliers — extending
+  it to cover the new entity types is the natural next step.
+- Asset POST quirks: response wrapper is `Assets` (plural) even
+  though the request wrapper is `Asset` (singular); `AcquisitionStart`
+  must be the 1st of a month; the field name is mistranslated as
+  "Avskrivningsstart" in error messages.
+
+---
+
 ## [0.5.0] — 2026-04-25
 
 Financial command center milestone. Conversational analytics layer across six
