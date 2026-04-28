@@ -37,7 +37,7 @@ func (c *Client) RecordPayment(p SupplierInvoicePayment) (int, error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return 0, fmt.Errorf("POST supplierinvoicepayments: %w", err)
 	}
@@ -69,7 +69,7 @@ func (c *Client) BookkeepPayment(paymentNumber int) error {
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return fmt.Errorf("PUT bookkeep %d: %w", paymentNumber, err)
 	}

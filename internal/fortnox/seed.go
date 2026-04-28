@@ -35,7 +35,7 @@ func (c *Client) CreateSupplier(s SupplierCreate) (int, error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return 0, fmt.Errorf("POST supplier: %w", err)
 	}
@@ -71,7 +71,7 @@ func (c *Client) DeactivateSupplier(supplierNumber int) error {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return fmt.Errorf("deactivate supplier %d: %w", supplierNumber, err)
 	}
@@ -95,7 +95,7 @@ func (c *Client) ActivateSupplier(supplierNumber int) error {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return fmt.Errorf("activate supplier %d: %w", supplierNumber, err)
 	}
@@ -144,7 +144,7 @@ func (c *Client) CreateSupplierInvoice(inv SupplierInvoiceCreate) (string, error
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return "", fmt.Errorf("POST supplierinvoice: %w", err)
 	}
@@ -180,7 +180,7 @@ func (c *Client) ListSuppliers(prefix string) ([]SupplierSummary, error) {
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return nil, fmt.Errorf("GET suppliers: %w", err)
 	}
@@ -218,7 +218,7 @@ func (c *Client) ListSupplierInvoicesBySupplier(supplierNumber int) ([]string, e
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return nil, fmt.Errorf("GET supplierinvoices: %w", err)
 	}
@@ -251,7 +251,7 @@ func (c *Client) BookkeepSupplierInvoice(givenNumber string) error {
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return fmt.Errorf("bookkeep invoice %s: %w", givenNumber, err)
 	}
@@ -288,7 +288,7 @@ func (c *Client) CreateCustomer(cu CustomerCreate) (int, error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return 0, fmt.Errorf("POST customer: %w", err)
 	}
@@ -322,7 +322,7 @@ func (c *Client) SetCustomerActive(customerNumber int, active bool) error {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return fmt.Errorf("set customer %d active=%v: %w", customerNumber, active, err)
 	}
@@ -353,7 +353,7 @@ func (c *Client) ListCustomers(prefix string) ([]CustomerSummary, error) {
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return nil, fmt.Errorf("GET customers: %w", err)
 	}
@@ -419,7 +419,7 @@ func (c *Client) CreateCustomerInvoice(inv CustomerInvoiceCreate) (string, error
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return "", fmt.Errorf("POST invoice: %w", err)
 	}
@@ -449,7 +449,7 @@ func (c *Client) BookkeepCustomerInvoice(documentNumber string) error {
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return fmt.Errorf("bookkeep invoice %s: %w", documentNumber, err)
 	}
@@ -471,7 +471,7 @@ func (c *Client) CancelCustomerInvoice(documentNumber string) error {
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return fmt.Errorf("cancel invoice %s: %w", documentNumber, err)
 	}
@@ -493,7 +493,7 @@ func (c *Client) FullyPayCustomerInvoice(documentNumber string, paymentDate stri
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return fmt.Errorf("GET invoice %s: %w", documentNumber, err)
 	}
@@ -544,7 +544,7 @@ func (c *Client) FullyPayCustomerInvoice(documentNumber string, paymentDate stri
 	req2.Header.Set("Content-Type", "application/json")
 	req2.Header.Set("Accept", "application/json")
 
-	resp2, err := c.httpClient.Do(req2)
+	resp2, err := c.do(req2)
 	if err != nil {
 		return fmt.Errorf("POST customer invoice payment %s: %w", documentNumber, err)
 	}
@@ -575,7 +575,7 @@ func (c *Client) FullyPayCustomerInvoice(documentNumber string, paymentDate stri
 	}
 	req3.Header.Set("Authorization", "Bearer "+c.token)
 	req3.Header.Set("Accept", "application/json")
-	resp3, err := c.httpClient.Do(req3)
+	resp3, err := c.do(req3)
 	if err != nil {
 		return fmt.Errorf("bookkeep payment %s: %w", paymentNumber, err)
 	}
@@ -598,7 +598,7 @@ func (c *Client) FullyPaySupplierInvoice(givenNumber string) error {
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return fmt.Errorf("GET invoice %s: %w", givenNumber, err)
 	}
@@ -646,7 +646,7 @@ func (c *Client) FullyPaySupplierInvoice(givenNumber string) error {
 	req2.Header.Set("Content-Type", "application/json")
 	req2.Header.Set("Accept", "application/json")
 
-	resp2, err := c.httpClient.Do(req2)
+	resp2, err := c.do(req2)
 	if err != nil {
 		return fmt.Errorf("POST payment for invoice %s: %w", givenNumber, err)
 	}
@@ -656,4 +656,322 @@ func (c *Client) FullyPaySupplierInvoice(givenNumber string) error {
 		return fmt.Errorf("POST payment for invoice %s: status %d", givenNumber, resp2.StatusCode)
 	}
 	return nil
+}
+
+// ProjectCreate holds the fields needed to create a project.
+type ProjectCreate struct {
+	Description string
+	StartDate   string // YYYY-MM-DD, optional
+	EndDate     string // YYYY-MM-DD, optional
+	Status      string // NOTSTARTED, ONGOING, COMPLETED
+}
+
+// CreateProject creates a project and returns its assigned ProjectNumber.
+func (c *Client) CreateProject(p ProjectCreate) (string, error) {
+	fields := map[string]any{"Description": p.Description}
+	if p.StartDate != "" {
+		fields["StartDate"] = p.StartDate
+	}
+	if p.EndDate != "" {
+		fields["EndDate"] = p.EndDate
+	}
+	if p.Status != "" {
+		fields["Status"] = p.Status
+	}
+	b, _ := json.Marshal(map[string]any{"Project": fields})
+	req, err := http.NewRequest(http.MethodPost, c.baseURL+"/3/projects", bytes.NewReader(b))
+	if err != nil {
+		return "", fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.do(req)
+	if err != nil {
+		return "", fmt.Errorf("POST project: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	var envelope struct {
+		Project struct {
+			ProjectNumber string `json:"ProjectNumber"`
+		} `json:"Project"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
+		return "", fmt.Errorf("decode project response: %w", err)
+	}
+	if envelope.Project.ProjectNumber == "" {
+		return "", fmt.Errorf("POST project: status %d", resp.StatusCode)
+	}
+	return envelope.Project.ProjectNumber, nil
+}
+
+// SetProjectStatus sets a project's lifecycle status. Used by teardown to
+// mark E2E projects COMPLETED (Fortnox does not allow deleting projects).
+func (c *Client) SetProjectStatus(projectNumber, status string) error {
+	url := fmt.Sprintf("%s/3/projects/%s", c.baseURL, projectNumber)
+	b, _ := json.Marshal(map[string]any{"Project": map[string]any{"Status": status}})
+	req, err := http.NewRequest(http.MethodPut, url, bytes.NewReader(b))
+	if err != nil {
+		return fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.do(req)
+	if err != nil {
+		return fmt.Errorf("set project %s status=%s: %w", projectNumber, status, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("set project %s status=%s: status %d", projectNumber, status, resp.StatusCode)
+	}
+	return nil
+}
+
+// ProjectSummary is a minimal project record returned by list operations.
+type ProjectSummary struct {
+	ProjectNumber string
+	Description   string
+	Status        string
+}
+
+// ListProjectsByPrefix returns projects whose Description starts with prefix.
+func (c *Client) ListProjectsByPrefix(prefix string) ([]ProjectSummary, error) {
+	req, err := http.NewRequest(http.MethodGet, c.baseURL+"/3/projects", nil)
+	if err != nil {
+		return nil, fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, fmt.Errorf("GET projects: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	var envelope struct {
+		Projects []struct {
+			ProjectNumber string `json:"ProjectNumber"`
+			Description   string `json:"Description"`
+			Status        string `json:"Status"`
+		} `json:"Projects"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
+		return nil, fmt.Errorf("decode projects: %w", err)
+	}
+
+	var result []ProjectSummary
+	for _, p := range envelope.Projects {
+		if strings.HasPrefix(p.Description, prefix) {
+			result = append(result, ProjectSummary{
+				ProjectNumber: p.ProjectNumber,
+				Description:   p.Description,
+				Status:        p.Status,
+			})
+		}
+	}
+	return result, nil
+}
+
+// CostCenterCreate holds the fields needed to create a cost center.
+type CostCenterCreate struct {
+	Code        string // user-defined identifier, e.g. "ENG"
+	Description string
+}
+
+// CreateCostCenter creates a cost center.
+func (c *Client) CreateCostCenter(cc CostCenterCreate) error {
+	b, _ := json.Marshal(map[string]any{
+		"CostCenter": map[string]any{
+			"Code":        cc.Code,
+			"Description": cc.Description,
+		},
+	})
+	req, err := http.NewRequest(http.MethodPost, c.baseURL+"/3/costcenters", bytes.NewReader(b))
+	if err != nil {
+		return fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.do(req)
+	if err != nil {
+		return fmt.Errorf("POST costcenter: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("POST costcenter %s: status %d", cc.Code, resp.StatusCode)
+	}
+	return nil
+}
+
+// SetCostCenterActive toggles a cost center's Active flag. Used by teardown.
+func (c *Client) SetCostCenterActive(code string, active bool) error {
+	url := fmt.Sprintf("%s/3/costcenters/%s", c.baseURL, code)
+	b, _ := json.Marshal(map[string]any{"CostCenter": map[string]any{"Active": active}})
+	req, err := http.NewRequest(http.MethodPut, url, bytes.NewReader(b))
+	if err != nil {
+		return fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.do(req)
+	if err != nil {
+		return fmt.Errorf("set costcenter %s active=%v: %w", code, active, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("set costcenter %s active=%v: status %d", code, active, resp.StatusCode)
+	}
+	return nil
+}
+
+// CostCenterSummary is a minimal cost center record returned by list operations.
+type CostCenterSummary struct {
+	Code        string
+	Description string
+	Active      bool
+}
+
+// ListCostCentersByPrefix returns cost centers whose Description starts with
+// prefix. Cost-center Code is length-limited (~5 chars) in Fortnox, so it
+// can't carry the E2E- marker — the marker lives on Description instead.
+func (c *Client) ListCostCentersByPrefix(prefix string) ([]CostCenterSummary, error) {
+	req, err := http.NewRequest(http.MethodGet, c.baseURL+"/3/costcenters", nil)
+	if err != nil {
+		return nil, fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, fmt.Errorf("GET costcenters: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	var envelope struct {
+		CostCenters []struct {
+			Code        string `json:"Code"`
+			Description string `json:"Description"`
+			Active      bool   `json:"Active"`
+		} `json:"CostCenters"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
+		return nil, fmt.Errorf("decode costcenters: %w", err)
+	}
+
+	var result []CostCenterSummary
+	for _, cc := range envelope.CostCenters {
+		if strings.HasPrefix(cc.Description, prefix) {
+			result = append(result, CostCenterSummary{
+				Code:        cc.Code,
+				Description: cc.Description,
+				Active:      cc.Active,
+			})
+		}
+	}
+	return result, nil
+}
+
+// AssetCreate holds the fields needed to create a fixed asset.
+// Sandbox-friendly minimum: description + acquisition value + dates +
+// depreciation accounts. Real usage would also need DepreciationFinal,
+// AssetType, etc.
+type AssetCreate struct {
+	Description       string
+	AcquisitionValue  float64
+	AcquisitionDate   string // YYYY-MM-DD
+	DepreciationFinal string // YYYY-MM-DD — when fully depreciated
+	TypeID            string // asset type ID; sandbox usually has "1"
+}
+
+// CreateAsset creates a fixed asset and returns its assigned Number.
+func (c *Client) CreateAsset(a AssetCreate) (string, error) {
+	fields := map[string]any{
+		"Description":       a.Description,
+		"AcquisitionValue":  a.AcquisitionValue,
+		"AcquisitionDate":   a.AcquisitionDate,
+		"DepreciationFinal": a.DepreciationFinal,
+	}
+	if a.TypeID != "" {
+		fields["TypeID"] = a.TypeID
+	}
+	b, _ := json.Marshal(map[string]any{"Asset": fields})
+	req, err := http.NewRequest(http.MethodPost, c.baseURL+"/3/assets", bytes.NewReader(b))
+	if err != nil {
+		return "", fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.do(req)
+	if err != nil {
+		return "", fmt.Errorf("POST asset: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	var envelope struct {
+		Asset struct {
+			Number string `json:"Number"`
+		} `json:"Asset"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
+		return "", fmt.Errorf("decode asset response: %w", err)
+	}
+	if envelope.Asset.Number == "" {
+		return "", fmt.Errorf("POST asset: status %d", resp.StatusCode)
+	}
+	return envelope.Asset.Number, nil
+}
+
+// AssetSummary is a minimal asset record returned by list operations.
+type AssetSummary struct {
+	Number      string
+	Description string
+}
+
+// ListAssetsByPrefix returns assets whose Description starts with prefix.
+func (c *Client) ListAssetsByPrefix(prefix string) ([]AssetSummary, error) {
+	req, err := http.NewRequest(http.MethodGet, c.baseURL+"/3/assets", nil)
+	if err != nil {
+		return nil, fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, fmt.Errorf("GET assets: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	var envelope struct {
+		Assets []struct {
+			Number      string `json:"Number"`
+			Description string `json:"Description"`
+		} `json:"Assets"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
+		return nil, fmt.Errorf("decode assets: %w", err)
+	}
+
+	var result []AssetSummary
+	for _, a := range envelope.Assets {
+		if strings.HasPrefix(a.Description, prefix) {
+			result = append(result, AssetSummary{Number: a.Number, Description: a.Description})
+		}
+	}
+	return result, nil
 }

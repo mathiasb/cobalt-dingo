@@ -61,7 +61,7 @@ func (c *Client) UnpaidSupplierInvoices() ([]domain.SupplierInvoice, error) {
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return nil, fmt.Errorf("GET supplierinvoices: %w", err)
 	}
@@ -102,9 +102,11 @@ type metaEnvelope struct {
 }
 
 // waitForRate blocks until a request slot is available within the Fortnox
-// rate limit (25 requests per 5-second window).
+// rate limit. Fortnox documents 25 req / 5 s but appears to enforce it via a
+// sliding window — bursting 25 req in <1 s reliably triggers 429s. The cap
+// is dialled back to 18 here to leave headroom for that sliding behaviour.
 func waitForRate() {
-	const maxReqs = 25
+	const maxReqs = 18
 	const window = 5 * time.Second
 
 	for {
@@ -125,11 +127,17 @@ func waitForRate() {
 	}
 }
 
+// do performs an HTTP request after waiting for a free rate-limit slot.
+// All Client methods that hit Fortnox should use this in place of
+// c.httpClient.Do(req) so the 25 req / 5 s ceiling is enforced.
+func (c *Client) do(req *http.Request) (*http.Response, error) {
+	waitForRate()
+	return c.httpClient.Do(req)
+}
+
 // Get performs an authenticated, rate-limited GET request and returns the raw
 // JSON response body.
 func (c *Client) Get(requestURL string) (json.RawMessage, error) {
-	waitForRate()
-
 	req, err := http.NewRequest(http.MethodGet, requestURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("build request: %w", err)
@@ -137,7 +145,7 @@ func (c *Client) Get(requestURL string) (json.RawMessage, error) {
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return nil, fmt.Errorf("GET %s: %w", requestURL, err)
 	}

@@ -29,7 +29,7 @@ func (c *Client) SupplierPaymentDetails(supplierNumber int) (iban, bic string, e
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return "", "", fmt.Errorf("GET supplier %d: %w", supplierNumber, err)
 	}

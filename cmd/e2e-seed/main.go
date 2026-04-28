@@ -17,6 +17,16 @@
 //	5 customers across NO/DE/FI/SE
 //	10 invoices spanning every aging bucket (paid, current, 1-30, 31-60, 90+)
 //
+// Operational entities:
+//
+//	3 projects: ongoing, near-completion, closed
+//	2 cost centers: SALES and ENG
+//
+// Asset seeding is deferred until Fortnox /3/assets POST field-naming is
+// established (the depreciation-start field rejects every common candidate).
+// CreateAsset / ListAssetsByPrefix in internal/fortnox/seed.go remain ready
+// to re-enable. See DECISIONS.md for the full investigation trail.
+//
 // Usage:
 //
 //	source .env && go run ./cmd/e2e-seed
@@ -96,6 +106,32 @@ type seedCustomerInvoice struct {
 	description  string
 	paid         bool   // if true, register a full payment after bookkeeping
 	paymentDate  string // only used when paid=true
+}
+
+type seedProject struct {
+	description string
+	startDate   string
+	endDate     string
+	status      string // NOTSTARTED | ONGOING | COMPLETED
+}
+
+type seedCostCenter struct {
+	code        string // E2E- prefixed code, e.g. E2E-ENG
+	description string
+}
+
+var projects = []seedProject{
+	{description: e2ePrefix + "Aurora Platform", startDate: "2026-01-15", status: "ONGOING"},
+	{description: e2ePrefix + "Borealis Migration", startDate: "2026-02-01", endDate: "2026-05-31", status: "ONGOING"},
+	{description: e2ePrefix + "Solstice Discovery", startDate: "2025-09-01", endDate: "2025-12-15", status: "COMPLETED"},
+}
+
+// Cost center Code is length-limited in Fortnox (~5 chars) so we can't fit
+// the E2E- prefix there. The Description carries the prefix instead, and
+// teardown looks the cost centers up by description prefix.
+var costCenters = []seedCostCenter{
+	{code: "ENG", description: e2ePrefix + "Engineering"},
+	{code: "SALES", description: e2ePrefix + "Sales"},
 }
 
 var customers = []seedCustomer{
@@ -344,6 +380,69 @@ func main() {
 		}
 		fmt.Printf("  ✓ %-40s %s %9.2f  due %s  → invoice %s (%s)\n",
 			inv.customerName, inv.currency, inv.total, inv.dueDate, docNumber, state)
+	}
+
+	// Projects.
+	existingProjects, err := client.ListProjectsByPrefix(e2ePrefix)
+	if err != nil {
+		log.Error("list projects", "err", err)
+		os.Exit(1)
+	}
+	projectByDesc := make(map[string]string, len(existingProjects))
+	for _, p := range existingProjects {
+		projectByDesc[p.Description] = p.ProjectNumber
+	}
+	fmt.Println("\nSetting up projects...")
+	for _, p := range projects {
+		if num, found := projectByDesc[p.description]; found {
+			if err := client.SetProjectStatus(num, p.status); err != nil {
+				log.Error("update project status", "desc", p.description, "err", err)
+				os.Exit(1)
+			}
+			fmt.Printf("  ↺ %-40s → project %s (status %s)\n", p.description, num, p.status)
+			continue
+		}
+		num, err := client.CreateProject(fortnox.ProjectCreate{
+			Description: p.description,
+			StartDate:   p.startDate,
+			EndDate:     p.endDate,
+			Status:      p.status,
+		})
+		if err != nil {
+			log.Error("create project", "desc", p.description, "err", err)
+			os.Exit(1)
+		}
+		fmt.Printf("  ✓ %-40s → project %s (created, %s)\n", p.description, num, p.status)
+	}
+
+	// Cost centers.
+	existingCC, err := client.ListCostCentersByPrefix(e2ePrefix)
+	if err != nil {
+		log.Error("list cost centers", "err", err)
+		os.Exit(1)
+	}
+	ccByCode := make(map[string]bool, len(existingCC))
+	for _, cc := range existingCC {
+		ccByCode[cc.Code] = true
+	}
+	fmt.Println("\nSetting up cost centers...")
+	for _, cc := range costCenters {
+		if ccByCode[cc.code] {
+			if err := client.SetCostCenterActive(cc.code, true); err != nil {
+				log.Error("reactivate cost center", "code", cc.code, "err", err)
+				os.Exit(1)
+			}
+			fmt.Printf("  ↺ %-40s (reactivated)\n", cc.code)
+			continue
+		}
+		if err := client.CreateCostCenter(fortnox.CostCenterCreate{
+			Code:        cc.code,
+			Description: cc.description,
+		}); err != nil {
+			log.Error("create cost center", "code", cc.code, "err", err)
+			os.Exit(1)
+		}
+		fmt.Printf("  ✓ %-40s (created)\n", cc.code)
 	}
 
 	fmt.Println("\nSeed complete. Run: source .env && go run ./cmd/e2e-teardown")
