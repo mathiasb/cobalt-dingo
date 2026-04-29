@@ -30,8 +30,20 @@ tasks:
   # ── Quality ─────────────────────────────────────────────────────────────────
 
   check:
-    desc: Run all checks (lint + test + vet)
+    desc: Run all checks (context freshness + lint + test + vet)
     cmds:
+      - task: context:sync
+      - cmd: |
+          drift=$(git status --porcelain -- AGENTS.md CLAUDE.md .cursorrules .aider.conventions.md .context/system-prompt.txt 2>/dev/null)
+          if [ -n "$drift" ]; then
+            echo "ERROR: derived adapters drifted from canonical context." >&2
+            echo "$drift" >&2
+            echo "" >&2
+            echo "Run: git add AGENTS.md CLAUDE.md .cursorrules .aider.conventions.md .context/system-prompt.txt" >&2
+            echo "     git commit -m 'chore: re-sync context adapters'" >&2
+            exit 1
+          fi
+          echo "✓ context: canonical and adapters are in sync"
       - task: lint
       - task: test
       - task: vet
