@@ -171,9 +171,6 @@ tasks:
     desc: Regenerate all harness-specific context files
     cmds:
       - bash scripts/context-sync.sh
-    sources:
-      - .context/PROJECT.md
-      - .skills/*/SKILL.md
 
   context:sync:claude:
     cmds: [bash scripts/context-sync.sh claude]
