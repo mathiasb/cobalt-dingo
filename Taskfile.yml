@@ -124,7 +124,7 @@ tasks:
   fortnox:auth:sandbox:
     desc: "OAuth2 flow against sandbox connected app — stop dev server first (both use :8080)"
     cmds:
-      - source .env && FORTNOX_MODE=sandbox go run ./cmd/fortnox-auth
+      - source .env && go run ./cmd/fortnox-auth --mode=sandbox
 
   fortnox:check:sandbox:
     desc: Verify sandbox Fortnox connection
@@ -149,7 +149,7 @@ tasks:
   fortnox:auth:real-ro:
     desc: OAuth2 flow against the real (read-only) Fortnox connected app
     cmds:
-      - source .env && FORTNOX_MODE=real_readonly go run ./cmd/fortnox-auth
+      - source .env && go run ./cmd/fortnox-auth --mode=real_readonly
 
   fortnox:check:real-ro:
     desc: Verify the real read-only Fortnox connection
