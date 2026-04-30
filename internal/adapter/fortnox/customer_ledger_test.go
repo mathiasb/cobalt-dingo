@@ -41,7 +41,7 @@ func TestCustomerLedger_UnpaidInvoices(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	adapter := adapterfortnox.NewCustomerLedgerAdapter(srv.URL, &stubTokenStore{})
+	adapter := adapterfortnox.NewCustomerLedgerAdapter(srv.URL, &stubTokenStore{}, false)
 	invoices, err := adapter.UnpaidInvoices(context.Background(), domain.TenantID("t1"))
 
 	require.NoError(t, err)
@@ -82,7 +82,7 @@ func TestCustomerLedger_InvoicePayments(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	adapter := adapterfortnox.NewCustomerLedgerAdapter(srv.URL, &stubTokenStore{})
+	adapter := adapterfortnox.NewCustomerLedgerAdapter(srv.URL, &stubTokenStore{}, false)
 	payments, err := adapter.InvoicePayments(context.Background(), domain.TenantID("t1"), 2001)
 
 	require.NoError(t, err)
@@ -113,7 +113,7 @@ func TestCustomerLedger_CustomerDetail(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	adapter := adapterfortnox.NewCustomerLedgerAdapter(srv.URL, &stubTokenStore{})
+	adapter := adapterfortnox.NewCustomerLedgerAdapter(srv.URL, &stubTokenStore{}, false)
 	customer, err := adapter.CustomerDetail(context.Background(), domain.TenantID("t1"), 10)
 
 	require.NoError(t, err)

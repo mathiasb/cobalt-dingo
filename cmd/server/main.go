@@ -31,15 +31,31 @@ func main() {
 		port = "8080"
 	}
 
-	cfg, err := config.Load()
-	if err != nil {
-		log.Warn("Fortnox not configured — serving placeholder data", "err", err)
+	// Fortnox is optional for the server: when FORTNOX_MODE is unset we run
+	// in dev mode with fake adapters. When set, the mode is strict — config
+	// loading rejects missing credentials so we fail fast on misconfiguration.
+	var (
+		cfg            config.Fortnox
+		fortnoxEnabled bool
+	)
+	if os.Getenv("FORTNOX_MODE") != "" {
+		c, err := config.Load()
+		if err != nil {
+			log.Error("Fortnox config error", "err", err)
+			os.Exit(1)
+		}
+		cfg = c
+		fortnoxEnabled = true
 	}
 
 	debtor := config.LoadDebtor()
 	appCfg := config.LoadApp()
 
-	log.Info("cobalt-dingo starting", "port", port, "fortnox_env", cfg.Env)
+	if fortnoxEnabled {
+		log.Info("cobalt-dingo starting", "port", port, "fortnox_mode", cfg.Mode)
+	} else {
+		log.Info("cobalt-dingo starting (dev mode — Fortnox unconfigured)", "port", port)
+	}
 
 	var (
 		invoiceSource domain.InvoiceSource
@@ -64,7 +80,7 @@ func main() {
 
 	pispSubmitter := pisp.NewStub(log)
 
-	if cfg.ClientID == "" {
+	if !fortnoxEnabled {
 		invoiceSource = fake.InvoiceSource{}
 		enricher = fake.SupplierEnricher{}
 	} else {
@@ -73,7 +89,7 @@ func main() {
 			store, _ := postgres.NewStore(appCfg.DatabaseURL)
 			tokenStore = postgres.NewTokenStore(store)
 		} else {
-			tokenStore = file.NewTokenStore()
+			tokenStore = file.NewTokenStore(cfg.Mode.TokenFile())
 		}
 		connector := adapterfortnox.NewConnector(cfg, tokenStore, log)
 		invoiceSource = connector
@@ -97,27 +113,28 @@ func main() {
 	srv.RegisterRoutes(mux)
 
 	claudeCfg := config.LoadClaude()
-	if claudeCfg.APIKey != "" {
+	if claudeCfg.APIKey != "" && fortnoxEnabled {
 		var tokenStore domain.TokenStore
 		if appCfg.DatabaseURL != "" {
 			store, _ := postgres.NewStore(appCfg.DatabaseURL)
 			tokenStore = postgres.NewTokenStore(store)
 		} else {
-			tokenStore = file.NewTokenStore()
+			tokenStore = file.NewTokenStore(cfg.Mode.TokenFile())
 		}
 		baseURL := cfg.BaseURL()
-		gl := adapterfortnox.NewGeneralLedgerAdapter(baseURL, tokenStore)
+		readOnly := !cfg.Mode.AllowsWrites()
+		gl := adapterfortnox.NewGeneralLedgerAdapter(baseURL, tokenStore, readOnly)
 		mcpDeps := mcpserver.Deps{
 			TenantID:    defaultTenantID,
-			SupplierLdg: adapterfortnox.NewSupplierLedgerAdapter(baseURL, tokenStore),
-			CustomerLdg: adapterfortnox.NewCustomerLedgerAdapter(baseURL, tokenStore),
+			SupplierLdg: adapterfortnox.NewSupplierLedgerAdapter(baseURL, tokenStore, readOnly),
+			CustomerLdg: adapterfortnox.NewCustomerLedgerAdapter(baseURL, tokenStore, readOnly),
 			GeneralLdg:  gl,
-			ProjectLdg:  adapterfortnox.NewProjectLedgerAdapter(baseURL, tokenStore, gl),
-			CostCtrLdg:  adapterfortnox.NewCostCenterLedgerAdapter(baseURL, tokenStore, gl),
-			AssetReg:    adapterfortnox.NewAssetRegisterAdapter(baseURL, tokenStore),
-			CompanyInf:  adapterfortnox.NewCompanyInfoAdapter(baseURL, tokenStore),
+			ProjectLdg:  adapterfortnox.NewProjectLedgerAdapter(baseURL, tokenStore, gl, readOnly),
+			CostCtrLdg:  adapterfortnox.NewCostCenterLedgerAdapter(baseURL, tokenStore, gl, readOnly),
+			AssetReg:    adapterfortnox.NewAssetRegisterAdapter(baseURL, tokenStore, readOnly),
+			CompanyInf:  adapterfortnox.NewCompanyInfoAdapter(baseURL, tokenStore, readOnly),
 		}
-		chatHandler := ui.NewChatHandler(mcpDeps, claudeCfg, log)
+		chatHandler := ui.NewChatHandler(mcpDeps, claudeCfg, cfg.Mode, log)
 		mux.HandleFunc("GET /chat", chatHandler.PageHandler)
 		mux.HandleFunc("POST /chat", chatHandler.MessageHandler)
 		log.Info("chat handler registered")

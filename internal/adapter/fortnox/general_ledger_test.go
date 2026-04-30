@@ -42,7 +42,7 @@ func TestGeneralLedger_ChartOfAccounts(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	adapter := adapterfortnox.NewGeneralLedgerAdapter(srv.URL, newStubTokenStore())
+	adapter := adapterfortnox.NewGeneralLedgerAdapter(srv.URL, newStubTokenStore(), false)
 	accounts, err := adapter.ChartOfAccounts(context.Background(), "tenant-1", 1)
 
 	require.NoError(t, err)
@@ -70,7 +70,7 @@ func TestGeneralLedger_FinancialYears(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	adapter := adapterfortnox.NewGeneralLedgerAdapter(srv.URL, newStubTokenStore())
+	adapter := adapterfortnox.NewGeneralLedgerAdapter(srv.URL, newStubTokenStore(), false)
 	years, err := adapter.FinancialYears(context.Background(), "tenant-1")
 
 	require.NoError(t, err)

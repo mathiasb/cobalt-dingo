@@ -10,14 +10,16 @@ import (
 
 // CompanyInfoAdapter implements domain.CompanyInfo using the Fortnox REST API.
 type CompanyInfoAdapter struct {
-	baseURL string
-	tokens  domain.TokenStore
+	baseURL  string
+	tokens   domain.TokenStore
+	readOnly bool
 }
 
-// NewCompanyInfoAdapter returns a CompanyInfoAdapter pointed at baseURL and
-// backed by the given token store.
-func NewCompanyInfoAdapter(baseURL string, tokens domain.TokenStore) *CompanyInfoAdapter {
-	return &CompanyInfoAdapter{baseURL: baseURL, tokens: tokens}
+// NewCompanyInfoAdapter returns a CompanyInfoAdapter pointed at baseURL
+// and backed by the given token store. readOnly is propagated to the raw
+// Fortnox client.
+func NewCompanyInfoAdapter(baseURL string, tokens domain.TokenStore, readOnly bool) *CompanyInfoAdapter {
+	return &CompanyInfoAdapter{baseURL: baseURL, tokens: tokens, readOnly: readOnly}
 }
 
 // client loads the tenant's access token and returns a ready-to-use raw Fortnox client.
@@ -26,7 +28,7 @@ func (a *CompanyInfoAdapter) client(ctx context.Context, tenantID domain.TenantI
 	if err != nil {
 		return nil, fmt.Errorf("load token: %w", err)
 	}
-	return rawfortnox.NewClient(a.baseURL, tok.AccessToken), nil
+	return rawfortnox.NewClient(a.baseURL, tok.AccessToken, a.readOnly), nil
 }
 
 // Info implements domain.CompanyInfo.

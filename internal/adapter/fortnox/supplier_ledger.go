@@ -13,14 +13,17 @@ import (
 // converts raw rows to domain types. No retry or refresh logic — callers that need
 // refresh should wrap the TokenStore or use the full Connector.
 type SupplierLedgerAdapter struct {
-	baseURL string
-	tokens  domain.TokenStore
+	baseURL  string
+	tokens   domain.TokenStore
+	readOnly bool
 }
 
-// NewSupplierLedgerAdapter returns a SupplierLedgerAdapter pointed at baseURL and
-// backed by the given token store.
-func NewSupplierLedgerAdapter(baseURL string, tokens domain.TokenStore) *SupplierLedgerAdapter {
-	return &SupplierLedgerAdapter{baseURL: baseURL, tokens: tokens}
+// NewSupplierLedgerAdapter returns a SupplierLedgerAdapter pointed at baseURL,
+// backed by the given token store. readOnly is propagated to the raw Fortnox
+// client so writes are refused locally when this adapter is used in a
+// read-only mode.
+func NewSupplierLedgerAdapter(baseURL string, tokens domain.TokenStore, readOnly bool) *SupplierLedgerAdapter {
+	return &SupplierLedgerAdapter{baseURL: baseURL, tokens: tokens, readOnly: readOnly}
 }
 
 // client loads the tenant's access token and returns a ready-to-use raw Fortnox client.
@@ -29,7 +32,7 @@ func (a *SupplierLedgerAdapter) client(ctx context.Context, tenantID domain.Tena
 	if err != nil {
 		return nil, fmt.Errorf("load token: %w", err)
 	}
-	return rawfortnox.NewClient(a.baseURL, tok.AccessToken), nil
+	return rawfortnox.NewClient(a.baseURL, tok.AccessToken, a.readOnly), nil
 }
 
 // UnpaidInvoices implements domain.SupplierLedger.

@@ -39,22 +39,26 @@ func main() {
 	}
 
 	fmt.Println("─────────────────────────────────────")
-	fmt.Printf("  Environment          : %s\n", cfg.Env)
+	fmt.Printf("  Mode                 : %s\n", cfg.Mode.Label())
+	fmt.Printf("  Token file           : %s\n", cfg.Mode.TokenFile())
 	fmt.Printf("  Base URL             : %s\n", cfg.BaseURL())
+	fmt.Printf("  Writes allowed       : %v\n", cfg.Mode.AllowsWrites())
 	fmt.Printf("  Unpaid invoices      : %d\n", count)
 	fmt.Println("─────────────────────────────────────")
 
-	if cfg.IsSandbox() {
-		fmt.Println("✓ Connected to SANDBOX — safe to proceed")
-	} else {
-		fmt.Println("⚠ Connected to PRODUCTION — handle with care")
+	switch cfg.Mode {
+	case config.ModeSandbox:
+		fmt.Println("✓ Connected to SANDBOX — safe to write")
+	case config.ModeRealReadonly:
+		fmt.Println("⚠ Connected to LIVE Fortnox in READ-ONLY mode — no writes possible")
 	}
 }
 
 func loadValidToken(cfg config.Fortnox, log *slog.Logger) (fortnox.Token, error) {
-	t, err := fortnox.LoadToken()
+	tokenPath := cfg.Mode.TokenFile()
+	t, err := fortnox.LoadToken(tokenPath)
 	if err != nil {
-		return fortnox.Token{}, fmt.Errorf("no saved token — run: go run ./cmd/fortnox-auth: %w", err)
+		return fortnox.Token{}, fmt.Errorf("no saved token at %s — run fortnox-auth for mode %s: %w", tokenPath, cfg.Mode, err)
 	}
 	if t.Valid() {
 		return t, nil
@@ -62,9 +66,9 @@ func loadValidToken(cfg config.Fortnox, log *slog.Logger) (fortnox.Token, error)
 	log.Info("access token expired, refreshing")
 	t, err = fortnox.RefreshAccessToken(cfg.ClientID, cfg.ClientSecret, t.RefreshToken)
 	if err != nil {
-		return fortnox.Token{}, fmt.Errorf("refresh failed — re-run fortnox-auth: %w", err)
+		return fortnox.Token{}, fmt.Errorf("refresh failed — re-run fortnox-auth for mode %s: %w", cfg.Mode, err)
 	}
-	if err := fortnox.SaveToken(t); err != nil {
+	if err := fortnox.SaveToken(tokenPath, t); err != nil {
 		log.Warn("could not save refreshed token", "err", err)
 	}
 	return t, nil

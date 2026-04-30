@@ -13,14 +13,16 @@ import (
 // It is intentionally thin: it loads a token, creates a raw client per call, and
 // converts raw rows to domain types.
 type CustomerLedgerAdapter struct {
-	baseURL string
-	tokens  domain.TokenStore
+	baseURL  string
+	tokens   domain.TokenStore
+	readOnly bool
 }
 
-// NewCustomerLedgerAdapter returns a CustomerLedgerAdapter pointed at baseURL and
-// backed by the given token store.
-func NewCustomerLedgerAdapter(baseURL string, tokens domain.TokenStore) *CustomerLedgerAdapter {
-	return &CustomerLedgerAdapter{baseURL: baseURL, tokens: tokens}
+// NewCustomerLedgerAdapter returns a CustomerLedgerAdapter pointed at
+// baseURL and backed by the given token store. readOnly is propagated to
+// the raw Fortnox client.
+func NewCustomerLedgerAdapter(baseURL string, tokens domain.TokenStore, readOnly bool) *CustomerLedgerAdapter {
+	return &CustomerLedgerAdapter{baseURL: baseURL, tokens: tokens, readOnly: readOnly}
 }
 
 // client loads the tenant's access token and returns a ready-to-use raw Fortnox client.
@@ -29,7 +31,7 @@ func (a *CustomerLedgerAdapter) client(ctx context.Context, tenantID domain.Tena
 	if err != nil {
 		return nil, fmt.Errorf("load token: %w", err)
 	}
-	return rawfortnox.NewClient(a.baseURL, tok.AccessToken), nil
+	return rawfortnox.NewClient(a.baseURL, tok.AccessToken, a.readOnly), nil
 }
 
 // UnpaidInvoices implements domain.CustomerLedger.

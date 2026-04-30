@@ -220,37 +220,39 @@ jobs:
 
       # Write credentials from secrets — never stored in the repo.
       # act_runner substitutes ${{ }} before passing the script to bash.
+      # Gitea secrets are still named FORTNOX_CLIENT_ID etc; the workflow
+      # maps them onto the new FORTNOX_SANDBOX_* keys consumed by config.Load.
       - name: Write credentials
         run: |
-          echo 'FORTNOX_CLIENT_ID=${{ secrets.FORTNOX_CLIENT_ID }}'     > .env
-          echo 'FORTNOX_CLIENT_SECRET=${{ secrets.FORTNOX_CLIENT_SECRET }}' >> .env
-          echo 'FORTNOX_REDIRECT_URI=http://localhost:8080/callback'         >> .env
-          echo 'FORTNOX_SCOPES="companyinformation bookkeeping customer invoice supplier supplierinvoice payment currency project costcenter assets settings"' >> .env
-          echo 'FORTNOX_ENV=sandbox'                                          >> .env
-          echo 'FORTNOX_INVOICE_INBOX=${{ secrets.FORTNOX_INVOICE_INBOX }}'  >> .env
-          python3 -c "import json; open('.fortnox-tokens.json','w').write(json.dumps({'access_token':'','refresh_token':'${{ secrets.FORTNOX_REFRESH_TOKEN }}','token_type':'bearer','expires_at':'2000-01-01T00:00:00Z'}))"
-          chmod 600 .fortnox-tokens.json
-          echo ".env lines: $(wc -l < .env)  token bytes: $(wc -c < .fortnox-tokens.json)"
-          cat .fortnox-tokens.json
+          echo 'FORTNOX_SANDBOX_CLIENT_ID=${{ secrets.FORTNOX_CLIENT_ID }}'         > .env
+          echo 'FORTNOX_SANDBOX_CLIENT_SECRET=${{ secrets.FORTNOX_CLIENT_SECRET }}' >> .env
+          echo 'FORTNOX_SANDBOX_REDIRECT_URI=http://localhost:8080/callback'        >> .env
+          echo 'FORTNOX_SANDBOX_SCOPES="companyinformation bookkeeping customer invoice supplier supplierinvoice payment currency project costcenter assets settings"' >> .env
+          echo 'FORTNOX_SANDBOX_INVOICE_INBOX=${{ secrets.FORTNOX_INVOICE_INBOX }}' >> .env
+          python3 -c "import json; open('.fortnox-tokens-sandbox.json','w').write(json.dumps({'access_token':'','refresh_token':'${{ secrets.FORTNOX_REFRESH_TOKEN }}','token_type':'bearer','expires_at':'2000-01-01T00:00:00Z'}))"
+          chmod 600 .fortnox-tokens-sandbox.json
+          echo ".env lines: $(wc -l < .env)  token bytes: $(wc -c < .fortnox-tokens-sandbox.json)"
+          cat .fortnox-tokens-sandbox.json
 
-      # Reset sandbox to a known state before seeding.
+      # Reset sandbox to a known state before seeding. FORTNOX_MODE is set
+      # explicitly per-step so a stray env in the runner cannot misroute.
       - name: Teardown E2E fixtures
         run: |
           set -a && source .env && set +a
-          go run ./cmd/e2e-teardown
+          FORTNOX_MODE=sandbox go run ./cmd/e2e-teardown
 
       # Seed test suppliers and booked invoices.
       - name: Seed E2E fixtures
         run: |
           set -a && source .env && set +a
-          go run ./cmd/e2e-seed
+          FORTNOX_MODE=sandbox go run ./cmd/e2e-seed
 
       # Run acceptance tests against the seeded sandbox.
       # Data is intentionally left in place after the run for manual inspection.
       - name: Run acceptance tests
         run: |
           set -a && source .env && set +a
-          go test -race -count=1 -timeout=120s ./internal/acceptance/...
+          FORTNOX_MODE=sandbox go test -race -count=1 -timeout=120s ./internal/acceptance/...
 
   # ── 5. Mirror to GitHub ─────────────────────────────────────────────────────
   mirror:

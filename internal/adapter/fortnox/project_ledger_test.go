@@ -33,8 +33,8 @@ func TestProjectLedger_Projects(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	gl := adapterfortnox.NewGeneralLedgerAdapter(srv.URL, newStubTokenStore())
-	adapter := adapterfortnox.NewProjectLedgerAdapter(srv.URL, newStubTokenStore(), gl)
+	gl := adapterfortnox.NewGeneralLedgerAdapter(srv.URL, newStubTokenStore(), false)
+	adapter := adapterfortnox.NewProjectLedgerAdapter(srv.URL, newStubTokenStore(), gl, false)
 	projects, err := adapter.Projects(context.Background(), "tenant-1")
 
 	require.NoError(t, err)
@@ -97,8 +97,8 @@ func TestProjectLedger_ProjectTransactions(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	gl := adapterfortnox.NewGeneralLedgerAdapter(srv.URL, newStubTokenStore())
-	adapter := adapterfortnox.NewProjectLedgerAdapter(srv.URL, newStubTokenStore(), gl)
+	gl := adapterfortnox.NewGeneralLedgerAdapter(srv.URL, newStubTokenStore(), false)
+	adapter := adapterfortnox.NewProjectLedgerAdapter(srv.URL, newStubTokenStore(), gl, false)
 
 	from := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2025, 12, 31, 0, 0, 0, 0, time.UTC)

@@ -82,7 +82,7 @@ func (c *Connector) client(ctx context.Context, tenantID domain.TenantID) (*fort
 		}
 	}
 
-	return fortnox.NewClient(c.cfg.BaseURL(), tok.AccessToken), nil
+	return fortnox.NewClient(c.cfg.BaseURL(), tok.AccessToken, !c.cfg.Mode.AllowsWrites()), nil
 }
 
 // refresh calls the Fortnox token endpoint and converts the result to domain.OAuthToken.

@@ -11,14 +11,17 @@ import (
 
 // GeneralLedgerAdapter implements domain.GeneralLedger using the Fortnox REST API.
 type GeneralLedgerAdapter struct {
-	baseURL string
-	tokens  domain.TokenStore
+	baseURL  string
+	tokens   domain.TokenStore
+	readOnly bool
 }
 
-// NewGeneralLedgerAdapter returns a GeneralLedgerAdapter pointed at baseURL and
-// backed by the given token store.
-func NewGeneralLedgerAdapter(baseURL string, tokens domain.TokenStore) *GeneralLedgerAdapter {
-	return &GeneralLedgerAdapter{baseURL: baseURL, tokens: tokens}
+// NewGeneralLedgerAdapter returns a GeneralLedgerAdapter pointed at baseURL
+// and backed by the given token store. readOnly is propagated to the raw
+// Fortnox client so writes are refused locally when this adapter is used
+// in a read-only mode.
+func NewGeneralLedgerAdapter(baseURL string, tokens domain.TokenStore, readOnly bool) *GeneralLedgerAdapter {
+	return &GeneralLedgerAdapter{baseURL: baseURL, tokens: tokens, readOnly: readOnly}
 }
 
 // client loads the tenant's access token and returns a ready-to-use raw Fortnox client.
@@ -27,7 +30,7 @@ func (a *GeneralLedgerAdapter) client(ctx context.Context, tenantID domain.Tenan
 	if err != nil {
 		return nil, fmt.Errorf("load token: %w", err)
 	}
-	return rawfortnox.NewClient(a.baseURL, tok.AccessToken), nil
+	return rawfortnox.NewClient(a.baseURL, tok.AccessToken, a.readOnly), nil
 }
 
 // ChartOfAccounts implements domain.GeneralLedger.

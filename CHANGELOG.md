@@ -14,6 +14,75 @@ the domain model or port interfaces will be called out explicitly.
 
 ---
 
+## [0.6.0] — 2026-05-01
+
+Mode separation — explicit `FORTNOX_MODE` selects between the sandbox
+(write-capable) and real_readonly (live company, read-only) Fortnox
+connected apps. Lays the safety groundwork for using cobalt-dingo as a
+read-only AI command center over real Fortnox data while keeping the
+sandbox available for write-action testing.
+
+### Added
+
+- **`FORTNOX_MODE` config**, required by every binary that touches Fortnox.
+  Two modes: `sandbox` (write-capable) and `real_readonly` (read-only).
+  A third `real_readwrite` is reserved for a future milestone.
+- **Mode-prefixed credential keys** (`FORTNOX_SANDBOX_*`,
+  `FORTNOX_REAL_RO_*`) and **mode-prefixed token files**
+  (`.fortnox-tokens-sandbox.json`, `.fortnox-tokens-real-ro.json`). Two
+  Fortnox connected apps are configured side-by-side with no shared state
+  between them.
+- **Client-side write gate** in `fortnox.Client.do`: when constructed with
+  `readOnly=true`, any non-GET/HEAD request is refused locally with
+  `ErrReadOnlyClient` before reaching Fortnox. Defense in depth on top of
+  the connected app's OAuth scope.
+- **Mode-explicit Taskfile targets**: `mcp:sandbox`, `mcp:real-ro`,
+  `fortnox:auth:sandbox`, `fortnox:auth:real-ro`, `fortnox:check:sandbox`,
+  `fortnox:check:real-ro`. No bare `task mcp` exists — every invocation
+  must commit to a mode so an MCP client cannot accidentally connect to
+  the wrong company.
+- **Chat UI mode banner** rendered on `/chat`, color-coded by mode
+  (sandbox=green, real_readonly=amber). Shows mode label and whether
+  writes are enabled.
+- **Startup banners** in every Fortnox-touching binary print the active
+  mode, token file, and (where relevant) writes-allowed flag.
+- **Unit tests** covering the write gate (refuses POST/PUT/DELETE/PATCH
+  in readOnly, allows GET/HEAD; passes through unchanged when not
+  readOnly) and the config loader (rejects unset/invalid mode, rejects
+  missing credentials per mode, no cred leakage between modes).
+- **`.env.example`** documenting the new layout including read-only
+  scope guidance for the live connected app.
+
+### Changed
+
+- **`config.Fortnox.Env` removed** — replaced by `config.Fortnox.Mode`
+  (`config.Mode` typed enum). Existing `cfg.IsSandbox()` preserved as a
+  shortcut around `cfg.Mode.IsSandbox()`.
+- **`fortnox.NewClient` signature** now requires a `readOnly bool` third
+  parameter. All call sites updated.
+- **All 7 ledger/connector adapters** propagate `readOnly` from
+  construction through to the raw Fortnox client.
+- **`e2e-seed`, `e2e-teardown`, `probe-sandbox`** explicitly refuse any
+  mode other than `sandbox` rather than relying on a string check.
+- **CI workflow** writes `FORTNOX_SANDBOX_*` keys (mapped from existing
+  Gitea secrets) and sets `FORTNOX_MODE=sandbox` per step.
+- **Token storage** functions `LoadToken`/`SaveToken` now take a path
+  argument; `file.NewTokenStore` takes a path; both wired to
+  `cfg.Mode.TokenFile()`.
+
+### Migration
+
+For local development, rename keys in `.env` from `FORTNOX_CLIENT_ID` →
+`FORTNOX_SANDBOX_CLIENT_ID` (and equivalents for `_CLIENT_SECRET`,
+`_REDIRECT_URI`, `_SCOPES`, `_INVOICE_INBOX`); drop `FORTNOX_ENV` (the
+Taskfile sets `FORTNOX_MODE` per-target). Rename
+`.fortnox-tokens.json` → `.fortnox-tokens-sandbox.json` (or re-run
+`task fortnox:auth:sandbox`). To use real_readonly mode, register a
+second Fortnox connected app with read-only scopes, populate the
+`FORTNOX_REAL_RO_*` block, and run `task fortnox:auth:real-ro`.
+
+---
+
 ## [0.5.1] — 2026-04-28
 
 GitOps deploy + sandbox seed buildout. No user-facing behavior change;

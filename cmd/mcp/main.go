@@ -2,6 +2,7 @@
 package main
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
 
@@ -22,26 +23,31 @@ func main() {
 		os.Exit(1)
 	}
 
-	tokenStore := file.NewTokenStore()
+	// Banner goes to stderr because stdout carries the MCP framing.
+	fmt.Fprintf(os.Stderr, "\n  cobalt-dingo MCP — mode: %s | token: %s | writes: %v\n\n",
+		cfg.Mode.Label(), cfg.Mode.TokenFile(), cfg.Mode.AllowsWrites())
+
+	tokenStore := file.NewTokenStore(cfg.Mode.TokenFile())
 	baseURL := cfg.BaseURL()
 	tenantID := domain.TenantID("default")
+	readOnly := !cfg.Mode.AllowsWrites()
 
-	gl := adapterfortnox.NewGeneralLedgerAdapter(baseURL, tokenStore)
+	gl := adapterfortnox.NewGeneralLedgerAdapter(baseURL, tokenStore, readOnly)
 
 	deps := mcpserver.Deps{
 		TenantID:    tenantID,
-		SupplierLdg: adapterfortnox.NewSupplierLedgerAdapter(baseURL, tokenStore),
-		CustomerLdg: adapterfortnox.NewCustomerLedgerAdapter(baseURL, tokenStore),
+		SupplierLdg: adapterfortnox.NewSupplierLedgerAdapter(baseURL, tokenStore, readOnly),
+		CustomerLdg: adapterfortnox.NewCustomerLedgerAdapter(baseURL, tokenStore, readOnly),
 		GeneralLdg:  gl,
-		ProjectLdg:  adapterfortnox.NewProjectLedgerAdapter(baseURL, tokenStore, gl),
-		CostCtrLdg:  adapterfortnox.NewCostCenterLedgerAdapter(baseURL, tokenStore, gl),
-		AssetReg:    adapterfortnox.NewAssetRegisterAdapter(baseURL, tokenStore),
-		CompanyInf:  adapterfortnox.NewCompanyInfoAdapter(baseURL, tokenStore),
+		ProjectLdg:  adapterfortnox.NewProjectLedgerAdapter(baseURL, tokenStore, gl, readOnly),
+		CostCtrLdg:  adapterfortnox.NewCostCenterLedgerAdapter(baseURL, tokenStore, gl, readOnly),
+		AssetReg:    adapterfortnox.NewAssetRegisterAdapter(baseURL, tokenStore, readOnly),
+		CompanyInf:  adapterfortnox.NewCompanyInfoAdapter(baseURL, tokenStore, readOnly),
 	}
 
 	s := mcpserver.NewServer(deps)
 
-	log.Info("cobalt-dingo MCP server starting", "transport", "stdio")
+	log.Info("cobalt-dingo MCP server starting", "transport", "stdio", "mode", cfg.Mode)
 	if err := server.ServeStdio(s); err != nil {
 		log.Error("MCP server failed", "err", err)
 		os.Exit(1)

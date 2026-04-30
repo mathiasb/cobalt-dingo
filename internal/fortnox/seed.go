@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -208,8 +209,21 @@ func (c *Client) ListSuppliers(prefix string) ([]SupplierSummary, error) {
 	return result, nil
 }
 
-// ListSupplierInvoicesBySupplier returns all invoice GivenNumbers for the given supplier number.
-func (c *Client) ListSupplierInvoicesBySupplier(supplierNumber int) ([]string, error) {
+// SupplierInvoiceSummary is a minimal supplier invoice record for teardown.
+// Balance is reported by Fortnox in SEK base currency as a JSON string.
+// Booked indicates the invoice has been posted to the ledger; Fortnox
+// exposes no API to undo bookkeeping, so a bookkept invoice cannot be
+// cancelled or deleted.
+type SupplierInvoiceSummary struct {
+	GivenNumber string
+	Cancelled   bool
+	Booked      bool
+	Balance     float64
+}
+
+// ListSupplierInvoicesBySupplier returns supplier invoices for the given
+// supplier number, including their cancelled flag and remaining SEK balance.
+func (c *Client) ListSupplierInvoicesBySupplier(supplierNumber int) ([]SupplierInvoiceSummary, error) {
 	url := fmt.Sprintf("%s/3/supplierinvoices?suppliernumber=%d", c.baseURL, supplierNumber)
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
@@ -227,17 +241,54 @@ func (c *Client) ListSupplierInvoicesBySupplier(supplierNumber int) ([]string, e
 	var envelope struct {
 		SupplierInvoices []struct {
 			GivenNumber string `json:"GivenNumber"`
+			// Fortnox quirk: the supplierinvoices LIST response uses
+			// "Cancel" (boolean) for the cancelled flag and returns
+			// "Cancelled" as null. Single-GET /3/supplierinvoices/{n}
+			// uses "Cancelled" instead. Customer-invoice listings use
+			// "Cancelled" correctly — only suppliers are inverted.
+			Cancelled bool   `json:"Cancel"`
+			Booked    bool   `json:"Booked"`
+			Balance   string `json:"Balance"`
 		} `json:"SupplierInvoices"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
 		return nil, fmt.Errorf("decode supplierinvoices: %w", err)
 	}
 
-	var numbers []string
+	result := make([]SupplierInvoiceSummary, 0, len(envelope.SupplierInvoices))
 	for _, inv := range envelope.SupplierInvoices {
-		numbers = append(numbers, inv.GivenNumber)
+		bal, _ := strconv.ParseFloat(inv.Balance, 64)
+		result = append(result, SupplierInvoiceSummary{
+			GivenNumber: inv.GivenNumber,
+			Cancelled:   inv.Cancelled,
+			Booked:      inv.Booked,
+			Balance:     bal,
+		})
 	}
-	return numbers, nil
+	return result, nil
+}
+
+// CancelSupplierInvoice cancels a supplier invoice (Fortnox does not allow
+// delete via the API). Calls PUT /3/supplierinvoices/{givenNumber}/cancel.
+func (c *Client) CancelSupplierInvoice(givenNumber string) error {
+	url := fmt.Sprintf("%s/3/supplierinvoices/%s/cancel", c.baseURL, givenNumber)
+	req, err := http.NewRequest(http.MethodPut, url, nil)
+	if err != nil {
+		return fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.do(req)
+	if err != nil {
+		return fmt.Errorf("cancel supplier invoice %s: %w", givenNumber, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("cancel supplier invoice %s: status %d", givenNumber, resp.StatusCode)
+	}
+	return nil
 }
 
 // BookkeepSupplierInvoice posts a supplier invoice to the general ledger,
@@ -459,6 +510,59 @@ func (c *Client) BookkeepCustomerInvoice(documentNumber string) error {
 		return fmt.Errorf("bookkeep invoice %s: status %d", documentNumber, resp.StatusCode)
 	}
 	return nil
+}
+
+// CustomerInvoiceSummary is a minimal customer invoice record for teardown.
+// Balance is reported by Fortnox in invoice currency (not SEK). Booked
+// indicates the invoice has been posted to the ledger and cannot be
+// cancelled via the API.
+type CustomerInvoiceSummary struct {
+	DocumentNumber string
+	Cancelled      bool
+	Booked         bool
+	Balance        float64
+}
+
+// ListCustomerInvoicesByCustomer returns customer invoices for the given
+// customer number, including the cancelled flag and remaining balance.
+// Calls GET /3/invoices?customernumber={n}.
+func (c *Client) ListCustomerInvoicesByCustomer(customerNumber int) ([]CustomerInvoiceSummary, error) {
+	url := fmt.Sprintf("%s/3/invoices?customernumber=%d", c.baseURL, customerNumber)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, fmt.Errorf("GET customer invoices: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	var envelope struct {
+		Invoices []struct {
+			DocumentNumber json.Number `json:"DocumentNumber"`
+			Cancelled      bool        `json:"Cancelled"`
+			Booked         bool        `json:"Booked"`
+			Balance        float64     `json:"Balance"`
+		} `json:"Invoices"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
+		return nil, fmt.Errorf("decode customer invoices: %w", err)
+	}
+
+	result := make([]CustomerInvoiceSummary, 0, len(envelope.Invoices))
+	for _, inv := range envelope.Invoices {
+		result = append(result, CustomerInvoiceSummary{
+			DocumentNumber: inv.DocumentNumber.String(),
+			Cancelled:      inv.Cancelled,
+			Booked:         inv.Booked,
+			Balance:        inv.Balance,
+		})
+	}
+	return result, nil
 }
 
 // CancelCustomerInvoice cancels a customer invoice (Fortnox does not allow delete).
@@ -944,7 +1048,10 @@ func (c *Client) CreateAsset(a AssetCreate) (string, error) {
 }
 
 // AssetSummary is a minimal asset record returned by list operations.
+// ID is the internal integer identifier used in /3/assets/{id} URLs;
+// Number is the user-supplied free-form text identifier.
 type AssetSummary struct {
+	ID          int
 	Number      string
 	Description string
 }
@@ -966,6 +1073,7 @@ func (c *Client) ListAssetsByPrefix(prefix string) ([]AssetSummary, error) {
 
 	var envelope struct {
 		Assets []struct {
+			ID          int    `json:"Id"`
 			Number      string `json:"Number"`
 			Description string `json:"Description"`
 		} `json:"Assets"`
@@ -977,8 +1085,33 @@ func (c *Client) ListAssetsByPrefix(prefix string) ([]AssetSummary, error) {
 	var result []AssetSummary
 	for _, a := range envelope.Assets {
 		if strings.HasPrefix(a.Description, prefix) {
-			result = append(result, AssetSummary{Number: a.Number, Description: a.Description})
+			result = append(result, AssetSummary{ID: a.ID, Number: a.Number, Description: a.Description})
 		}
 	}
 	return result, nil
+}
+
+// DeleteAsset removes a fixed asset by its internal integer Id (not Number).
+// Fortnox semantics: an inactive or non-depreciable asset is hard-deleted;
+// an active or fully-depreciated asset is voided (Fortnox uses today as
+// voiddate). Either path returns 200 and removes the asset from listings.
+func (c *Client) DeleteAsset(id int) error {
+	url := fmt.Sprintf("%s/3/assets/%d", c.baseURL, id)
+	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	if err != nil {
+		return fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.do(req)
+	if err != nil {
+		return fmt.Errorf("delete asset %d: %w", id, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("delete asset %d: status %d", id, resp.StatusCode)
+	}
+	return nil
 }

@@ -117,27 +117,44 @@ tasks:
       - git tag -a {{.version}} -m "Release {{.version}}"
       - task: push
 
-  # ── Fortnox ─────────────────────────────────────────────────────────────────
+  # ── Fortnox: sandbox (write-capable) ────────────────────────────────────────
+  # Targets in this section set FORTNOX_MODE=sandbox unconditionally so a
+  # forgotten env var cannot route them to live data.
 
-  fortnox:auth:
-    desc: "One-time OAuth2 flow — stop dev server first (both use :8080)"
+  fortnox:auth:sandbox:
+    desc: "OAuth2 flow against sandbox connected app — stop dev server first (both use :8080)"
     cmds:
-      - source .env && go run ./cmd/fortnox-auth
+      - source .env && FORTNOX_MODE=sandbox go run ./cmd/fortnox-auth
 
-  fortnox:check:
-    desc: Verify Fortnox connection and confirm sandbox vs production
+  fortnox:check:sandbox:
+    desc: Verify sandbox Fortnox connection
     cmds:
-      - source .env && go run ./cmd/fortnox-check
+      - source .env && FORTNOX_MODE=sandbox go run ./cmd/fortnox-check
 
   e2e:seed:
-    desc: Seed sandbox with [E2E]-tagged test suppliers and FCY invoices
+    desc: Seed sandbox with [E2E]-tagged test data (sandbox-only by precondition)
     cmds:
-      - source .env && go run ./cmd/e2e-seed
+      - source .env && FORTNOX_MODE=sandbox go run ./cmd/e2e-seed
 
   e2e:teardown:
-    desc: Remove all [E2E]-tagged data from the Fortnox sandbox
+    desc: Remove [E2E]-tagged data from the Fortnox sandbox
     cmds:
-      - source .env && go run ./cmd/e2e-teardown
+      - source .env && FORTNOX_MODE=sandbox go run ./cmd/e2e-teardown
+
+  # ── Fortnox: real (read-only) ───────────────────────────────────────────────
+  # Targets that hit the live Fortnox connected app via read-only OAuth scope.
+  # The Client.do() write gate refuses any non-GET request locally as defense
+  # in depth on top of the OAuth scope.
+
+  fortnox:auth:real-ro:
+    desc: OAuth2 flow against the real (read-only) Fortnox connected app
+    cmds:
+      - source .env && FORTNOX_MODE=real_readonly go run ./cmd/fortnox-auth
+
+  fortnox:check:real-ro:
+    desc: Verify the real read-only Fortnox connection
+    cmds:
+      - source .env && FORTNOX_MODE=real_readonly go run ./cmd/fortnox-check
 
   # ── Database ────────────────────────────────────────────────────────────────
 
@@ -180,11 +197,19 @@ tasks:
     cmds: [bash scripts/context-sync.sh cursor]
 
   # ── MCP ────────────────────────────────────────────────────────────────────
+  # No bare `mcp` target — every invocation must explicitly choose its mode
+  # so an MCP client (Claude Desktop, Code) cannot accidentally connect to
+  # the wrong Fortnox company.
 
-  mcp:
-    desc: Start MCP server (stdio)
+  mcp:sandbox:
+    desc: Start MCP server (stdio) against the sandbox Fortnox company
     cmds:
-      - source .env && go run ./cmd/mcp
+      - source .env && FORTNOX_MODE=sandbox go run ./cmd/mcp
+
+  mcp:real-ro:
+    desc: Start MCP server (stdio) against the real Fortnox company in read-only mode
+    cmds:
+      - source .env && FORTNOX_MODE=real_readonly go run ./cmd/mcp
 
   mcp:build:
     desc: Build MCP server binary

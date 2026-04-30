@@ -11,16 +11,19 @@ import (
 	"github.com/mathiasb/cobalt-dingo/internal/fortnox"
 )
 
-// TokenStore implements domain.TokenStore using the local .fortnox-tokens.json file.
-// A mutex provides in-process CAS semantics; it does not protect against concurrent
-// processes — use the postgres adapter in production.
+// TokenStore implements domain.TokenStore using a mode-specific token file
+// on disk (e.g. .fortnox-tokens-sandbox.json or .fortnox-tokens-real-ro.json).
+// A mutex provides in-process CAS semantics; it does not protect against
+// concurrent processes — use the postgres adapter in production.
 type TokenStore struct {
-	mu sync.Mutex
+	mu   sync.Mutex
+	path string
 }
 
-// NewTokenStore returns a file-backed TokenStore.
-func NewTokenStore() *TokenStore {
-	return &TokenStore{}
+// NewTokenStore returns a file-backed TokenStore reading and writing the
+// given path. Pass config.Mode.TokenFile() to keep modes isolated.
+func NewTokenStore(path string) *TokenStore {
+	return &TokenStore{path: path}
 }
 
 // Load reads the current token from disk. tenantID is ignored (single-tenant).
@@ -28,7 +31,7 @@ func (s *TokenStore) Load(_ context.Context, _ domain.TenantID) (domain.OAuthTok
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	t, err := fortnox.LoadToken()
+	t, err := fortnox.LoadToken(s.path)
 	if err != nil {
 		return domain.OAuthToken{}, fmt.Errorf("file token store load: %w", err)
 	}
@@ -45,7 +48,7 @@ func (s *TokenStore) AtomicRefresh(_ context.Context, _ domain.TenantID, old, ne
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	current, err := fortnox.LoadToken()
+	current, err := fortnox.LoadToken(s.path)
 	if err != nil {
 		return fmt.Errorf("file token store read: %w", err)
 	}
@@ -58,7 +61,7 @@ func (s *TokenStore) AtomicRefresh(_ context.Context, _ domain.TenantID, old, ne
 		RefreshToken: newToken.RefreshToken,
 		ExpiresAt:    newToken.ExpiresAt,
 	}
-	if err := fortnox.SaveToken(t); err != nil {
+	if err := fortnox.SaveToken(s.path, t); err != nil {
 		return fmt.Errorf("file token store write: %w", err)
 	}
 	return nil

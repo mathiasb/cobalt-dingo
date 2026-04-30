@@ -12,15 +12,17 @@ import (
 // ProjectLedgerAdapter implements domain.ProjectLedger using the Fortnox REST API.
 // It delegates voucher queries to GeneralLedgerAdapter to reuse existing GL logic.
 type ProjectLedgerAdapter struct {
-	baseURL string
-	tokens  domain.TokenStore
-	gl      *GeneralLedgerAdapter
+	baseURL  string
+	tokens   domain.TokenStore
+	gl       *GeneralLedgerAdapter
+	readOnly bool
 }
 
 // NewProjectLedgerAdapter returns a ProjectLedgerAdapter pointed at baseURL,
 // backed by the given token store, and using gl for voucher queries.
-func NewProjectLedgerAdapter(baseURL string, tokens domain.TokenStore, gl *GeneralLedgerAdapter) *ProjectLedgerAdapter {
-	return &ProjectLedgerAdapter{baseURL: baseURL, tokens: tokens, gl: gl}
+// readOnly is propagated to the raw Fortnox client.
+func NewProjectLedgerAdapter(baseURL string, tokens domain.TokenStore, gl *GeneralLedgerAdapter, readOnly bool) *ProjectLedgerAdapter {
+	return &ProjectLedgerAdapter{baseURL: baseURL, tokens: tokens, gl: gl, readOnly: readOnly}
 }
 
 // client loads the tenant's access token and returns a ready-to-use raw Fortnox client.
@@ -29,7 +31,7 @@ func (a *ProjectLedgerAdapter) client(ctx context.Context, tenantID domain.Tenan
 	if err != nil {
 		return nil, fmt.Errorf("load token: %w", err)
 	}
-	return rawfortnox.NewClient(a.baseURL, tok.AccessToken), nil
+	return rawfortnox.NewClient(a.baseURL, tok.AccessToken, a.readOnly), nil
 }
 
 // Projects implements domain.ProjectLedger.

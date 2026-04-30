@@ -10,14 +10,16 @@ import (
 
 // AssetRegisterAdapter implements domain.AssetRegister using the Fortnox REST API.
 type AssetRegisterAdapter struct {
-	baseURL string
-	tokens  domain.TokenStore
+	baseURL  string
+	tokens   domain.TokenStore
+	readOnly bool
 }
 
-// NewAssetRegisterAdapter returns an AssetRegisterAdapter pointed at baseURL and
-// backed by the given token store.
-func NewAssetRegisterAdapter(baseURL string, tokens domain.TokenStore) *AssetRegisterAdapter {
-	return &AssetRegisterAdapter{baseURL: baseURL, tokens: tokens}
+// NewAssetRegisterAdapter returns an AssetRegisterAdapter pointed at
+// baseURL and backed by the given token store. readOnly is propagated to
+// the raw Fortnox client.
+func NewAssetRegisterAdapter(baseURL string, tokens domain.TokenStore, readOnly bool) *AssetRegisterAdapter {
+	return &AssetRegisterAdapter{baseURL: baseURL, tokens: tokens, readOnly: readOnly}
 }
 
 // client loads the tenant's access token and returns a ready-to-use raw Fortnox client.
@@ -26,7 +28,7 @@ func (a *AssetRegisterAdapter) client(ctx context.Context, tenantID domain.Tenan
 	if err != nil {
 		return nil, fmt.Errorf("load token: %w", err)
 	}
-	return rawfortnox.NewClient(a.baseURL, tok.AccessToken), nil
+	return rawfortnox.NewClient(a.baseURL, tok.AccessToken, a.readOnly), nil
 }
 
 // rowToAsset converts a raw Fortnox AssetRow to a domain.Asset.

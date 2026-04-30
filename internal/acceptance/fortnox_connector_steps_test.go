@@ -49,7 +49,7 @@ func aFortnoxAPIStubReturningTheseUnpaidSupplierInvoices(table *godog.Table) err
 }
 
 func theFortnoxConnectorFetchesUnpaidInvoices() error {
-	client := fortnox.NewClient(fcCtx.stub.URL, "test-token")
+	client := fortnox.NewClient(fcCtx.stub.URL, "test-token", false)
 	invoices, err := client.UnpaidSupplierInvoices()
 	if err != nil {
 		return fmt.Errorf("fetch unpaid invoices: %w", err)

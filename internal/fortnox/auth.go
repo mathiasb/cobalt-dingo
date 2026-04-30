@@ -14,7 +14,6 @@ import (
 const (
 	authEndpoint  = "https://apps.fortnox.se/oauth-v1/auth"
 	tokenEndpoint = "https://apps.fortnox.se/oauth-v1/token"
-	tokenFile     = ".fortnox-tokens.json"
 )
 
 // Token holds OAuth2 tokens and their expiry.
@@ -97,26 +96,28 @@ func postToken(clientID, clientSecret string, body url.Values) (Token, error) {
 	}, nil
 }
 
-// SaveToken writes the token to the local token file.
-func SaveToken(t Token) error {
-	f, err := os.OpenFile(tokenFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+// SaveToken writes the token to a mode-specific token file. Pass the mode's
+// TokenFile() value as path so sandbox and real-readonly tokens never share
+// state.
+func SaveToken(path string, t Token) error {
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
-		return fmt.Errorf("open token file: %w", err)
+		return fmt.Errorf("open token file %s: %w", path, err)
 	}
 	defer func() { _ = f.Close() }()
 	return json.NewEncoder(f).Encode(t)
 }
 
-// LoadToken reads the token from the local token file.
-func LoadToken() (Token, error) {
-	f, err := os.Open(tokenFile)
+// LoadToken reads the token from a mode-specific token file.
+func LoadToken(path string) (Token, error) {
+	f, err := os.Open(path)
 	if err != nil {
-		return Token{}, fmt.Errorf("open token file: %w", err)
+		return Token{}, fmt.Errorf("open token file %s: %w", path, err)
 	}
 	defer func() { _ = f.Close() }()
 	var t Token
 	if err := json.NewDecoder(f).Decode(&t); err != nil {
-		return Token{}, fmt.Errorf("decode token file: %w", err)
+		return Token{}, fmt.Errorf("decode token file %s: %w", path, err)
 	}
 	return t, nil
 }

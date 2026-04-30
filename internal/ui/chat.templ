@@ -1,7 +1,30 @@
 package ui
 
-templ ChatPage() {
+import "github.com/mathiasb/cobalt-dingo/internal/config"
+
+// modeBannerStyle returns the inline CSS for the chat-page mode banner.
+// Sandbox mode is green (safe to write); real_readonly is amber (live data,
+// no writes); anything else is red (misconfiguration).
+func modeBannerStyle(m config.Mode) string {
+	switch m {
+	case config.ModeSandbox:
+		return "background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;"
+	case config.ModeRealReadonly:
+		return "background:#fef3c7;color:#78350f;border:1px solid #fcd34d;"
+	}
+	return "background:#fee2e2;color:#7f1d1d;border:1px solid #fca5a5;"
+}
+
+templ ChatPage(mode config.Mode) {
 	@Layout("Chat") {
+		<div style={ "padding:0.5rem 0.75rem;border-radius:0.375rem;font-size:0.8125rem;font-weight:500;margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center;" + modeBannerStyle(mode) }>
+			<span>Mode: { mode.Label() }</span>
+			if mode.AllowsWrites() {
+				<span style="font-weight:400;opacity:0.8;">writes enabled</span>
+			} else {
+				<span style="font-weight:400;opacity:0.8;">read-only</span>
+			}
+		</div>
 		<style>
 			.chat-container {
 				display: flex;

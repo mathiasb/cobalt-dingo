@@ -18,10 +18,12 @@ vendor/
 # ── Sensitive ──
 .env
 .env.*
+!.env.example
 *.key
 *.pem
 secrets/
-.fortnox-tokens.json
+.fortnox-tokens*.json
+.task/
 
 # IDE
 .idea/

@@ -18,17 +18,20 @@ import (
 type ChatHandler struct {
 	deps      mcpserver.Deps
 	claudeCfg config.Claude
+	mode      config.Mode
 	log       *slog.Logger
 }
 
 // NewChatHandler constructs a ChatHandler wired to the given MCP deps.
-func NewChatHandler(deps mcpserver.Deps, claudeCfg config.Claude, log *slog.Logger) *ChatHandler {
-	return &ChatHandler{deps: deps, claudeCfg: claudeCfg, log: log}
+// mode is rendered in the page banner so users can never confuse the
+// sandbox chat with a session against live data.
+func NewChatHandler(deps mcpserver.Deps, claudeCfg config.Claude, mode config.Mode, log *slog.Logger) *ChatHandler {
+	return &ChatHandler{deps: deps, claudeCfg: claudeCfg, mode: mode, log: log}
 }
 
 // PageHandler serves GET /chat — renders the chat template.
 func (h *ChatHandler) PageHandler(w http.ResponseWriter, r *http.Request) {
-	render(w, r, ChatPage())
+	render(w, r, ChatPage(h.mode))
 }
 
 // chatMessage mirrors the Claude API message format.

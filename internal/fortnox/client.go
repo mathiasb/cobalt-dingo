@@ -22,18 +22,32 @@ var rateLimiter = struct {
 }{}
 
 // Client is an authenticated Fortnox API client.
+//
+// readOnly controls a client-side write gate enforced in Client.do: when
+// true, any request whose HTTP method is not GET (or HEAD) is rejected
+// before it reaches Fortnox. This is defence in depth on top of the
+// OAuth scope assigned to the connected app — even if a future tool
+// accidentally calls a write method, it cannot mutate live data.
 type Client struct {
 	baseURL    string
 	token      string
 	httpClient *http.Client
+	readOnly   bool
 }
 
-// NewClient returns a Client pointed at baseURL using the given access token.
-func NewClient(baseURL, token string) *Client {
+// ErrReadOnlyClient is returned by Client.do when a write request is
+// attempted on a read-only client. The message is intentionally loud so it
+// surfaces clearly in MCP tool results, server logs, and stderr.
+var ErrReadOnlyClient = fmt.Errorf("WRITE BLOCKED: this Fortnox client is read-only — set FORTNOX_MODE=sandbox to test writes")
+
+// NewClient returns a Client pointed at baseURL using the given access
+// token. Pass readOnly=true to refuse any non-GET request locally.
+func NewClient(baseURL, token string, readOnly bool) *Client {
 	return &Client{
 		baseURL:    baseURL,
 		token:      token,
 		httpClient: &http.Client{},
+		readOnly:   readOnly,
 	}
 }
 
@@ -130,7 +144,15 @@ func waitForRate() {
 // do performs an HTTP request after waiting for a free rate-limit slot.
 // All Client methods that hit Fortnox should use this in place of
 // c.httpClient.Do(req) so the 25 req / 5 s ceiling is enforced.
+//
+// Write gate: when c.readOnly is true, any request whose method is not GET
+// or HEAD is rejected with ErrReadOnlyClient before any HTTP traffic. This
+// is the single chokepoint for the readonly mode safety guarantee — every
+// write method on Client routes through here.
 func (c *Client) do(req *http.Request) (*http.Response, error) {
+	if c.readOnly && req.Method != http.MethodGet && req.Method != http.MethodHead {
+		return nil, fmt.Errorf("%w: attempted %s %s", ErrReadOnlyClient, req.Method, req.URL.Path)
+	}
 	waitForRate()
 	return c.httpClient.Do(req)
 }

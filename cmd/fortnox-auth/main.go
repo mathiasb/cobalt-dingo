@@ -34,10 +34,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	if !cfg.IsSandbox() {
-		log.Error("refusing to run auth flow against production — set FORTNOX_ENV=sandbox")
-		os.Exit(1)
-	}
+	fmt.Printf("\n  Fortnox auth — mode: %s\n  Credential prefix : %s\n  Token file        : %s\n\n",
+		cfg.Mode.Label(), cfg.Mode.EnvPrefix(), cfg.Mode.TokenFile())
 
 	state, err := randomState()
 	if err != nil {
@@ -100,13 +98,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := fortnox.SaveToken(token); err != nil {
+	if err := fortnox.SaveToken(cfg.Mode.TokenFile(), token); err != nil {
 		log.Error("save token", "err", err)
 		os.Exit(1)
 	}
 
-	log.Info("tokens saved", "expires_at", token.ExpiresAt.Format("2006-01-02 15:04:05"), "file", ".fortnox-tokens.json")
-	fmt.Println("Done. Run: source .env && go run ./cmd/fortnox-check")
+	log.Info("tokens saved", "expires_at", token.ExpiresAt.Format("2006-01-02 15:04:05"), "file", cfg.Mode.TokenFile())
+	fmt.Printf("Done. Run: FORTNOX_MODE=%s go run ./cmd/fortnox-check\n", cfg.Mode)
 }
 
 func randomState() (string, error) {

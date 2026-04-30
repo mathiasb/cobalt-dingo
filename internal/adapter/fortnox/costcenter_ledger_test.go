@@ -29,8 +29,8 @@ func TestCostCenterLedger_CostCenters(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	gl := adapterfortnox.NewGeneralLedgerAdapter(srv.URL, newStubTokenStore())
-	adapter := adapterfortnox.NewCostCenterLedgerAdapter(srv.URL, newStubTokenStore(), gl)
+	gl := adapterfortnox.NewGeneralLedgerAdapter(srv.URL, newStubTokenStore(), false)
+	adapter := adapterfortnox.NewCostCenterLedgerAdapter(srv.URL, newStubTokenStore(), gl, false)
 	centers, err := adapter.CostCenters(context.Background(), "tenant-1")
 
 	require.NoError(t, err)
@@ -88,8 +88,8 @@ func TestCostCenterLedger_CostCenterTransactions(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	gl := adapterfortnox.NewGeneralLedgerAdapter(srv.URL, newStubTokenStore())
-	adapter := adapterfortnox.NewCostCenterLedgerAdapter(srv.URL, newStubTokenStore(), gl)
+	gl := adapterfortnox.NewGeneralLedgerAdapter(srv.URL, newStubTokenStore(), false)
+	adapter := adapterfortnox.NewCostCenterLedgerAdapter(srv.URL, newStubTokenStore(), gl, false)
 
 	from := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2025, 12, 31, 0, 0, 0, 0, time.UTC)

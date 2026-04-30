@@ -12,15 +12,17 @@ import (
 // CostCenterLedgerAdapter implements domain.CostCenterLedger using the Fortnox REST API.
 // It reuses GeneralLedgerAdapter for voucher queries.
 type CostCenterLedgerAdapter struct {
-	baseURL string
-	tokens  domain.TokenStore
-	gl      *GeneralLedgerAdapter
+	baseURL  string
+	tokens   domain.TokenStore
+	gl       *GeneralLedgerAdapter
+	readOnly bool
 }
 
-// NewCostCenterLedgerAdapter returns a CostCenterLedgerAdapter pointed at baseURL,
-// backed by the given token store, and reusing gl for voucher lookups.
-func NewCostCenterLedgerAdapter(baseURL string, tokens domain.TokenStore, gl *GeneralLedgerAdapter) *CostCenterLedgerAdapter {
-	return &CostCenterLedgerAdapter{baseURL: baseURL, tokens: tokens, gl: gl}
+// NewCostCenterLedgerAdapter returns a CostCenterLedgerAdapter pointed at
+// baseURL, backed by the given token store, and reusing gl for voucher
+// lookups. readOnly is propagated to the raw Fortnox client.
+func NewCostCenterLedgerAdapter(baseURL string, tokens domain.TokenStore, gl *GeneralLedgerAdapter, readOnly bool) *CostCenterLedgerAdapter {
+	return &CostCenterLedgerAdapter{baseURL: baseURL, tokens: tokens, gl: gl, readOnly: readOnly}
 }
 
 // client loads the tenant's access token and returns a ready-to-use raw Fortnox client.
@@ -29,7 +31,7 @@ func (a *CostCenterLedgerAdapter) client(ctx context.Context, tenantID domain.Te
 	if err != nil {
 		return nil, fmt.Errorf("load token: %w", err)
 	}
-	return rawfortnox.NewClient(a.baseURL, tok.AccessToken), nil
+	return rawfortnox.NewClient(a.baseURL, tok.AccessToken, a.readOnly), nil
 }
 
 // CostCenters implements domain.CostCenterLedger.

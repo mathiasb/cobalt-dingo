@@ -38,7 +38,7 @@ func TestCompanyInfo_Info(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	adapter := adapterfortnox.NewCompanyInfoAdapter(srv.URL, &stubTokenStore{})
+	adapter := adapterfortnox.NewCompanyInfoAdapter(srv.URL, &stubTokenStore{}, false)
 	company, err := adapter.Info(context.Background(), domain.TenantID("t1"))
 
 	require.NoError(t, err)

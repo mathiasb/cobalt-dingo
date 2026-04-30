@@ -38,7 +38,7 @@ func TestAssetRegister_Assets(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	adapter := adapterfortnox.NewAssetRegisterAdapter(srv.URL, &stubTokenStore{})
+	adapter := adapterfortnox.NewAssetRegisterAdapter(srv.URL, &stubTokenStore{}, false)
 	assets, err := adapter.Assets(context.Background(), domain.TenantID("t1"))
 
 	require.NoError(t, err)
@@ -73,7 +73,7 @@ func TestAssetRegister_AssetDetail(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	adapter := adapterfortnox.NewAssetRegisterAdapter(srv.URL, &stubTokenStore{})
+	adapter := adapterfortnox.NewAssetRegisterAdapter(srv.URL, &stubTokenStore{}, false)
 	a, err := adapter.AssetDetail(context.Background(), domain.TenantID("t1"), 1)
 
 	require.NoError(t, err)

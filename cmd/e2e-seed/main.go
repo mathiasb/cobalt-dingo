@@ -259,10 +259,11 @@ func main() {
 		log.Error("config", "err", err)
 		os.Exit(1)
 	}
-	if !cfg.IsSandbox() {
-		log.Error("refusing to seed production — set FORTNOX_ENV=sandbox")
+	if cfg.Mode != config.ModeSandbox {
+		log.Error("e2e-seed only runs in sandbox mode", "current_mode", cfg.Mode)
 		os.Exit(1)
 	}
+	fmt.Printf("\n  Mode: %s | Token: %s\n\n", cfg.Mode.Label(), cfg.Mode.TokenFile())
 
 	token, err := loadValidToken(cfg, log)
 	if err != nil {
@@ -270,7 +271,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	client := fortnox.NewClient(cfg.BaseURL(), token.AccessToken)
+	client := fortnox.NewClient(cfg.BaseURL(), token.AccessToken, false)
 
 	// Build name→number index: reactivate existing E2E suppliers, create missing ones.
 	supplierNumbers := make(map[string]int, len(suppliers))
@@ -503,9 +504,10 @@ func main() {
 }
 
 func loadValidToken(cfg config.Fortnox, log *slog.Logger) (fortnox.Token, error) {
-	t, err := fortnox.LoadToken()
+	tokenPath := cfg.Mode.TokenFile()
+	t, err := fortnox.LoadToken(tokenPath)
 	if err != nil {
-		return fortnox.Token{}, fmt.Errorf("no saved token — run fortnox-auth first: %w", err)
+		return fortnox.Token{}, fmt.Errorf("no saved token at %s — run fortnox-auth for mode %s: %w", tokenPath, cfg.Mode, err)
 	}
 	if t.Valid() {
 		return t, nil
@@ -513,9 +515,9 @@ func loadValidToken(cfg config.Fortnox, log *slog.Logger) (fortnox.Token, error)
 	log.Info("access token expired, refreshing")
 	t, err = fortnox.RefreshAccessToken(cfg.ClientID, cfg.ClientSecret, t.RefreshToken)
 	if err != nil {
-		return fortnox.Token{}, fmt.Errorf("refresh failed — re-run fortnox-auth: %w", err)
+		return fortnox.Token{}, fmt.Errorf("refresh failed — re-run fortnox-auth for mode %s: %w", cfg.Mode, err)
 	}
-	if err := fortnox.SaveToken(t); err != nil {
+	if err := fortnox.SaveToken(tokenPath, t); err != nil {
 		log.Warn("could not save refreshed token", "err", err)
 	}
 	return t, nil
