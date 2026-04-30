@@ -30,7 +30,14 @@ tasks:
   # ── Quality ─────────────────────────────────────────────────────────────────
 
   check:
-    desc: Run all checks (context freshness + lint + test + vet)
+    desc: Run code checks (lint + test + vet) — used by CI
+    cmds:
+      - task: lint
+      - task: test
+      - task: vet
+
+  check:local:
+    desc: Full pre-commit check (context drift + code) — for local dev
     cmds:
       - task: context:sync
       - cmd: |
@@ -44,9 +51,7 @@ tasks:
             exit 1
           fi
           echo "✓ context: canonical and adapters are in sync"
-      - task: lint
-      - task: test
-      - task: vet
+      - task: check
 
   lint:
     cmds: [golangci-lint run ./...]
