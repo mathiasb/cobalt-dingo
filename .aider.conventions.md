@@ -152,10 +152,6 @@ Workflow:
    and missing-untracked adapters). A drift fails the check with a
    message telling you to stage the regenerated files.
 
-Escape hatch: a derived file containing `<!-- HANDROLLED: do not regenerate -->`
-near the top is skipped by sync. Used for ops repos where the derived file
-is the canonical safety doc (e.g. `~/dev/AI/infra/CLAUDE.md`).
-
 Behavior rules in this file and per-project rules in `PROJECT.md` apply
 unconditionally on every host, every harness.
 
