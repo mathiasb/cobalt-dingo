@@ -14,21 +14,6 @@ set -euo pipefail
 
 PROJECT_FILE=".context/PROJECT.md"
 SKILLS_DIR=".skills"
-HANDROLLED_MARKER="HANDROLLED: do not regenerate"
-
-# Skip regenerating any target file that opts out via the HANDROLLED sentinel.
-# Add `<!-- HANDROLLED: do not regenerate -->` near the top of a file to keep
-# it hand-maintained even when context:sync runs. Useful for projects whose
-# CLAUDE.md (or other adapter) is the single source of truth — e.g. ops repos
-# where incident-derived safety rules must not be diluted by templated content.
-skip_if_handrolled() {
-  local file="$1"
-  if [ -f "$file" ] && head -n 20 "$file" | grep -q "$HANDROLLED_MARKER"; then
-    echo "  → $file (handrolled, skipped)"
-    return 0
-  fi
-  return 1
-}
 
 # Walk up to find root .context/AGENT.md
 find_root_context() {
@@ -71,7 +56,6 @@ root_block() {
 # Claude Code walks up the tree — it finds ~/dev/CLAUDE.md automatically.
 # Project-level CLAUDE.md only needs project-specific context.
 generate_claude() {
-  skip_if_handrolled CLAUDE.md && return
   cat "$PROJECT_FILE" > CLAUDE.md
   echo "  → CLAUDE.md (project-only; Claude Code inherits root)"
 }
@@ -80,14 +64,12 @@ generate_claude() {
 # These tools read AGENTS.md from cwd but don't walk up.
 # Concatenate root + project.
 generate_agents() {
-  skip_if_handrolled AGENTS.md && return
   { root_block; cat "$PROJECT_FILE"; } > AGENTS.md
   echo "  → AGENTS.md (root + project; Crush, Pi, Antigravity)"
 }
 
 # ── Cursor ───────────────────────────────────────────────────
 generate_cursor() {
-  skip_if_handrolled .cursorrules && return
   {
     echo "# Cursor rules — auto-generated"
     echo "# Do not edit. Run: task context:sync"
@@ -100,7 +82,6 @@ generate_cursor() {
 
 # ── Aider ────────────────────────────────────────────────────
 generate_aider() {
-  skip_if_handrolled .aider.conventions.md && return
   { root_block; cat "$PROJECT_FILE"; } > .aider.conventions.md
   if [ ! -f .aider.conf.yml ]; then
     cat > .aider.conf.yml << 'YAML'
@@ -113,7 +94,6 @@ YAML
 
 # ── Generic system prompt (Open WebUI, Mods, etc.) ──────────
 generate_system_prompt() {
-  skip_if_handrolled .context/system-prompt.txt && return
   {
     echo "You are a coding assistant working on a specific project."
     echo "Follow all conventions from both the root agent context and project context."
