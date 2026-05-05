@@ -65,16 +65,18 @@ func main() {
 	)
 
 	// Wire postgres adapters when DATABASE_URL is set.
+	var pgStore *postgres.Store
 	var batchRepo domain.BatchRepository
 	var tenantRepo domain.TenantRepository
 	if appCfg.DatabaseURL != "" {
-		store, dbErr := postgres.NewStore(appCfg.DatabaseURL)
+		var dbErr error
+		pgStore, dbErr = postgres.NewStore(appCfg.DatabaseURL)
 		if dbErr != nil {
 			log.Error("postgres connect failed", "err", dbErr)
 			os.Exit(1)
 		}
-		batchRepo = postgres.NewBatchRepo(store)
-		tenantRepo = postgres.NewTenantRepo(store)
+		batchRepo = postgres.NewBatchRepo(pgStore)
+		tenantRepo = postgres.NewTenantRepo(pgStore)
 		log.Info("postgres connected")
 	}
 
@@ -85,9 +87,8 @@ func main() {
 		enricher = fake.SupplierEnricher{}
 	} else {
 		var tokenStore domain.TokenStore
-		if appCfg.DatabaseURL != "" {
-			store, _ := postgres.NewStore(appCfg.DatabaseURL)
-			tokenStore = postgres.NewTokenStore(store)
+		if pgStore != nil {
+			tokenStore = postgres.NewTokenStore(pgStore)
 		} else {
 			tokenStore = file.NewTokenStore(cfg.Mode.TokenFile())
 		}
@@ -115,9 +116,8 @@ func main() {
 	llmCfg := config.LoadLLM()
 	if llmCfg.IsEnabled() && fortnoxEnabled {
 		var tokenStore domain.TokenStore
-		if appCfg.DatabaseURL != "" {
-			store, _ := postgres.NewStore(appCfg.DatabaseURL)
-			tokenStore = postgres.NewTokenStore(store)
+		if pgStore != nil {
+			tokenStore = postgres.NewTokenStore(pgStore)
 		} else {
 			tokenStore = file.NewTokenStore(cfg.Mode.TokenFile())
 		}
@@ -139,7 +139,7 @@ func main() {
 		mux.HandleFunc("POST /chat", chatHandler.MessageHandler)
 		log.Info("chat handler registered")
 	} else {
-		log.Info("chat handler disabled", "reason", "LLM_BASE_URL or LLM_API_KEY not set, or Fortnox disabled")
+		log.Info("chat handler disabled", "reason", "LLM_BASE_URL or LLM_API_KEY not set, or Fortnox not configured")
 	}
 
 	if err := http.ListenAndServe(":"+port, mux); err != nil {

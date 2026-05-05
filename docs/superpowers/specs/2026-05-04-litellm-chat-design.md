@@ -137,7 +137,7 @@ If `escalate: true` and `EscalationModel` is non-empty, use escalation model. Ot
 
 ```go
 llmCfg := config.LoadLLM()
-if llmCfg.BaseURL != "" && fortnoxEnabled {
+if llmCfg.IsEnabled() && fortnoxEnabled {
     chatHandler := ui.NewChatHandler(mcpDeps, llmCfg, cfg.Mode, log)
     mux.HandleFunc("GET /chat", chatHandler.PageHandler)
     mux.HandleFunc("POST /chat", chatHandler.MessageHandler)
