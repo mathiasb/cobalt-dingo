@@ -68,7 +68,7 @@ func TestCallLLM_BuildsCorrectRequest(t *testing.T) {
 }
 
 func TestCallLLM_NonOKReturnsError(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "rate limited", http.StatusTooManyRequests)
 	}))
 	defer srv.Close()
@@ -85,7 +85,7 @@ func TestCallLLM_NonOKReturnsError(t *testing.T) {
 }
 
 func TestMessageHandler_DirectResponse(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(llmResponse{
 			Choices: []llmChoice{{
@@ -110,7 +110,7 @@ func TestMessageHandler_DirectResponse(t *testing.T) {
 
 func TestMessageHandler_ToolCallsThenStop(t *testing.T) {
 	callCount := 0
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		callCount++
 		w.Header().Set("Content-Type", "application/json")
 		if callCount == 1 {

@@ -139,7 +139,7 @@ func main() {
 		mux.HandleFunc("POST /chat", chatHandler.MessageHandler)
 		log.Info("chat handler registered")
 	} else {
-		log.Info("chat handler disabled — set LLM_BASE_URL, LLM_API_KEY, LLM_DEFAULT_MODEL to enable")
+		log.Info("chat handler disabled", "reason", "LLM_BASE_URL or LLM_API_KEY not set, or Fortnox disabled")
 	}
 
 	if err := http.ListenAndServe(":"+port, mux); err != nil {
