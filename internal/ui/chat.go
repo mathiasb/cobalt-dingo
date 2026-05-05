@@ -14,6 +14,7 @@ import (
 	mcpserver "github.com/mathiasb/cobalt-dingo/internal/mcp"
 )
 
+// ChatHandler serves the LLM-backed financial chat endpoints.
 type ChatHandler struct {
 	deps   mcpserver.Deps
 	llmCfg config.LLM
@@ -21,6 +22,7 @@ type ChatHandler struct {
 	log    *slog.Logger
 }
 
+// NewChatHandler wires a ChatHandler with the given MCP dependencies and LLM config.
 func NewChatHandler(deps mcpserver.Deps, llmCfg config.LLM, mode config.Mode, log *slog.Logger) *ChatHandler {
 	return &ChatHandler{deps: deps, llmCfg: llmCfg, mode: mode, log: log}
 }
@@ -199,6 +201,7 @@ func (h *ChatHandler) callLLM(ctx context.Context, req llmRequest) (*llmResponse
 	return &lr, nil
 }
 
+// MessageHandler handles POST /chat — runs the agentic LLM loop and streams the reply via SSE.
 func (h *ChatHandler) MessageHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
