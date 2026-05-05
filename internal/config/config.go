@@ -139,21 +139,32 @@ func LoadDebtor() Debtor {
 	return Debtor{Name: name, IBAN: iban, BIC: bic}
 }
 
-// Claude holds Claude API configuration for the chat interface.
-type Claude struct {
-	APIKey string
-	Model  string
+// LLM holds configuration for the LiteLLM gateway used by the chat interface.
+type LLM struct {
+	BaseURL         string // e.g. "https://llm-api.d-ma.be"
+	APIKey          string // LiteLLM master key (Bearer token)
+	DefaultModel    string // e.g. "iguana/gemma4-31b"
+	EscalationModel string // optional; empty = no escalation button shown
 }
 
-// LoadClaude reads Claude config from environment variables.
-func LoadClaude() Claude {
-	model := os.Getenv("CLAUDE_MODEL")
+// IsEnabled reports whether the LLM gateway is fully configured.
+// Chat is enabled only when all three required fields are non-empty.
+func (l LLM) IsEnabled() bool {
+	return l.BaseURL != "" && l.APIKey != "" && l.DefaultModel != ""
+}
+
+// LoadLLM reads LLM gateway config from environment variables.
+// LLM_DEFAULT_MODEL defaults to "iguana/gemma4-31b" if unset.
+func LoadLLM() LLM {
+	model := os.Getenv("LLM_DEFAULT_MODEL")
 	if model == "" {
-		model = "claude-sonnet-4-6"
+		model = "iguana/gemma4-31b"
 	}
-	return Claude{
-		APIKey: os.Getenv("ANTHROPIC_API_KEY"),
-		Model:  model,
+	return LLM{
+		BaseURL:         os.Getenv("LLM_BASE_URL"),
+		APIKey:          os.Getenv("LLM_API_KEY"),
+		DefaultModel:    model,
+		EscalationModel: os.Getenv("LLM_ESCALATION_MODEL"),
 	}
 }
 

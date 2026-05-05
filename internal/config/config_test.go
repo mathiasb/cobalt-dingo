@@ -170,3 +170,55 @@ func clearFortnoxEnv(t *testing.T) {
 		t.Setenv(k, "")
 	}
 }
+
+func TestLoadLLM_Defaults(t *testing.T) {
+	t.Setenv("LLM_BASE_URL", "https://llm-api.example.com")
+	t.Setenv("LLM_API_KEY", "test-key")
+	// LLM_DEFAULT_MODEL unset → should default to "iguana/gemma4-31b"
+	// LLM_ESCALATION_MODEL unset → should be ""
+
+	cfg := LoadLLM()
+
+	assert.Equal(t, "https://llm-api.example.com", cfg.BaseURL)
+	assert.Equal(t, "test-key", cfg.APIKey)
+	assert.Equal(t, "iguana/gemma4-31b", cfg.DefaultModel)
+	assert.Equal(t, "", cfg.EscalationModel)
+}
+
+func TestLoadLLM_Explicit(t *testing.T) {
+	t.Setenv("LLM_BASE_URL", "https://llm-api.example.com")
+	t.Setenv("LLM_API_KEY", "sk-abc")
+	t.Setenv("LLM_DEFAULT_MODEL", "koala/phi4-14b")
+	t.Setenv("LLM_ESCALATION_MODEL", "berget/llama-3.3-70b")
+
+	cfg := LoadLLM()
+
+	assert.Equal(t, "koala/phi4-14b", cfg.DefaultModel)
+	assert.Equal(t, "berget/llama-3.3-70b", cfg.EscalationModel)
+}
+
+func TestLoadLLM_Empty(t *testing.T) {
+	cfg := LoadLLM()
+
+	assert.Empty(t, cfg.BaseURL)
+	assert.Empty(t, cfg.APIKey)
+	assert.False(t, cfg.IsEnabled())
+}
+
+func TestLLM_IsEnabled(t *testing.T) {
+	tests := []struct {
+		name    string
+		cfg     LLM
+		enabled bool
+	}{
+		{"all set", LLM{BaseURL: "http://x", APIKey: "k", DefaultModel: "m"}, true},
+		{"missing BaseURL", LLM{APIKey: "k", DefaultModel: "m"}, false},
+		{"missing APIKey", LLM{BaseURL: "http://x", DefaultModel: "m"}, false},
+		{"missing DefaultModel", LLM{BaseURL: "http://x", APIKey: "k"}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.enabled, tt.cfg.IsEnabled())
+		})
+	}
+}
