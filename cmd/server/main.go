@@ -112,8 +112,8 @@ func main() {
 	srv := ui.NewServer(defaultTenantID, debtor, invoiceSource, enricher, batchSvc, log)
 	srv.RegisterRoutes(mux)
 
-	claudeCfg := config.LoadClaude()
-	if claudeCfg.APIKey != "" && fortnoxEnabled {
+	llmCfg := config.LoadLLM()
+	if llmCfg.IsEnabled() && fortnoxEnabled {
 		var tokenStore domain.TokenStore
 		if appCfg.DatabaseURL != "" {
 			store, _ := postgres.NewStore(appCfg.DatabaseURL)
@@ -134,12 +134,12 @@ func main() {
 			AssetReg:    adapterfortnox.NewAssetRegisterAdapter(baseURL, tokenStore, readOnly),
 			CompanyInf:  adapterfortnox.NewCompanyInfoAdapter(baseURL, tokenStore, readOnly),
 		}
-		chatHandler := ui.NewChatHandler(mcpDeps, claudeCfg, cfg.Mode, log)
+		chatHandler := ui.NewChatHandler(mcpDeps, llmCfg, cfg.Mode, log)
 		mux.HandleFunc("GET /chat", chatHandler.PageHandler)
 		mux.HandleFunc("POST /chat", chatHandler.MessageHandler)
 		log.Info("chat handler registered")
 	} else {
-		log.Info("chat handler disabled — set ANTHROPIC_API_KEY to enable")
+		log.Info("chat handler disabled — set LLM_BASE_URL, LLM_API_KEY, LLM_DEFAULT_MODEL to enable")
 	}
 
 	if err := http.ListenAndServe(":"+port, mux); err != nil {
