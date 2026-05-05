@@ -199,7 +199,96 @@ func (h *ChatHandler) callLLM(ctx context.Context, req llmRequest) (*llmResponse
 	return &lr, nil
 }
 
-// MessageHandler handles POST /chat — stubbed pending Task 3 agentic loop rewrite.
 func (h *ChatHandler) MessageHandler(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "not implemented in this task", http.StatusNotImplemented)
+	ctx := r.Context()
+
+	var body struct {
+		Messages []llmMessage `json:"messages"`
+		Message  string       `json:"message"`
+		Escalate bool         `json:"escalate"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid json body", http.StatusBadRequest)
+		return
+	}
+
+	model := h.llmCfg.DefaultModel
+	if body.Escalate && h.llmCfg.EscalationModel != "" {
+		model = h.llmCfg.EscalationModel
+	}
+
+	messages := []llmMessage{
+		{
+			Role:    "system",
+			Content: "You are a financial analyst for a Swedish company using Fortnox ERP. Use your tools to answer questions about accounts payable (AP), accounts receivable (AR), general ledger (GL), projects, cost centers, and assets. Always use tools to fetch live data before answering. Respond in the same language as the user's question.",
+		},
+	}
+	messages = append(messages, body.Messages...)
+	messages = append(messages, llmMessage{Role: "user", Content: body.Message})
+
+	req := llmRequest{
+		Model:     model,
+		Messages:  messages,
+		Tools:     toolSchemas(),
+		MaxTokens: 4096,
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	flusher, canFlush := w.(http.Flusher)
+
+	sseWrite := func(data string) {
+		_, _ = fmt.Fprintf(w, "data: %s\n\n", data)
+		if canFlush {
+			flusher.Flush()
+		}
+	}
+
+	const maxTurns = 5
+	for turn := range maxTurns {
+		resp, err := h.callLLM(ctx, req)
+		if err != nil {
+			h.log.Error("llm call failed", "turn", turn, "err", err)
+			sseWrite(fmt.Sprintf("[error: %v]", err))
+			return
+		}
+		if len(resp.Choices) == 0 {
+			sseWrite("[error: empty response from LLM]")
+			return
+		}
+
+		choice := resp.Choices[0]
+
+		if choice.FinishReason != "tool_calls" {
+			if s, ok := choice.Message.Content.(string); ok && s != "" {
+				sseWrite(s)
+			}
+			return
+		}
+
+		req.Messages = append(req.Messages, choice.Message)
+
+		for _, tc := range choice.Message.ToolCalls {
+			h.log.Info("executing tool", "name", tc.Function.Name)
+
+			var args map[string]any
+			if tc.Function.Arguments != "" {
+				_ = json.Unmarshal([]byte(tc.Function.Arguments), &args)
+			}
+
+			result, toolErr := h.dispatchTool(ctx, tc.Function.Name, args)
+			if toolErr != nil {
+				result = fmt.Sprintf(`{"error": %q}`, toolErr.Error())
+			}
+
+			req.Messages = append(req.Messages, llmMessage{
+				Role:       "tool",
+				ToolCallID: tc.ID,
+				Content:    result,
+			})
+		}
+	}
+
+	sseWrite("[max tool turns reached]")
 }
