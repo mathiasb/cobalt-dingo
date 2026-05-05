@@ -1,10 +1,9 @@
 package ui
 
-import "github.com/mathiasb/cobalt-dingo/internal/config"
+import (
+	"github.com/mathiasb/cobalt-dingo/internal/config"
+)
 
-// modeBannerStyle returns the inline CSS for the chat-page mode banner.
-// Sandbox mode is green (safe to write); real_readonly is amber (live data,
-// no writes); anything else is red (misconfiguration).
 func modeBannerStyle(m config.Mode) string {
 	switch m {
 	case config.ModeSandbox:
@@ -15,15 +14,26 @@ func modeBannerStyle(m config.Mode) string {
 	return "background:#fee2e2;color:#7f1d1d;border:1px solid #fca5a5;"
 }
 
-templ ChatPage(mode config.Mode) {
+templ ChatPage(mode config.Mode, llm config.LLM) {
 	@Layout("Chat") {
 		<div style={ "padding:0.5rem 0.75rem;border-radius:0.375rem;font-size:0.8125rem;font-weight:500;margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center;" + modeBannerStyle(mode) }>
-			<span>Mode: { mode.Label() }</span>
-			if mode.AllowsWrites() {
-				<span style="font-weight:400;opacity:0.8;">writes enabled</span>
-			} else {
-				<span style="font-weight:400;opacity:0.8;">read-only</span>
-			}
+			<span>Mode: { mode.Label() } &nbsp;·&nbsp; Model: <span id="active-model">{ llm.DefaultModel }</span></span>
+			<div style="display:flex;gap:0.5rem;align-items:center;">
+				if mode.AllowsWrites() {
+					<span style="font-weight:400;opacity:0.8;">writes enabled</span>
+				} else {
+					<span style="font-weight:400;opacity:0.8;">read-only</span>
+				}
+				if llm.EscalationModel != "" {
+					<button
+						id="escalate-btn"
+						type="button"
+						data-default={ llm.DefaultModel }
+						data-escalation={ llm.EscalationModel }
+						style="font-size:0.75rem;padding:0.2rem 0.6rem;border-radius:0.375rem;border:1px solid currentColor;background:transparent;cursor:pointer;opacity:0.8;"
+					>Escalate</button>
+				}
+			</div>
 		</div>
 		<style>
 			.chat-container {
@@ -101,13 +111,8 @@ templ ChatPage(mode config.Mode) {
 				white-space: nowrap;
 				align-self: flex-end;
 			}
-			.chat-send-btn:hover {
-				opacity: 0.9;
-			}
-			.chat-send-btn:disabled {
-				opacity: 0.5;
-				cursor: not-allowed;
-			}
+			.chat-send-btn:hover { opacity: 0.9; }
+			.chat-send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 			.chat-thinking {
 				align-self: flex-start;
 				font-size: 0.875rem;
@@ -140,16 +145,27 @@ templ ChatPage(mode config.Mode) {
 
 		<script>
 		(function() {
-			const thread = document.getElementById('chat-thread');
-			const input  = document.getElementById('chat-input');
-			const btn    = document.getElementById('chat-send');
+			const thread    = document.getElementById('chat-thread');
+			const input     = document.getElementById('chat-input');
+			const btn       = document.getElementById('chat-send');
+			const escBtn    = document.getElementById('escalate-btn');
+			const modelSpan = document.getElementById('active-model');
 
-			// Conversation history sent back to the server.
-			let history = [];
+			let history  = [];
+			let escalate = false;
 
-			function scrollBottom() {
-				thread.scrollTop = thread.scrollHeight;
+			if (escBtn) {
+				escBtn.addEventListener('click', function() {
+					escalate = !escalate;
+					escBtn.textContent = escalate ? 'Default' : 'Escalate';
+					escBtn.style.fontWeight = escalate ? '700' : 'normal';
+					if (modelSpan) {
+						modelSpan.textContent = escalate ? escBtn.dataset.escalation : escBtn.dataset.default;
+					}
+				});
 			}
+
+			function scrollBottom() { thread.scrollTop = thread.scrollHeight; }
 
 			function addBubble(role, text) {
 				const div = document.createElement('div');
@@ -188,7 +204,7 @@ templ ChatPage(mode config.Mode) {
 					const resp = await fetch('/chat', {
 						method: 'POST',
 						headers: {'Content-Type': 'application/json'},
-						body: JSON.stringify({messages: history, message: text}),
+						body: JSON.stringify({messages: history, message: text, escalate: escalate}),
 					});
 
 					if (!resp.ok) {
@@ -197,7 +213,6 @@ templ ChatPage(mode config.Mode) {
 						return;
 					}
 
-					// Read SSE stream.
 					const reader = resp.body.getReader();
 					const dec    = new TextDecoder();
 					let buf      = '';
@@ -212,7 +227,7 @@ templ ChatPage(mode config.Mode) {
 
 						buf += dec.decode(value, {stream: true});
 						const lines = buf.split('\n');
-						buf = lines.pop(); // keep incomplete line
+						buf = lines.pop();
 
 						for (const line of lines) {
 							if (!line.startsWith('data: ')) continue;
@@ -227,7 +242,6 @@ templ ChatPage(mode config.Mode) {
 						}
 					}
 
-					// Push completed exchange into history.
 					history.push({role: 'user',      content: text});
 					history.push({role: 'assistant', content: content});
 
@@ -249,7 +263,6 @@ templ ChatPage(mode config.Mode) {
 				}
 			});
 
-			// Auto-grow textarea.
 			input.addEventListener('input', function() {
 				this.style.height = 'auto';
 				this.style.height = Math.min(this.scrollHeight, 128) + 'px';
