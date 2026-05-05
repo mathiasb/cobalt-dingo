@@ -162,7 +162,7 @@ func LoadLLM() LLM {
 	}
 	return LLM{
 		BaseURL:         os.Getenv("LLM_BASE_URL"),
-		APIKey:          os.Getenv("LLM_API_KEY"),
+		APIKey:          os.Getenv("DMABE_LLMAPI_KEY"),
 		DefaultModel:    model,
 		EscalationModel: os.Getenv("LLM_ESCALATION_MODEL"),
 	}

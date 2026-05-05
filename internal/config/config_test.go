@@ -173,7 +173,7 @@ func clearFortnoxEnv(t *testing.T) {
 
 func TestLoadLLM_Defaults(t *testing.T) {
 	t.Setenv("LLM_BASE_URL", "https://llm-api.example.com")
-	t.Setenv("LLM_API_KEY", "test-key")
+	t.Setenv("DMABE_LLMAPI_KEY", "test-key")
 	// LLM_DEFAULT_MODEL unset → should default to "iguana/gemma4-31b"
 	// LLM_ESCALATION_MODEL unset → should be ""
 
@@ -187,7 +187,7 @@ func TestLoadLLM_Defaults(t *testing.T) {
 
 func TestLoadLLM_Explicit(t *testing.T) {
 	t.Setenv("LLM_BASE_URL", "https://llm-api.example.com")
-	t.Setenv("LLM_API_KEY", "sk-abc")
+	t.Setenv("DMABE_LLMAPI_KEY", "sk-abc")
 	t.Setenv("LLM_DEFAULT_MODEL", "koala/phi4-14b")
 	t.Setenv("LLM_ESCALATION_MODEL", "berget/llama-3.3-70b")
 
@@ -199,7 +199,7 @@ func TestLoadLLM_Explicit(t *testing.T) {
 
 func TestLoadLLM_Empty(t *testing.T) {
 	t.Setenv("LLM_BASE_URL", "")
-	t.Setenv("LLM_API_KEY", "")
+	t.Setenv("DMABE_LLMAPI_KEY", "")
 	t.Setenv("LLM_DEFAULT_MODEL", "")
 	t.Setenv("LLM_ESCALATION_MODEL", "")
 
