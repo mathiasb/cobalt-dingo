@@ -198,6 +198,11 @@ func TestLoadLLM_Explicit(t *testing.T) {
 }
 
 func TestLoadLLM_Empty(t *testing.T) {
+	t.Setenv("LLM_BASE_URL", "")
+	t.Setenv("LLM_API_KEY", "")
+	t.Setenv("LLM_DEFAULT_MODEL", "")
+	t.Setenv("LLM_ESCALATION_MODEL", "")
+
 	cfg := LoadLLM()
 
 	assert.Empty(t, cfg.BaseURL)

@@ -141,14 +141,14 @@ func LoadDebtor() Debtor {
 
 // LLM holds configuration for the LiteLLM gateway used by the chat interface.
 type LLM struct {
-	BaseURL         string // e.g. "https://llm-api.d-ma.be"
+	BaseURL         string
 	APIKey          string // LiteLLM master key (Bearer token)
-	DefaultModel    string // e.g. "iguana/gemma4-31b"
+	DefaultModel    string
 	EscalationModel string // optional; empty = no escalation button shown
 }
 
 // IsEnabled reports whether the LLM gateway is fully configured.
-// Chat is enabled only when all three required fields are non-empty.
+// BaseURL, APIKey, and DefaultModel are all required; EscalationModel is optional.
 func (l LLM) IsEnabled() bool {
 	return l.BaseURL != "" && l.APIKey != "" && l.DefaultModel != ""
 }
