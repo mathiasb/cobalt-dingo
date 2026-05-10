@@ -66,9 +66,10 @@ func (c *Client) GetVoucher(series string, number int) (VoucherJSON, error) {
 }
 
 // PredefinedAccountRow maps a system role name to a GL account number.
+// Fortnox returns Account as a string or number inconsistently across API versions.
 type PredefinedAccountRow struct {
-	Name    string `json:"Name"`
-	Account int    `json:"Account"`
+	Name    string  `json:"Name"`
+	Account FlexInt `json:"Account"`
 }
 
 // predefinedAccountsResponse is the envelope for GET /3/predefinedaccounts.

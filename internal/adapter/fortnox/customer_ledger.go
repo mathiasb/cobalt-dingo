@@ -53,7 +53,7 @@ func (a *CustomerLedgerAdapter) UnpaidInvoices(ctx context.Context, tenantID dom
 			return nil, fmt.Errorf("customer ledger: parse customer number %q: %w", row.CustomerNumber, err)
 		}
 		invoices[i] = domain.CustomerInvoice{
-			InvoiceNumber:  row.DocumentNumber,
+			InvoiceNumber:  int(row.DocumentNumber),
 			CustomerNumber: customerNum,
 			CustomerName:   row.CustomerName,
 			Amount:         domain.MoneyFromFloat(row.Total, row.Currency),

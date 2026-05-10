@@ -186,7 +186,7 @@ func (a *GeneralLedgerAdapter) PredefinedAccounts(ctx context.Context, tenantID 
 	for i, r := range rows {
 		result[i] = domain.PredefinedAccount{
 			Name:    r.Name,
-			Account: r.Account,
+			Account: int(r.Account),
 		}
 	}
 	return result, nil

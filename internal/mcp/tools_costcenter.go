@@ -109,13 +109,22 @@ func costCenterAnalysisHandler(deps Deps) server.ToolHandlerFunc {
 			return mcp.NewToolResultError("code is required"), nil
 		}
 
-		// Fetch all time for full picture.
-		from := time.Time{}
-		to := time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC)
-
-		rows, err := deps.CostCtrLdg.CostCenterTransactions(ctx, deps.TenantID, code, from, to)
+		// Aggregate across all financial years for a full picture.
+		years, err := deps.GeneralLdg.FinancialYears(ctx, deps.TenantID)
 		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("fetch cost center transactions: %v", err)), nil
+			return mcp.NewToolResultError(fmt.Sprintf("fetch financial years: %v", err)), nil
+		}
+		if len(years) == 0 {
+			return jsonResult([]accountAnalysisRow{})
+		}
+
+		var rows []domain.VoucherRow
+		for _, yr := range years {
+			yr_rows, err := deps.CostCtrLdg.CostCenterTransactions(ctx, deps.TenantID, code, yr.From, yr.To)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("fetch cost center transactions: %v", err)), nil
+			}
+			rows = append(rows, yr_rows...)
 		}
 
 		grouped := analyst.GroupBy(rows, func(r domain.VoucherRow) int {

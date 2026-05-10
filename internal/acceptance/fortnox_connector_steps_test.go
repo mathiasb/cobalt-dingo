@@ -34,7 +34,7 @@ func aFortnoxAPIStubReturningTheseUnpaidSupplierInvoices(table *godog.Table) err
 			return fmt.Errorf("parse TotalInvoiceCurrency: %w", err)
 		}
 		rows = append(rows, fortnox.SupplierInvoiceRow{
-			InvoiceNumber:        num,
+			InvoiceNumber:        fortnox.FlexInt(num),
 			Currency:             row.Cells[1].Value,
 			TotalInvoiceCurrency: total,
 			DueDate:              row.Cells[3].Value,

@@ -52,9 +52,10 @@ func NewClient(baseURL, token string, readOnly bool) *Client {
 }
 
 // SupplierInvoiceRow is the Fortnox JSON representation of a supplier invoice.
+// Fortnox returns InvoiceNumber and SupplierNumber as strings or numbers inconsistently.
 type SupplierInvoiceRow struct {
-	InvoiceNumber        int     `json:"InvoiceNumber"`
-	SupplierNumber       int     `json:"SupplierNumber"`
+	InvoiceNumber        FlexInt `json:"InvoiceNumber"`
+	SupplierNumber       FlexInt `json:"SupplierNumber"`
 	SupplierName         string  `json:"SupplierName"`
 	Currency             string  `json:"Currency"`
 	TotalInvoiceCurrency float64 `json:"TotalInvoiceCurrency"`
@@ -93,8 +94,8 @@ func (c *Client) UnpaidSupplierInvoices() ([]domain.SupplierInvoice, error) {
 	invoices := make([]domain.SupplierInvoice, len(envelope.SupplierInvoices))
 	for i, row := range envelope.SupplierInvoices {
 		invoices[i] = domain.SupplierInvoice{
-			InvoiceNumber:  row.InvoiceNumber,
-			SupplierNumber: row.SupplierNumber,
+			InvoiceNumber:  int(row.InvoiceNumber),
+			SupplierNumber: int(row.SupplierNumber),
 			SupplierName:   row.SupplierName,
 			Amount:         domain.MoneyFromFloat(row.TotalInvoiceCurrency, row.Currency),
 			DueDate:        row.DueDate,
@@ -218,13 +219,13 @@ func (c *Client) ListSupplierInvoicePayments(invoiceNumber int) ([]SupplierInvoi
 
 // FullSupplierRow contains all fields relevant for supplier analysis.
 type FullSupplierRow struct {
-	SupplierNumber int    `json:"SupplierNumber"`
-	Name           string `json:"Name"`
-	Email          string `json:"Email"`
-	Phone          string `json:"Phone1"`
-	IBAN           string `json:"IBAN"`
-	BIC            string `json:"BIC"`
-	Active         bool   `json:"Active"`
+	SupplierNumber FlexInt `json:"SupplierNumber"`
+	Name           string  `json:"Name"`
+	Email          string  `json:"Email"`
+	Phone          string  `json:"Phone1"`
+	IBAN           string  `json:"IBAN"`
+	BIC            string  `json:"BIC"`
+	Active         bool    `json:"Active"`
 }
 
 // fullSupplierResponse is the envelope for GET /3/suppliers/{n}.
@@ -248,9 +249,10 @@ func (c *Client) GetFullSupplier(supplierNumber int) (FullSupplierRow, error) {
 }
 
 // CustomerInvoiceRow is the Fortnox JSON for a customer invoice from GET /3/invoices.
+// Fortnox returns DocumentNumber as a string or number inconsistently; CustomerNumber always string.
 type CustomerInvoiceRow struct {
-	DocumentNumber int     `json:"DocumentNumber"`
-	CustomerNumber string  `json:"CustomerNumber"` // Fortnox returns this as a string
+	DocumentNumber FlexInt `json:"DocumentNumber"`
+	CustomerNumber string  `json:"CustomerNumber"`
 	CustomerName   string  `json:"CustomerName"`
 	Currency       string  `json:"Currency"`
 	Total          float64 `json:"Total"`

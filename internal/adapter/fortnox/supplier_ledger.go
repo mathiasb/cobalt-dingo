@@ -84,7 +84,7 @@ func (a *SupplierLedgerAdapter) SupplierDetail(ctx context.Context, tenantID dom
 		return domain.Supplier{}, fmt.Errorf("supplier ledger supplier detail: %w", err)
 	}
 	return domain.Supplier{
-		SupplierNumber: row.SupplierNumber,
+		SupplierNumber: int(row.SupplierNumber),
 		Name:           row.Name,
 		Email:          row.Email,
 		Phone:          row.Phone,

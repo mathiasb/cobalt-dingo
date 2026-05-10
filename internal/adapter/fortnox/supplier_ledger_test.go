@@ -22,8 +22,8 @@ func TestSupplierLedger_UnpaidInvoices(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"SupplierInvoices": []map[string]any{
 				{
-					"InvoiceNumber":        42,
-					"SupplierNumber":       7,
+					"InvoiceNumber":        "42",
+					"SupplierNumber":       "7",
 					"SupplierName":         "Acme GmbH",
 					"Currency":             "EUR",
 					"TotalInvoiceCurrency": 1000.50,

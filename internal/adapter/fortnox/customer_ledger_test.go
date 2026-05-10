@@ -24,7 +24,7 @@ func TestCustomerLedger_UnpaidInvoices(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"Invoices": []map[string]any{
 				{
-					"DocumentNumber": 2001,
+					"DocumentNumber": "2001",
 					"CustomerNumber": "10",
 					"CustomerName":   "Test AB",
 					"Currency":       "SEK",
