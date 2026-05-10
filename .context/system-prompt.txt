@@ -41,6 +41,9 @@ These rules apply to every task across every project, regardless of harness.
 4. **Goal-driven execution.** Define clear success criteria up front for every task.
    Loop — implement, verify, refine — until those criteria are met. Don't claim
    completion without evidence (tests pass, command output, observed behavior).
+5. **Branch-per-task for multi-agent repos.** When another agent may be active on
+   the same repo, create a branch (`agent/<description>`), commit there, and open a
+   PR. Do not merge without explicit instruction from Mathias.
 
 ## Default stack
 
