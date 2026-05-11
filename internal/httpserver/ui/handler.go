@@ -1,3 +1,4 @@
+// Package ui provides HTTP handlers for the coo-agent admin UI.
 package ui
 
 import (
