@@ -1,3 +1,4 @@
+// Package main is the HTTP server binary for coo-agent.
 package main
 
 import (
