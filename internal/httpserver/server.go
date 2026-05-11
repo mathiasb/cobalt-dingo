@@ -34,7 +34,7 @@ func New(cfg Config) *Server {
 	mux.HandleFunc("GET /health", healthHandler(cfg.Health))
 
 	// Redirect root to UI.
-	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" {
 			http.Redirect(w, r, "/ui/", http.StatusFound)
 			return
