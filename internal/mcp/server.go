@@ -133,7 +133,7 @@ func (s *Server) registerTools() {
 
 	s.mcp.AddTool(
 		mcplib.NewTool("get_company_info",
-			mcplib.WithDescription("Hämta grundläggande företagsinformation (namn, organisationsnummer, adress)."),
+			mcplib.WithDescription("Hämta grundläggande företagsinformation (namn, organisationsnummer, adress)."), //nolint:misspell
 		),
 		s.handleGetCompanyInfo,
 	)
@@ -141,7 +141,7 @@ func (s *Server) registerTools() {
 	// --- YELLOW: write tools (require confirmed=true) ---
 	s.mcp.AddTool(
 		mcplib.NewTool("create_voucher",
-			mcplib.WithDescription("Skapa en ny verifikation i Fortnox. KRÄVER explicit bekräftelse från användaren (confirmed=true). Fråga alltid användaren innan du anropar detta verktyg."),
+			mcplib.WithDescription("Skapa en ny verifikation i Fortnox. KRÄVER explicit bekräftelse från användaren (confirmed=true). Fråga alltid användaren innan du anropar detta verktyg."), //nolint:misspell
 			mcplib.WithString("description",
 				mcplib.Description("Verifikationstext (leverantör + period)"),
 				mcplib.Required(),
@@ -323,12 +323,12 @@ func (s *Server) handleCreateVoucher(ctx context.Context, req mcplib.CallToolReq
 
 	created, err := s.client.CreateVoucher(ctx, voucher)
 	if err != nil {
-		return mcplib.NewToolResultError(fmt.Sprintf("Kunde inte skapa verifikation: %v", err)), nil
+		return mcplib.NewToolResultError(fmt.Sprintf("Kunde inte skapa verifikation: %v", err)), nil //nolint:misspell
 	}
 
 	b, err := json.MarshalIndent(created, "", "  ")
 	if err != nil {
-		return mcplib.NewToolResultError("Verifikation skapad men kunde inte serialisera svaret"), nil
+		return mcplib.NewToolResultError("Verifikation skapad men kunde inte serialisera svaret"), nil //nolint:misspell
 	}
 	return mcplib.NewToolResultText(string(b)), nil
 }
