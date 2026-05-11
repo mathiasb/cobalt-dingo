@@ -1,3 +1,4 @@
+// Package receipts implements the IMAP-based receipt collection pipeline.
 package receipts
 
 import (
