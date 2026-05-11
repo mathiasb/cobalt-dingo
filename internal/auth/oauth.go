@@ -95,7 +95,7 @@ func ExchangeCode(ctx context.Context, cfg OAuthConfig, code string) (*Token, er
 	if err != nil {
 		return nil, fmt.Errorf("oauth: token request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 	respBody, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
@@ -193,7 +193,7 @@ func (s *CallbackServer) handleCallback(w http.ResponseWriter, r *http.Request) 
 			desc = errParam
 		}
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w, "<html><body><h2>Autentisering misslyckades</h2><p>%s</p></body></html>", desc)
+		fmt.Fprintf(w, "<html><body><h2>Autentisering misslyckades</h2><p>%s</p></body></html>", desc) //nolint:errcheck
 		s.resultCh <- CallbackResult{Err: fmt.Errorf("oauth: authorization denied: %s", errParam)}
 		return
 	}
@@ -201,12 +201,12 @@ func (s *CallbackServer) handleCallback(w http.ResponseWriter, r *http.Request) 
 	code := q.Get("code")
 	if code == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprint(w, "<html><body><h2>Saknad kod</h2></body></html>")
+		fmt.Fprint(w, "<html><body><h2>Saknad kod</h2></body></html>") //nolint:errcheck
 		s.resultCh <- CallbackResult{Err: errors.New("oauth: callback missing code parameter")}
 		return
 	}
 
-	fmt.Fprint(w, `<html><body style="font-family:sans-serif;text-align:center;padding:4rem">
+	_, _ = fmt.Fprint(w, `<html><body style="font-family:sans-serif;text-align:center;padding:4rem">
 <h2>✓ Autentisering lyckades</h2>
 <p>Du kan stänga det här fönstret och gå tillbaka till terminalen.</p>
 </body></html>`)

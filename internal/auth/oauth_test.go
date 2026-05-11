@@ -79,7 +79,7 @@ func TestOAuth_ExchangeCode_SendsCorrectRequest(t *testing.T) {
 }
 
 func TestOAuth_ExchangeCode_ReturnsErrorOnNon200(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = fmt.Fprint(w, `{"error":"invalid_client"}`)
 	}))
@@ -97,7 +97,7 @@ func TestOAuth_ExchangeCode_ReturnsErrorOnNon200(t *testing.T) {
 }
 
 func TestOAuth_ExchangeCode_TokenExpirySetFromExpiresIn(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		writeTokenResponse(w, "acc", "ref", 7200)
 	}))
 	defer srv.Close()
@@ -128,7 +128,7 @@ func TestOAuth_CallbackServer_CapturesCodeAndState(t *testing.T) {
 	port := srv.Port()
 	resp, err := http.Get(fmt.Sprintf("http://localhost:%d/callback?code=the-auth-code&state=the-state", port))
 	require.NoError(t, err)
-	resp.Body.Close()
+	resp.Body.Close() //nolint:errcheck
 
 	result := <-resultCh
 	assert.NoError(t, result.Err)
@@ -151,7 +151,7 @@ func TestOAuth_CallbackServer_ReturnsErrorOnMissingCode(t *testing.T) {
 	port := srv.Port()
 	resp, err := http.Get(fmt.Sprintf("http://localhost:%d/callback?error=access_denied", port))
 	require.NoError(t, err)
-	resp.Body.Close()
+	resp.Body.Close() //nolint:errcheck
 
 	result := <-resultCh
 	assert.Error(t, result.Err)
@@ -169,7 +169,7 @@ func TestOAuth_CallbackServer_ShowsSuccessPageToUser(t *testing.T) {
 	port := srv.Port()
 	resp, err := http.Get(fmt.Sprintf("http://localhost:%d/callback?code=x&state=y", port))
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	body := make([]byte, 512)
@@ -198,6 +198,6 @@ func TestOAuth_ValidateState_EmptyStateReturnsError(t *testing.T) {
 
 func writeTokenResponse(w http.ResponseWriter, access, refresh string, expiresIn int) {
 	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprintf(w, `{"access_token":%q,"refresh_token":%q,"expires_in":%d,"token_type":"Bearer"}`,
+	_, _ = fmt.Fprintf(w, `{"access_token":%q,"refresh_token":%q,"expires_in":%d,"token_type":"Bearer"}`,
 		access, refresh, expiresIn)
 }

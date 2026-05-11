@@ -136,14 +136,14 @@ func TestFileLogger_LogAfterCloseReturnsError(t *testing.T) {
 	assert.Error(t, err, "Log after Close must return an error")
 }
 
-func TestFileLogger_ImplementsLoggerInterface(t *testing.T) {
+func TestFileLogger_ImplementsLoggerInterface(_ *testing.T) {
 	// Compile-time check: FileLogger satisfies the Logger interface.
 	var _ audit.Logger = (*audit.FileLogger)(nil)
 }
 
 // --- contract tests for MemoryLogger (test helper) ---
 
-func TestMemoryLogger_ImplementsLoggerInterface(t *testing.T) {
+func TestMemoryLogger_ImplementsLoggerInterface(_ *testing.T) {
 	var _ audit.Logger = (*audit.MemoryLogger)(nil)
 }
 
@@ -205,7 +205,7 @@ func readJSONLines(t *testing.T, path string) []map[string]any {
 	t.Helper()
 	f, err := os.Open(path)
 	require.NoError(t, err)
-	defer f.Close()
+	defer f.Close() //nolint:errcheck
 
 	var rows []map[string]any
 	scanner := bufio.NewScanner(f)

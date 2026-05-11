@@ -1,3 +1,4 @@
+// Package main is the MCP server binary for coo-agent.
 package main
 
 import (
@@ -29,7 +30,7 @@ func main() {
 		slog.Error("failed to open audit log", "err", err)
 		os.Exit(1)
 	}
-	defer auditLog.Close()
+	defer func() { _ = auditLog.Close() }()
 
 	encKey, err := loadOrCreateKey()
 	if err != nil {
@@ -97,22 +98,6 @@ func tokenPath() string {
 	}
 	home, _ := os.UserHomeDir()
 	return home + "/.coo-agent/tokens.enc"
-}
-
-// extractCallbackAddr extracts ":port" from a redirect URI like "http://localhost:8080/callback".
-func extractCallbackAddr(redirectURI string) string {
-	// Simple extraction: find the port from the URI.
-	// Works for http://localhost:PORT/anything.
-	for i := len("http://localhost"); i < len(redirectURI); i++ {
-		if redirectURI[i] == ':' {
-			end := i + 1
-			for end < len(redirectURI) && redirectURI[end] >= '0' && redirectURI[end] <= '9' {
-				end++
-			}
-			return ":" + redirectURI[i+1:end]
-		}
-	}
-	return ":8080"
 }
 
 // loadOrCreateKey reads the AES-256 key from disk, generating a new one if absent.

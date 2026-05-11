@@ -1,3 +1,4 @@
+// Package httpserver provides the HTTP admin server for coo-agent.
 package httpserver
 
 import (
@@ -18,11 +19,11 @@ type Server struct {
 
 // Config holds server configuration.
 type Config struct {
-	Addr    string // e.g. ":8080"
-	Tokens  ui.TokenChecker
-	Keys    ui.APIKeyStore
-	Audit   ui.AuditReader
-	Health  ui.HealthChecker
+	Addr   string // e.g. ":8080"
+	Tokens ui.TokenChecker
+	Keys   ui.APIKeyStore
+	Audit  ui.AuditReader
+	Health ui.HealthChecker
 }
 
 // New constructs a Server wired with the provided dependencies.

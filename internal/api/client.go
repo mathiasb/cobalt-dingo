@@ -65,6 +65,7 @@ func New(cfg Config) (*Client, error) {
 	}, nil
 }
 
+// ListInvoices returns invoices optionally filtered by status (e.g. "unpaid").
 func (c *Client) ListInvoices(ctx context.Context, filter string) ([]Invoice, error) {
 	path := "invoices"
 	if filter != "" {
@@ -79,6 +80,7 @@ func (c *Client) ListInvoices(ctx context.Context, filter string) ([]Invoice, er
 	return resp.Invoices, nil
 }
 
+// ListVouchers returns vouchers created between from and to.
 func (c *Client) ListVouchers(ctx context.Context, from, to time.Time) ([]Voucher, error) {
 	path := fmt.Sprintf("vouchers?fromdate=%s&todate=%s",
 		from.Format("2006-01-02"), to.Format("2006-01-02"))
@@ -91,6 +93,7 @@ func (c *Client) ListVouchers(ctx context.Context, from, to time.Time) ([]Vouche
 	return resp.Vouchers, nil
 }
 
+// ListAccounts returns all chart-of-accounts entries.
 func (c *Client) ListAccounts(ctx context.Context) ([]validator.Account, error) {
 	var resp struct {
 		Accounts []struct {
@@ -108,6 +111,7 @@ func (c *Client) ListAccounts(ctx context.Context) ([]validator.Account, error) 
 	return accounts, nil
 }
 
+// ListSupplierInvoices returns supplier invoices, optionally filtered.
 func (c *Client) ListSupplierInvoices(ctx context.Context, filter string) ([]SupplierInvoice, error) {
 	path := "supplierinvoices"
 	if filter != "" {
@@ -122,6 +126,7 @@ func (c *Client) ListSupplierInvoices(ctx context.Context, filter string) ([]Sup
 	return resp.SupplierInvoices, nil
 }
 
+// ListAssets returns all fixed assets from the asset registry.
 func (c *Client) ListAssets(ctx context.Context) ([]Asset, error) {
 	var resp struct {
 		Assets []Asset `json:"Assets"`
@@ -132,6 +137,7 @@ func (c *Client) ListAssets(ctx context.Context) ([]Asset, error) {
 	return resp.Assets, nil
 }
 
+// GetCompanyInfo returns basic company information.
 func (c *Client) GetCompanyInfo(ctx context.Context) (*CompanyInfo, error) {
 	var resp struct {
 		CompanyInformation CompanyInfo `json:"CompanyInformation"`
@@ -142,6 +148,7 @@ func (c *Client) GetCompanyInfo(ctx context.Context) (*CompanyInfo, error) {
 	return &resp.CompanyInformation, nil
 }
 
+// CreateVoucher creates a new accounting voucher. Requires explicit user confirmation.
 func (c *Client) CreateVoucher(ctx context.Context, v Voucher) (*Voucher, error) {
 	body, err := json.Marshal(map[string]any{"Voucher": v})
 	if err != nil {
@@ -201,7 +208,7 @@ func (c *Client) doWithRetry(ctx context.Context, method, path string, body []by
 			continue
 		}
 		respBody, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		resp.Body.Close() //nolint:errcheck
 
 		_ = c.cfg.AuditLog.Log(audit.Entry{
 			Op:         method,
@@ -253,7 +260,7 @@ func (c *Client) refreshToken(ctx context.Context, token *auth.Token) (*auth.Tok
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 	body, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {

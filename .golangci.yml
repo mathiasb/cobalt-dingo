@@ -18,12 +18,5 @@ formatters:
 linters-settings:
   revive:
     rules:
-      - name: exported
-        severity: warning
       - name: var-naming
         severity: warning
-
-issues:
-  exclude-rules:
-    - path: "_test\\.go"
-      linters: [revive, unused]

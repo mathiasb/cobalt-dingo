@@ -72,7 +72,7 @@ type VoucherRow struct {
 	Description string  `json:"TransactionInformation,omitempty"`
 }
 
-// Voucher represents a Fortnox accounting voucher (verifikation).
+// Voucher represents a Fortnox accounting voucher.
 type Voucher struct {
 	VoucherSeries string       `json:"VoucherSeries,omitempty"`
 	VoucherNumber int          `json:"VoucherNumber,omitempty"`

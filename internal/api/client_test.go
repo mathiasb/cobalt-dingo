@@ -49,7 +49,7 @@ func TestClient_ListInvoices_ForwardsFilterParameter(t *testing.T) {
 }
 
 func TestClient_ListInvoices_LogsAuditEntry(t *testing.T) {
-	srv := newFakeFortnox(t, func(w http.ResponseWriter, r *http.Request) {
+	srv := newFakeFortnox(t, func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, map[string]any{"Invoices": []any{}})
 	})
 
@@ -71,7 +71,7 @@ func TestClient_ListInvoices_LogsAuditEntry(t *testing.T) {
 
 func TestClient_RetriesOnHTTP429(t *testing.T) {
 	attempts := 0
-	srv := newFakeFortnox(t, func(w http.ResponseWriter, r *http.Request) {
+	srv := newFakeFortnox(t, func(w http.ResponseWriter, _ *http.Request) {
 		attempts++
 		if attempts < 3 {
 			w.WriteHeader(http.StatusTooManyRequests)
@@ -87,7 +87,7 @@ func TestClient_RetriesOnHTTP429(t *testing.T) {
 }
 
 func TestClient_StopsRetryingAfterMaxAttempts(t *testing.T) {
-	srv := newFakeFortnox(t, func(w http.ResponseWriter, r *http.Request) {
+	srv := newFakeFortnox(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusTooManyRequests)
 	})
 
@@ -98,7 +98,7 @@ func TestClient_StopsRetryingAfterMaxAttempts(t *testing.T) {
 
 func TestClient_DoesNotRetryOnHTTP400(t *testing.T) {
 	attempts := 0
-	srv := newFakeFortnox(t, func(w http.ResponseWriter, r *http.Request) {
+	srv := newFakeFortnox(t, func(w http.ResponseWriter, _ *http.Request) {
 		attempts++
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte(`{"ErrorInformation":{"Error":1,"Message":"Bad request"}}`))
@@ -145,7 +145,7 @@ func TestClient_CreateVoucher_SendsCorrectPayload(t *testing.T) {
 }
 
 func TestClient_CreateVoucher_LogsAuditEntry(t *testing.T) {
-	srv := newFakeFortnox(t, func(w http.ResponseWriter, r *http.Request) {
+	srv := newFakeFortnox(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusCreated)
 		writeJSON(w, map[string]any{"Voucher": map[string]any{"VoucherNumber": 1}})
 	})

@@ -19,10 +19,10 @@ func (s TokenStatus) DaysUntilExpiry() int {
 
 // APIKey is a redacted view of an API key (plaintext never returned after creation).
 type APIKey struct {
-	ID          string
-	Label       string
-	CreatedAt   time.Time
-	LastUsedAt  *time.Time
+	ID         string
+	Label      string
+	CreatedAt  time.Time
+	LastUsedAt *time.Time
 }
 
 // CreatedKey is returned once when a new key is created; Plaintext is never stored.

@@ -19,9 +19,12 @@ type Tokens struct {
 	Err    error
 }
 
+// TokenStatus returns the stub token status.
 func (t *Tokens) TokenStatus(_ context.Context) (templates.TokenStatus, error) {
 	return t.Status, t.Err
 }
+
+// RefreshToken simulates a token refresh.
 func (t *Tokens) RefreshToken(_ context.Context) error {
 	if t.Err != nil {
 		return t.Err
@@ -29,6 +32,8 @@ func (t *Tokens) RefreshToken(_ context.Context) error {
 	t.Status.ExpiresAt = time.Now().Add(3600 * time.Second)
 	return nil
 }
+
+// RevokeToken simulates a token revocation.
 func (t *Tokens) RevokeToken(_ context.Context) error {
 	if t.Err != nil {
 		return t.Err
@@ -53,6 +58,7 @@ type Keys struct {
 	Err  error
 }
 
+// ListKeys returns all in-memory API keys.
 func (k *Keys) ListKeys(_ context.Context) ([]templates.APIKey, error) {
 	if k.Err != nil {
 		return nil, k.Err
@@ -62,6 +68,7 @@ func (k *Keys) ListKeys(_ context.Context) ([]templates.APIKey, error) {
 	return out, nil
 }
 
+// CreateKey creates a new in-memory API key with a random plaintext token.
 func (k *Keys) CreateKey(_ context.Context, label string) (templates.CreatedKey, error) {
 	if k.Err != nil {
 		return templates.CreatedKey{}, k.Err
@@ -78,6 +85,7 @@ func (k *Keys) CreateKey(_ context.Context, label string) (templates.CreatedKey,
 	return templates.CreatedKey{APIKey: key, Plaintext: plain}, nil
 }
 
+// RevokeKey removes an API key by ID from the in-memory store.
 func (k *Keys) RevokeKey(_ context.Context, id string) error {
 	if k.Err != nil {
 		return k.Err
@@ -111,6 +119,7 @@ type Audit struct {
 	Err    error
 }
 
+// ListEvents returns a paginated slice of stub audit events.
 func (a *Audit) ListEvents(_ context.Context, page, pageSize int) ([]templates.AuditEvent, error) {
 	if a.Err != nil {
 		return nil, a.Err
@@ -149,7 +158,10 @@ type Health struct {
 	Fortnox bool
 }
 
-func (h *Health) DBReachable(_ context.Context) bool      { return h.DB }
+// DBReachable returns the stub DB health flag.
+func (h *Health) DBReachable(_ context.Context) bool { return h.DB }
+
+// FortnoxReachable returns the stub Fortnox health flag.
 func (h *Health) FortnoxReachable(_ context.Context) bool { return h.Fortnox }
 
 // AllHealthy returns a Health stub where everything is reachable.

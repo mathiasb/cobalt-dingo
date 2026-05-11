@@ -1,3 +1,4 @@
+// Package main is the receipt-collector daemon binary.
 package main
 
 import (
@@ -62,7 +63,7 @@ func main() {
 	for _, s := range cfg.Sources {
 		password := os.Getenv(s.PasswordEnv)
 		if password == "" {
-			log.Fatalf("miljövariabel %s är inte satt (source: %s)", s.PasswordEnv, s.Name)
+			log.Fatalf("miljövariabel %s är inte satt (source: %s)", s.PasswordEnv, s.Name) //nolint:misspell
 		}
 		sources = append(sources, &receipts.Source{
 			Name:     s.Name,
@@ -129,7 +130,7 @@ func loadConfig(path string) (*configFile, error) {
 	if err != nil {
 		return nil, fmt.Errorf("öppna %s: %w", path, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	var cfg configFile
 	if err := yaml.NewDecoder(f).Decode(&cfg); err != nil {
