@@ -13,6 +13,7 @@ credentials/
 # Go
 bin/
 coo-agent
+receipt-collector
 *.test
 *.out
 coverage.html
@@ -20,6 +21,9 @@ coverage.html
 # Personliga Claude-inställningar
 .claude/settings.local.json
 CLAUDE.local.md
+
+# Konfiguration med känsliga uppgifter (mailadresser, env-refs)
+config/receipt-sources.yml
 
 # Temporärt
 *.tmp
