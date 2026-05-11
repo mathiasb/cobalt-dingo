@@ -1,0 +1,64 @@
+package templates
+
+templ Auth(status TokenStatus) {
+	@Layout("Fortnox-anslutning") {
+		<div id="auth-section">
+			@authContent(status)
+		</div>
+	}
+}
+
+// AuthPartial renders only the inner content for HTMX swaps.
+templ AuthPartial(status TokenStatus) {
+	<div id="auth-section">
+		@authContent(status)
+	</div>
+}
+
+templ authContent(status TokenStatus) {
+	<h1 class="text-xl font-semibold mb-6">Fortnox OAuth</h1>
+	<div class="rounded-lg border bg-white p-6 max-w-lg">
+		if status.Connected {
+			<div class="flex items-center justify-between mb-4">
+				<div>
+					@Badge(true, "Ansluten", "")
+					<p class="mt-1 text-sm text-gray-500">
+						Token giltig till { status.ExpiresAt.Format("2006-01-02 15:04") }
+					</p>
+				</div>
+			</div>
+			<div class="flex gap-3">
+				<button
+					hx-post="/ui/token/refresh"
+					hx-target="#auth-section"
+					hx-swap="outerHTML"
+					class="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+				>
+					Förnya token nu
+				</button>
+				<button
+					hx-delete="/ui/token"
+					hx-target="#auth-section"
+					hx-swap="outerHTML"
+					hx-confirm="Koppla från Fortnox? Du måste autentisera om för att fortsätta."
+					class="rounded border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+				>
+					Koppla från
+				</button>
+			</div>
+		} else {
+			<div class="mb-4">
+				@Badge(false, "", "Ej ansluten")
+				<p class="mt-2 text-sm text-gray-500">
+					Anslut till Fortnox för att auktorisera coo-agent.
+				</p>
+			</div>
+			<a
+				href="/auth/start"
+				class="inline-block rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+			>
+				Anslut till Fortnox
+			</a>
+		}
+	</div>
+}
