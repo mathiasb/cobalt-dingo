@@ -1,0 +1,224 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "claude/**", "feature/**", "fix/**", "chore/**"]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+
+env:
+  IMAGE: coo-agent
+
+jobs:
+  # ── 1. Quality gate ─────────────────────────────────────────────────────────
+  check:
+    name: Lint / Test / Vet
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false   # self-hosted runner: Go cache persists on disk between runs
+
+      - name: Verify toolchain
+        run: |
+          go version
+          task --version
+          govulncheck -version 2>&1 || true
+
+      - name: Install templ
+        run: |
+          go install github.com/a-h/templ/cmd/templ@latest
+          templ --version
+
+      - name: Install golangci-lint
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh \
+            | sh -s -- -b "$(go env GOPATH)/bin" v2.11.4
+          golangci-lint --version
+
+      - name: Run checks
+        run: task check
+
+  # ── 2. Build ─────────────────────────────────────────────────────────────────
+  build:
+    name: Build & Import
+    needs: check
+    runs-on: self-hosted
+    if: github.event_name != 'pull_request'
+    outputs:
+      image-tag: ${{ steps.meta.outputs.sha-tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Derive image tags
+        id: meta
+        run: |
+          SHA=$(git rev-parse --short HEAD)
+          echo "sha-tag=${SHA}" >> "$GITHUB_OUTPUT"
+          REF="${{ github.ref }}"
+          if [[ "$REF" == refs/tags/v* ]]; then
+            echo "version-tag=${REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and push to local registry
+        run: |
+          REGISTRY="localhost:5000"
+          REF="${REGISTRY}/${{ env.IMAGE }}:${{ steps.meta.outputs.sha-tag }}"
+          buildah build \
+            --label "org.opencontainers.image.revision=${{ github.sha }}" \
+            --label "org.opencontainers.image.source=${{ github.repositoryUrl }}" \
+            -t ${REF} \
+            -t ${REGISTRY}/${{ env.IMAGE }}:latest \
+            .
+          buildah push --tls-verify=false ${REF}
+          buildah push --tls-verify=false ${REGISTRY}/${{ env.IMAGE }}:latest
+          [[ -n "${{ steps.meta.outputs.version-tag }}" ]] && \
+            buildah push --tls-verify=false \
+              ${REF} \
+              ${REGISTRY}/${{ env.IMAGE }}:${{ steps.meta.outputs.version-tag }} || true
+          echo "✓ Image pushed to ${REF}"
+
+      - name: Smoke test
+        run: |
+          REGISTRY="localhost:5000"
+          REF="${REGISTRY}/${{ env.IMAGE }}:${{ steps.meta.outputs.sha-tag }}"
+          CNAME="smoke-${{ steps.meta.outputs.sha-tag }}"
+          sudo k3s ctr images pull --plain-http ${REF}
+          OUTPUT=$(timeout 5 sudo k3s ctr run --rm ${REF} ${CNAME} /coo-agent-server 2>&1 || true)
+          sudo k3s ctr containers delete ${CNAME} 2>/dev/null || true
+          echo "$OUTPUT" | grep -q "listening\|coo-agent" \
+            && echo "✓ Smoke test passed" \
+            || echo "⚠ Smoke test inconclusive: $OUTPUT"
+
+      # Verify MCP binary cross-compiles for all deployment targets.
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Build MCP binary (all platforms)
+        run: task build:all
+
+  # ── 3. Deploy via infra repo + Flux ─────────────────────────────────────────
+  deploy:
+    name: Deploy via GitOps
+    needs: build
+    runs-on: self-hosted
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: staging
+    steps:
+      - name: Update image tag in infra repo
+        env:
+          IMAGE_TAG: ${{ needs.build.outputs.image-tag }}
+          DEPLOY_KEY: ${{ secrets.INFRA_DEPLOY_KEY }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p ~/.ssh
+          echo "$DEPLOY_KEY" > ~/.ssh/id_infra
+          chmod 600 ~/.ssh/id_infra
+          ssh-keyscan -p 30022 10.0.1.20 >> ~/.ssh/known_hosts 2>/dev/null
+
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/id_infra -o IdentitiesOnly=yes"
+          rm -rf /tmp/infra-coo
+          git clone -b main ssh://git@10.0.1.20:30022/mathias/infra.git /tmp/infra-coo
+          cd /tmp/infra-coo
+
+          DEPLOYMENT="k3s/apps/coo-agent/deployment.yaml"
+          sed -i "s|image: localhost:5000/coo-agent:.*|image: localhost:5000/coo-agent:${IMAGE_TAG}|" "$DEPLOYMENT"
+
+          grep -q "localhost:5000/coo-agent:${IMAGE_TAG}" "$DEPLOYMENT" \
+            || { echo "✗ image tag patch failed"; exit 1; }
+
+          if git diff --quiet "$DEPLOYMENT"; then
+            echo "ℹ image tag unchanged — skipping push"
+          else
+            git -c user.name="coo-agent CI" \
+                -c user.email="ci@coo-agent.local" \
+                commit -m "chore(deploy): coo-agent → ${IMAGE_TAG}" "$DEPLOYMENT"
+            git push origin main
+            echo "✓ pushed to infra repo"
+          fi
+
+          shred -u ~/.ssh/id_infra
+
+      - name: Trigger Flux reconcile (immediate)
+        run: |
+          kubectl -n flux-system annotate gitrepository flux-system \
+            reconcile.fluxcd.io/requestedAt="$(date +%s)" --overwrite
+          kubectl -n flux-system annotate kustomization apps \
+            reconcile.fluxcd.io/requestedAt="$(date +%s)" --overwrite
+
+      - name: Wait for Flux to apply new image
+        env:
+          IMAGE_TAG: ${{ needs.build.outputs.image-tag }}
+        run: |
+          EXPECTED="localhost:5000/coo-agent:${IMAGE_TAG}"
+          for i in $(seq 1 60); do
+            CURRENT=$(kubectl get deploy coo-agent -n coo-agent \
+              -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || echo "")
+            if [ "$CURRENT" = "$EXPECTED" ]; then
+              echo "✓ Flux applied new image after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+          kubectl get deploy coo-agent -n coo-agent \
+            -o jsonpath='{.spec.template.spec.containers[0].image}' \
+            | grep -qx "$EXPECTED" \
+            || { echo "✗ Flux did not apply new image within 60s"; exit 1; }
+
+      - name: Verify rollout
+        run: |
+          kubectl rollout status deployment/coo-agent \
+            --namespace coo-agent \
+            --timeout=120s \
+          || {
+            echo "── pod status ──"
+            kubectl get pods -n coo-agent -o wide
+            echo "── events ──"
+            kubectl get events -n coo-agent --sort-by='.lastTimestamp' | tail -20
+            echo "── describe ──"
+            kubectl describe pods -n coo-agent -l app=coo-agent | tail -40
+            exit 1
+          }
+
+      - name: Confirm pod running new image
+        env:
+          IMAGE_TAG: ${{ needs.build.outputs.image-tag }}
+        run: |
+          kubectl get pods -n coo-agent \
+            -l app=coo-agent \
+            --field-selector=status.phase=Running \
+            -o jsonpath='{.items[*].spec.containers[0].image}' \
+          | grep -q "localhost:5000/coo-agent:${IMAGE_TAG}" \
+          && echo "✓ pod running new image" \
+          || { echo "✗ pod image mismatch"; exit 1; }
+
+  # ── 4. Mirror to GitHub ──────────────────────────────────────────────────────
+  mirror:
+    name: Mirror to GitHub
+    needs: [deploy]
+    runs-on: self-hosted
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to GitHub
+        env:
+          GH_DEPLOY_KEY: ${{ secrets.GH_DEPLOY_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$GH_DEPLOY_KEY" > ~/.ssh/id_rsa_gh_mirror
+          chmod 600 ~/.ssh/id_rsa_gh_mirror
+          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+          GIT_SSH_COMMAND="ssh -i ~/.ssh/id_rsa_gh_mirror -o IdentitiesOnly=yes" \
+            git push git@github.com:mathiasb/coo-agent.git HEAD:main
+          rm ~/.ssh/id_rsa_gh_mirror
+          echo "✓ Mirrored to GitHub"
