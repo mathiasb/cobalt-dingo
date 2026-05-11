@@ -67,7 +67,7 @@ tasks:
     cmds:
       - go test -race -coverprofile=coverage.out ./...
       - go tool cover -html=coverage.out -o coverage.html
-      - echo "Coverage report: coverage.html"
+      - 'echo "Coverage report: coverage.html"'
 
   # ── Utilities ───────────────────────────────────────────────────────────────
   tidy:
