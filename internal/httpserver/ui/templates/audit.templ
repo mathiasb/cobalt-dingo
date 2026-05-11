@@ -1,0 +1,75 @@
+package templates
+
+import "fmt"
+
+templ Audit(events []AuditEvent, page int) {
+	@Layout("Audit-logg") {
+		<h1 class="text-xl font-semibold mb-6">Audit-logg</h1>
+		<div class="rounded-lg border bg-white overflow-hidden">
+			<table class="min-w-full divide-y divide-gray-200">
+				<thead class="bg-gray-50">
+					<tr>
+						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tid</th>
+						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Operation</th>
+						<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+						<th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">ms</th>
+					</tr>
+				</thead>
+				<tbody class="divide-y divide-gray-100">
+					for _, e := range events {
+						<tr>
+							<td class="px-4 py-2 text-xs text-gray-500 whitespace-nowrap">
+								{ e.Timestamp.Format("2006-01-02 15:04:05") }
+							</td>
+							<td class="px-4 py-2 text-sm text-gray-900">
+								<span class="text-xs text-gray-400 mr-1">{ e.Method }</span>
+								{ e.Endpoint }
+							</td>
+							<td class="px-4 py-2 text-sm">
+								@statusBadge(e.StatusCode)
+							</td>
+							<td class="px-4 py-2 text-sm text-right text-gray-500">
+								{ fmt.Sprintf("%d", e.DurationMS) }
+							</td>
+						</tr>
+					}
+					if len(events) == 0 {
+						<tr>
+							<td colspan="4" class="px-4 py-6 text-center text-sm text-gray-400">
+								Inga händelser att visa.
+							</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+		<div class="mt-4 flex gap-3">
+			if page > 1 {
+				<a
+					href={ templ.SafeURL(fmt.Sprintf("/ui/audit?page=%d", page-1)) }
+					class="text-sm text-blue-600 hover:underline"
+				>
+					← Föregående
+				</a>
+			}
+			if len(events) == 50 {
+				<a
+					href={ templ.SafeURL(fmt.Sprintf("/ui/audit?page=%d", page+1)) }
+					class="text-sm text-blue-600 hover:underline"
+				>
+					Nästa →
+				</a>
+			}
+		</div>
+	}
+}
+
+templ statusBadge(code int) {
+	if code >= 200 && code < 300 {
+		<span class="text-green-700">{ fmt.Sprintf("%d", code) }</span>
+	} else if code >= 400 {
+		<span class="text-red-600 font-medium">{ fmt.Sprintf("%d", code) }</span>
+	} else {
+		<span class="text-gray-500">{ fmt.Sprintf("%d", code) }</span>
+	}
+}
