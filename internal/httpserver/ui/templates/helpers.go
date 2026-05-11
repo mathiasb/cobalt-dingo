@@ -1,3 +1,4 @@
+// Package templates contains templ-generated HTML templates and helper functions.
 package templates
 
 import "strconv"
