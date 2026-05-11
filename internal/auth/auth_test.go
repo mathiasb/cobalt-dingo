@@ -101,13 +101,13 @@ func TestFileTokenStore_DifferentKeyCannotDecrypt(t *testing.T) {
 	assert.Error(t, err, "token encrypted with key A must not be decryptable with key B")
 }
 
-func TestFileTokenStore_ImplementsTokenStoreInterface(t *testing.T) {
+func TestFileTokenStore_ImplementsTokenStoreInterface(_ *testing.T) {
 	var _ auth.TokenStore = (*auth.FileTokenStore)(nil)
 }
 
 // --- MemoryTokenStore (test helper) ---
 
-func TestMemoryTokenStore_ImplementsTokenStoreInterface(t *testing.T) {
+func TestMemoryTokenStore_ImplementsTokenStoreInterface(_ *testing.T) {
 	var _ auth.TokenStore = (*auth.MemoryTokenStore)(nil)
 }
 
