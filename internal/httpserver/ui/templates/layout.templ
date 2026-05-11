@@ -1,0 +1,40 @@
+package templates
+
+templ Layout(title string) {
+	<!DOCTYPE html>
+	<html lang="sv">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>{ title } – coo-agent</title>
+			<script src="https://cdn.tailwindcss.com"></script>
+			<script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
+		</head>
+		<body class="bg-gray-50 text-gray-900 min-h-screen">
+			<nav class="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-6">
+				<span class="font-semibold text-gray-700">coo-agent</span>
+				<a href="/ui/" class="text-sm text-gray-600 hover:text-gray-900">Status</a>
+				<a href="/ui/auth" class="text-sm text-gray-600 hover:text-gray-900">Fortnox</a>
+				<a href="/ui/keys" class="text-sm text-gray-600 hover:text-gray-900">API-nycklar</a>
+				<a href="/ui/audit" class="text-sm text-gray-600 hover:text-gray-900">Audit-logg</a>
+			</nav>
+			<main class="max-w-4xl mx-auto px-6 py-8">
+				{ children... }
+			</main>
+		</body>
+	</html>
+}
+
+templ Badge(ok bool, okLabel, failLabel string) {
+	if ok {
+		<span class="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+			<span>✓</span>
+			{ okLabel }
+		</span>
+	} else {
+		<span class="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">
+			<span>✗</span>
+			{ failLabel }
+		</span>
+	}
+}

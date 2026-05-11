@@ -1,0 +1,63 @@
+# Kopiera till config/receipt-sources.yml och fyll i dina värden.
+# receipt-sources.yml committas ALDRIG – den finns i .gitignore.
+#
+# Schema:
+#   sources       – IMAP-konton att bevaka
+#   destinations  – Vidarebefordransmål (smtp / fortnox-receipts / fortnox-invoices)
+#   rules         – Routingsregler, utvärderas i ordning (första träff gäller)
+
+sources:
+  - name: kvitton
+    host: imap.gmail.com
+    port: 993
+    username: kvitton@example.com
+    # Lösenordet hämtas från miljövariabel – aldrig i klartext här.
+    password_env: IMAP_PASSWORD_KVITTON
+    folder: INBOX
+    tls: true
+
+destinations:
+  # Mynt – kvitton matchas mot korttransaktioner
+  - name: mynt
+    type: smtp
+    address: mynt-inbox@mynt.se   # ersätt med din faktiska Mynt-adress
+
+  # Fortnox kvitto-inbox (scannade kvitton)
+  - name: fortnox-receipts
+    type: fortnox-receipts
+    address: ""
+
+  # Fortnox faktura-inbox (leverantörsfakturor)
+  - name: fortnox-invoices
+    type: fortnox-invoices
+    address: ""
+
+rules:
+  # Mynt-transaktionsmail
+  - name: mynt-transaktioner
+    match_from:
+      - noreply@mynt.se
+      - kvitto@mynt.se
+    destination: mynt
+
+  # Vanliga leverantörsfakturor (Telenor, Telia, Bahnhof m.fl.)
+  - name: leverantörsfakturor
+    match_from:
+      - "*@telenor.se"
+      - "*@telia.se"
+      - "*@bahnhof.se"
+    destination: fortnox-invoices
+
+  # Allt med "faktura" eller "invoice" i ämnesraden
+  - name: faktura-i-amne
+    match_subject:
+      - faktura
+      - invoice
+    destination: fortnox-invoices
+
+  # Övriga bifogade kvitton – hamnar i Fortnox kvitto-inbox
+  - name: kvitton-fallback
+    match_subject:
+      - kvitto
+      - receipt
+    destination: fortnox-receipts

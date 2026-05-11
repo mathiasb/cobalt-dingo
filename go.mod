@@ -1,6 +1,6 @@
 module github.com/mathiasb/coo-agent
 
-go 1.24
+go 1.25.0
 
 require (
 	github.com/joho/godotenv v1.5.1
@@ -9,7 +9,10 @@ require (
 )
 
 require (
+	github.com/a-h/templ v0.3.1020 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/emersion/go-imap/v2 v2.0.0-beta.8 // indirect
+	github.com/emersion/go-message v0.18.2 // indirect
 	github.com/google/jsonschema-go v0.4.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
