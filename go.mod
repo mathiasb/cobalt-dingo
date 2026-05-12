@@ -12,9 +12,11 @@ require (
 )
 
 require (
+	github.com/coreos/go-oidc/v3 v3.18.0 // indirect
 	github.com/cucumber/gherkin/go/v26 v26.2.0 // indirect
 	github.com/cucumber/messages/go/v21 v21.0.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
+	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/gofrs/uuid v4.3.1+incompatible // indirect
 	github.com/google/jsonschema-go v0.4.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
@@ -25,5 +27,6 @@ require (
 	github.com/spf13/cast v1.7.1 // indirect
 	github.com/spf13/pflag v1.0.7 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
+	golang.org/x/oauth2 v0.36.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/a-h/templ"
+	"github.com/mathiasb/cobalt-dingo/internal/auth"
 	"github.com/mathiasb/cobalt-dingo/internal/config"
 	"github.com/mathiasb/cobalt-dingo/internal/domain"
 	"github.com/mathiasb/cobalt-dingo/internal/payment"
@@ -16,32 +17,41 @@ import (
 
 // Server handles HTTP requests for the cobalt-dingo UI.
 type Server struct {
-	tenantID domain.TenantID
 	debtor   config.Debtor
 	invoices domain.InvoiceSource
 	enricher domain.SupplierEnricher
 	batches  *domain.BatchService // nil when DB is not configured
+	sessions *auth.SessionManager
 	log      *slog.Logger
 }
 
 // NewServer constructs a Server wired to the given domain ports.
 // batches may be nil; submission endpoints return 503 when it is absent.
 func NewServer(
-	tenantID domain.TenantID,
 	debtor config.Debtor,
 	invoices domain.InvoiceSource,
 	enricher domain.SupplierEnricher,
 	batches *domain.BatchService,
+	sessions *auth.SessionManager,
 	log *slog.Logger,
 ) *Server {
 	return &Server{
-		tenantID: tenantID,
 		debtor:   debtor,
 		invoices: invoices,
 		enricher: enricher,
 		batches:  batches,
+		sessions: sessions,
 		log:      log,
 	}
+}
+
+// tenantID resolves the per-request tenant from the session.
+// Falls back to "default" when auth is disabled (dev mode without OIDC).
+func (s *Server) tenantID(r *http.Request) domain.TenantID {
+	if sess := auth.FromContext(r); sess != nil {
+		return domain.TenantID(sess.TenantID())
+	}
+	return domain.TenantID("default")
 }
 
 // RegisterRoutes wires the UI handlers onto mux.
@@ -51,27 +61,57 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /invoices/batch", s.batchHandler)
 	mux.HandleFunc("GET /invoices/batch/download", s.downloadHandler)
 	mux.HandleFunc("POST /invoices/batch/submit", s.submitHandler)
+	mux.HandleFunc("POST /settings/mode", s.modeHandler)
+}
+
+// modeHandler switches the active Fortnox mode in the session cookie.
+func (s *Server) modeHandler(w http.ResponseWriter, r *http.Request) {
+	sess := auth.FromContext(r)
+	if sess == nil {
+		http.Error(w, "not authenticated", http.StatusUnauthorized)
+		return
+	}
+	m := config.Mode(r.FormValue("mode"))
+	if !m.IsValid() {
+		http.Error(w, "invalid mode", http.StatusBadRequest)
+		return
+	}
+	sess.Mode = m
+	if err := s.sessions.Set(w, *sess); err != nil {
+		http.Error(w, "session error", http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, r.Referer(), http.StatusSeeOther)
+}
+
+// userNavFrom builds a UserNav from the current session, or nil in dev mode.
+func userNavFrom(r *http.Request) *UserNav {
+	s := auth.FromContext(r)
+	if s == nil {
+		return nil
+	}
+	return &UserNav{Name: s.Name, Email: s.Email, Mode: s.Mode}
 }
 
 func (s *Server) invoicesHandler(w http.ResponseWriter, r *http.Request) {
-	invoices, err := s.loadPendingInvoices(r.Context())
+	invoices, err := s.loadPendingInvoices(r)
 	if err != nil {
 		s.log.Error("load invoices", "err", err)
 		http.Error(w, "failed to load invoices from Fortnox", http.StatusBadGateway)
 		return
 	}
-	render(w, r, InvoicesPage(invoices))
+	render(w, r, InvoicesPage(invoices, userNavFrom(r)))
 }
 
 func (s *Server) batchHandler(w http.ResponseWriter, r *http.Request) {
-	invoices, err := s.loadPendingInvoices(r.Context())
+	invoices, err := s.loadPendingInvoices(r)
 	if err != nil {
 		s.log.Error("load invoices for batch", "err", err)
 		http.Error(w, "failed to load invoices from Fortnox", http.StatusBadGateway)
 		return
 	}
 	debtor := payment.Debtor{Name: s.debtor.Name, IBAN: s.debtor.IBAN, BIC: s.debtor.BIC}
-	summary, err := buildBatchSummary(r.Context(), invoices, debtor, s.tenantID, s.batches)
+	summary, err := buildBatchSummary(r.Context(), invoices, debtor, s.tenantID(r), s.batches)
 	if err != nil {
 		s.log.Error("build batch", "err", err)
 		http.Error(w, fmt.Sprintf("batch generation failed: %v", err), http.StatusInternalServerError)
@@ -90,7 +130,7 @@ func (s *Server) submitHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "batch_id required", http.StatusBadRequest)
 		return
 	}
-	ref, err := s.batches.Submit(r.Context(), s.tenantID, batchID)
+	ref, err := s.batches.Submit(r.Context(), s.tenantID(r), batchID)
 	if err != nil {
 		s.log.Error("submit batch", "batch_id", batchID, "err", err)
 		http.Error(w, fmt.Sprintf("submit failed: %v", err), http.StatusInternalServerError)
@@ -100,14 +140,14 @@ func (s *Server) submitHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) downloadHandler(w http.ResponseWriter, r *http.Request) {
-	invoices, err := s.loadPendingInvoices(r.Context())
+	invoices, err := s.loadPendingInvoices(r)
 	if err != nil {
 		s.log.Error("load invoices for download", "err", err)
 		http.Error(w, "failed to load invoices from Fortnox", http.StatusBadGateway)
 		return
 	}
 	debtor := payment.Debtor{Name: s.debtor.Name, IBAN: s.debtor.IBAN, BIC: s.debtor.BIC}
-	summary, err := buildBatchSummary(r.Context(), invoices, debtor, s.tenantID, s.batches)
+	summary, err := buildBatchSummary(r.Context(), invoices, debtor, s.tenantID(r), s.batches)
 	if err != nil {
 		s.log.Error("build batch for download", "err", err)
 		http.Error(w, fmt.Sprintf("batch generation failed: %v", err), http.StatusInternalServerError)
@@ -119,8 +159,10 @@ func (s *Server) downloadHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // loadPendingInvoices runs the full pipeline: fetch → filter FCY → enrich with IBAN/BIC.
-func (s *Server) loadPendingInvoices(ctx context.Context) ([]PendingInvoice, error) {
-	all, err := s.invoices.UnpaidInvoices(ctx, s.tenantID)
+func (s *Server) loadPendingInvoices(r *http.Request) ([]PendingInvoice, error) {
+	tid := s.tenantID(r)
+	ctx := r.Context()
+	all, err := s.invoices.UnpaidInvoices(ctx, tid)
 	if err != nil {
 		return nil, fmt.Errorf("fetch invoices: %w", err)
 	}
@@ -133,7 +175,7 @@ func (s *Server) loadPendingInvoices(ctx context.Context) ([]PendingInvoice, err
 		return nil, nil
 	}
 
-	enriched, err := domain.Enrich(fcyInvoices, cachedLookup(ctx, s.tenantID, s.enricher))
+	enriched, err := domain.Enrich(fcyInvoices, cachedLookup(ctx, tid, s.enricher))
 	if err != nil {
 		return nil, fmt.Errorf("enrich invoices: %w", err)
 	}

@@ -47,8 +47,8 @@ func invoiceCount(groups []BatchGroup) int {
 	return n
 }
 
-templ InvoicesPage(invoices []PendingInvoice) {
-	@Layout("Pending payments") {
+templ InvoicesPage(invoices []PendingInvoice, nav *UserNav) {
+	@Layout("Pending payments", nav) {
 		<style>
 			.cd-page-header {
 				display: flex;

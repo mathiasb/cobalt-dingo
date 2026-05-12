@@ -153,6 +153,34 @@ func (l LLM) IsEnabled() bool {
 	return l.BaseURL != "" && l.APIKey != "" && l.DefaultModel != ""
 }
 
+// OIDC holds configuration for the OpenID Connect login provider.
+type OIDC struct {
+	IssuerURL    string
+	ClientID     string
+	ClientSecret string
+	RedirectURL  string
+}
+
+// IsEnabled reports whether all required OIDC fields are present.
+func (o OIDC) IsEnabled() bool {
+	return o.IssuerURL != "" && o.ClientID != "" && o.ClientSecret != "" && o.RedirectURL != ""
+}
+
+// LoadOIDC reads OIDC config from environment variables.
+func LoadOIDC() OIDC {
+	return OIDC{
+		IssuerURL:    os.Getenv("OIDC_ISSUER_URL"),
+		ClientID:     os.Getenv("OIDC_CLIENT_ID"),
+		ClientSecret: os.Getenv("OIDC_CLIENT_SECRET"),
+		RedirectURL:  os.Getenv("OIDC_REDIRECT_URL"),
+	}
+}
+
+// LoadSessionSecret reads the SESSION_SECRET env var used for cookie signing.
+func LoadSessionSecret() string {
+	return os.Getenv("SESSION_SECRET")
+}
+
 // LoadLLM reads LLM gateway config from environment variables.
 // LLM_DEFAULT_MODEL defaults to "iguana/gemma4-31b" if unset.
 func LoadLLM() LLM {
@@ -166,6 +194,26 @@ func LoadLLM() LLM {
 		DefaultModel:    model,
 		EscalationModel: os.Getenv("LLM_ESCALATION_MODEL"),
 	}
+}
+
+// LoadAllModes returns a config for each mode whose CLIENT_ID env var is set.
+// Used by FortnoxConnector to support multiple modes simultaneously.
+func LoadAllModes() map[Mode]Fortnox {
+	modes := map[Mode]Fortnox{}
+	for _, m := range []Mode{ModeSandbox, ModeRealReadonly} {
+		p := m.EnvPrefix()
+		if id := os.Getenv(p + "CLIENT_ID"); id != "" {
+			modes[m] = Fortnox{
+				Mode:         m,
+				ClientID:     id,
+				ClientSecret: os.Getenv(p + "CLIENT_SECRET"),
+				RedirectURI:  os.Getenv(p + "REDIRECT_URI"),
+				Scopes:       os.Getenv(p + "SCOPES"),
+				InvoiceInbox: os.Getenv(p + "INVOICE_INBOX"),
+			}
+		}
+	}
+	return modes
 }
 
 // Load reads Fortnox configuration based on FORTNOX_MODE. It returns an

@@ -1,6 +1,16 @@
 package ui
 
-templ Layout(title string) {
+import "github.com/mathiasb/cobalt-dingo/internal/config"
+
+// UserNav carries per-request user identity for the nav bar.
+// Nil when auth is disabled (dev mode).
+type UserNav struct {
+	Name  string
+	Email string
+	Mode  config.Mode
+}
+
+templ Layout(title string, nav *UserNav) {
 	<!DOCTYPE html>
 	<html lang="en">
 		<head>
@@ -38,6 +48,21 @@ templ Layout(title string) {
 					font-size: 0.875rem;
 					color: var(--gds-sys-color-text-secondary);
 				}
+				.cd-nav-right {
+					margin-left: auto;
+					display: flex;
+					align-items: center;
+					gap: 0.75rem;
+				}
+				.cd-mode-select {
+					font-size: 0.8125rem;
+					border: 1px solid var(--gds-sys-color-base-300);
+					border-radius: 0.25rem;
+					padding: 0.125rem 0.375rem;
+					background: var(--gds-sys-color-background-primary);
+					color: var(--gds-sys-color-text-primary);
+					cursor: pointer;
+				}
 				.cd-main {
 					max-width: 960px;
 					margin: 0 auto;
@@ -52,6 +77,21 @@ templ Layout(title string) {
 				<a href="/invoices" class="cd-nav-sub" style="text-decoration:none;color:inherit;">Invoices</a>
 				<span class="cd-nav-divider">·</span>
 				<a href="/chat" class="cd-nav-sub" style="text-decoration:none;color:inherit;">Chat</a>
+				if nav != nil {
+					<div class="cd-nav-right">
+						<form method="POST" action="/settings/mode" style="display:inline;">
+							<select name="mode" class="cd-mode-select" onchange="this.form.submit()">
+								<option value="sandbox" selected?={ nav.Mode == config.ModeSandbox }>Sandbox</option>
+								<option value="real_readonly" selected?={ nav.Mode == config.ModeRealReadonly }>Real (read-only)</option>
+							</select>
+						</form>
+						<a href="/fortnox/connect" class="cd-nav-sub" style="text-decoration:none;">Connect Fortnox</a>
+						<span class="cd-nav-divider">·</span>
+						<span class="cd-nav-sub">{ nav.Email }</span>
+						<span class="cd-nav-divider">·</span>
+						<a href="/auth/logout" class="cd-nav-sub" style="text-decoration:none;">Logout</a>
+					</div>
+				}
 			</nav>
 			<main class="cd-main">
 				{ children... }

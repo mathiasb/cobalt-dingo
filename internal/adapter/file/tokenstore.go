@@ -42,6 +42,22 @@ func (s *TokenStore) Load(_ context.Context, _ domain.TenantID) (domain.OAuthTok
 	}, nil
 }
 
+// Save implements domain.TokenStore — unconditionally writes the token to disk.
+// tenantID is ignored (single-tenant file store).
+func (s *TokenStore) Save(_ context.Context, _ domain.TenantID, token domain.OAuthToken) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	t := fortnox.Token{
+		AccessToken:  token.AccessToken,
+		RefreshToken: token.RefreshToken,
+		ExpiresAt:    token.ExpiresAt,
+	}
+	if err := fortnox.SaveToken(s.path, t); err != nil {
+		return fmt.Errorf("file token store save: %w", err)
+	}
+	return nil
+}
+
 // AtomicRefresh writes newToken only when the stored refresh token matches old.RefreshToken.
 // Returns domain.ErrTokenConflict if the stored token has already been replaced.
 func (s *TokenStore) AtomicRefresh(_ context.Context, _ domain.TenantID, old, newToken domain.OAuthToken) error {

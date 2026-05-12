@@ -29,7 +29,7 @@ func NewChatHandler(deps mcpserver.Deps, llmCfg config.LLM, mode config.Mode, lo
 
 // PageHandler serves GET /chat — renders the chat template.
 func (h *ChatHandler) PageHandler(w http.ResponseWriter, r *http.Request) {
-	render(w, r, ChatPage(h.mode, h.llmCfg))
+	render(w, r, ChatPage(h.mode, h.llmCfg, userNavFrom(r)))
 }
 
 type llmMessage struct {

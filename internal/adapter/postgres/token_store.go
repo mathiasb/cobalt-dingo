@@ -34,6 +34,19 @@ func (t *TokenStore) Load(ctx context.Context, tenantID domain.TenantID) (domain
 	}, nil
 }
 
+// Save implements domain.TokenStore — unconditionally upserts the token.
+func (t *TokenStore) Save(ctx context.Context, tenantID domain.TenantID, token domain.OAuthToken) error {
+	if err := t.s.queries.UpsertToken(ctx, pgstore.UpsertTokenParams{
+		TenantID:     string(tenantID),
+		AccessToken:  token.AccessToken,
+		RefreshToken: token.RefreshToken,
+		ExpiresAt:    token.ExpiresAt,
+	}); err != nil {
+		return fmt.Errorf("save token: %w", err)
+	}
+	return nil
+}
+
 // AtomicRefresh implements domain.TokenStore.
 // Issues an UPDATE WHERE refresh_token = old.RefreshToken; returns
 // domain.ErrTokenConflict if zero rows are updated (another replica won the race).

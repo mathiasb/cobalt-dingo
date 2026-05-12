@@ -120,11 +120,11 @@ func costCenterAnalysisHandler(deps Deps) server.ToolHandlerFunc {
 
 		var rows []domain.VoucherRow
 		for _, yr := range years {
-			yr_rows, err := deps.CostCtrLdg.CostCenterTransactions(ctx, deps.TenantID, code, yr.From, yr.To)
+			yrRows, err := deps.CostCtrLdg.CostCenterTransactions(ctx, deps.TenantID, code, yr.From, yr.To)
 			if err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("fetch cost center transactions: %v", err)), nil
 			}
-			rows = append(rows, yr_rows...)
+			rows = append(rows, yrRows...)
 		}
 
 		grouped := analyst.GroupBy(rows, func(r domain.VoucherRow) int {

@@ -35,6 +35,7 @@ type BatchRepository interface {
 // Implementations: internal/adapter/postgres (future)
 type TenantRepository interface {
 	Get(ctx context.Context, id TenantID) (Tenant, error)
+	UpsertTenant(ctx context.Context, t Tenant) error
 	DefaultDebtorAccount(ctx context.Context, tenantID TenantID) (DebtorAccount, error)
 }
 
@@ -55,6 +56,8 @@ var ErrTokenConflict = errors.New("token conflict: refresh already performed by 
 // Implementations: internal/adapter/postgres (future)
 type TokenStore interface {
 	Load(ctx context.Context, tenantID TenantID) (OAuthToken, error)
+	// Save unconditionally writes (upserts) a token for tenantID.
+	Save(ctx context.Context, tenantID TenantID, token OAuthToken) error
 	// AtomicRefresh replaces old with newToken only if old.RefreshToken still matches
 	// the stored value. Returns ErrTokenConflict if another process won the race.
 	AtomicRefresh(ctx context.Context, tenantID TenantID, old, newToken OAuthToken) error

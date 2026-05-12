@@ -21,6 +21,10 @@ func (s *stubTokenStore) Load(_ context.Context, _ domain.TenantID) (domain.OAut
 	}, nil
 }
 
+func (s *stubTokenStore) Save(_ context.Context, _ domain.TenantID, _ domain.OAuthToken) error {
+	return nil
+}
+
 func (s *stubTokenStore) AtomicRefresh(_ context.Context, _ domain.TenantID, _, _ domain.OAuthToken) error {
 	return nil
 }

@@ -8,7 +8,17 @@ package ui
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-func Layout(title string) templ.Component {
+import "github.com/mathiasb/cobalt-dingo/internal/config"
+
+// UserNav carries per-request user identity for the nav bar.
+// Nil when auth is disabled (dev mode).
+type UserNav struct {
+	Name  string
+	Email string
+	Mode  config.Mode
+}
+
+func Layout(title string, nav *UserNav) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -36,13 +46,56 @@ func Layout(title string) templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layout.templ`, Line: 9, Col: 17}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layout.templ`, Line: 19, Col: 17}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " — cobalt-dingo</title><link rel=\"stylesheet\" href=\"/static/css/green-chlorophyll.min.css\"><script src=\"https://unpkg.com/htmx.org@2.0.4\" integrity=\"sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+\" crossorigin=\"anonymous\"></script><style>\n\t\t\t\tbody {\n\t\t\t\t\tfont-family: \"SEB SansSerif\", sans-serif;\n\t\t\t\t\tbackground-color: var(--gds-sys-color-base-100);\n\t\t\t\t\tcolor: var(--gds-sys-color-text-primary);\n\t\t\t\t\tmin-height: 100vh;\n\t\t\t\t\tmargin: 0;\n\t\t\t\t}\n\t\t\t\t.cd-nav {\n\t\t\t\t\tbackground: var(--gds-sys-color-background-primary);\n\t\t\t\t\tborder-bottom: 1px solid var(--gds-sys-color-base-300);\n\t\t\t\t\tpadding: 1rem 1.5rem;\n\t\t\t\t\tdisplay: flex;\n\t\t\t\t\talign-items: center;\n\t\t\t\t\tgap: 0.75rem;\n\t\t\t\t}\n\t\t\t\t.cd-nav-brand {\n\t\t\t\t\tfont-weight: 500;\n\t\t\t\t\tfont-size: 1rem;\n\t\t\t\t\tcolor: var(--gds-sys-color-base-900);\n\t\t\t\t\tletter-spacing: -0.01em;\n\t\t\t\t}\n\t\t\t\t.cd-nav-divider {\n\t\t\t\t\tcolor: var(--gds-sys-color-base-400);\n\t\t\t\t}\n\t\t\t\t.cd-nav-sub {\n\t\t\t\t\tfont-size: 0.875rem;\n\t\t\t\t\tcolor: var(--gds-sys-color-text-secondary);\n\t\t\t\t}\n\t\t\t\t.cd-main {\n\t\t\t\t\tmax-width: 960px;\n\t\t\t\t\tmargin: 0 auto;\n\t\t\t\t\tpadding: 2rem 1.5rem;\n\t\t\t\t}\n\t\t\t</style></head><body><nav class=\"cd-nav\"><span class=\"cd-nav-brand\">cobalt-dingo</span> <span class=\"cd-nav-divider\">|</span> <a href=\"/invoices\" class=\"cd-nav-sub\" style=\"text-decoration:none;color:inherit;\">Invoices</a> <span class=\"cd-nav-divider\">·</span> <a href=\"/chat\" class=\"cd-nav-sub\" style=\"text-decoration:none;color:inherit;\">Chat</a></nav><main class=\"cd-main\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " — cobalt-dingo</title><link rel=\"stylesheet\" href=\"/static/css/green-chlorophyll.min.css\"><script src=\"https://unpkg.com/htmx.org@2.0.4\" integrity=\"sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+\" crossorigin=\"anonymous\"></script><style>\n\t\t\t\tbody {\n\t\t\t\t\tfont-family: \"SEB SansSerif\", sans-serif;\n\t\t\t\t\tbackground-color: var(--gds-sys-color-base-100);\n\t\t\t\t\tcolor: var(--gds-sys-color-text-primary);\n\t\t\t\t\tmin-height: 100vh;\n\t\t\t\t\tmargin: 0;\n\t\t\t\t}\n\t\t\t\t.cd-nav {\n\t\t\t\t\tbackground: var(--gds-sys-color-background-primary);\n\t\t\t\t\tborder-bottom: 1px solid var(--gds-sys-color-base-300);\n\t\t\t\t\tpadding: 1rem 1.5rem;\n\t\t\t\t\tdisplay: flex;\n\t\t\t\t\talign-items: center;\n\t\t\t\t\tgap: 0.75rem;\n\t\t\t\t}\n\t\t\t\t.cd-nav-brand {\n\t\t\t\t\tfont-weight: 500;\n\t\t\t\t\tfont-size: 1rem;\n\t\t\t\t\tcolor: var(--gds-sys-color-base-900);\n\t\t\t\t\tletter-spacing: -0.01em;\n\t\t\t\t}\n\t\t\t\t.cd-nav-divider {\n\t\t\t\t\tcolor: var(--gds-sys-color-base-400);\n\t\t\t\t}\n\t\t\t\t.cd-nav-sub {\n\t\t\t\t\tfont-size: 0.875rem;\n\t\t\t\t\tcolor: var(--gds-sys-color-text-secondary);\n\t\t\t\t}\n\t\t\t\t.cd-nav-right {\n\t\t\t\t\tmargin-left: auto;\n\t\t\t\t\tdisplay: flex;\n\t\t\t\t\talign-items: center;\n\t\t\t\t\tgap: 0.75rem;\n\t\t\t\t}\n\t\t\t\t.cd-mode-select {\n\t\t\t\t\tfont-size: 0.8125rem;\n\t\t\t\t\tborder: 1px solid var(--gds-sys-color-base-300);\n\t\t\t\t\tborder-radius: 0.25rem;\n\t\t\t\t\tpadding: 0.125rem 0.375rem;\n\t\t\t\t\tbackground: var(--gds-sys-color-background-primary);\n\t\t\t\t\tcolor: var(--gds-sys-color-text-primary);\n\t\t\t\t\tcursor: pointer;\n\t\t\t\t}\n\t\t\t\t.cd-main {\n\t\t\t\t\tmax-width: 960px;\n\t\t\t\t\tmargin: 0 auto;\n\t\t\t\t\tpadding: 2rem 1.5rem;\n\t\t\t\t}\n\t\t\t</style></head><body><nav class=\"cd-nav\"><span class=\"cd-nav-brand\">cobalt-dingo</span> <span class=\"cd-nav-divider\">|</span> <a href=\"/invoices\" class=\"cd-nav-sub\" style=\"text-decoration:none;color:inherit;\">Invoices</a> <span class=\"cd-nav-divider\">·</span> <a href=\"/chat\" class=\"cd-nav-sub\" style=\"text-decoration:none;color:inherit;\">Chat</a> ")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if nav != nil {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<div class=\"cd-nav-right\"><form method=\"POST\" action=\"/settings/mode\" style=\"display:inline;\"><select name=\"mode\" class=\"cd-mode-select\" onchange=\"this.form.submit()\"><option value=\"sandbox\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			if nav.Mode == config.ModeSandbox {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, " selected")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, ">Sandbox</option> <option value=\"real_readonly\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			if nav.Mode == config.ModeRealReadonly {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, " selected")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, ">Real (read-only)</option></select></form><a href=\"/fortnox/connect\" class=\"cd-nav-sub\" style=\"text-decoration:none;\">Connect Fortnox</a> <span class=\"cd-nav-divider\">·</span> <span class=\"cd-nav-sub\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var3 string
+			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(nav.Email)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layout.templ`, Line: 90, Col: 42}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</span> <span class=\"cd-nav-divider\">·</span> <a href=\"/auth/logout\" class=\"cd-nav-sub\" style=\"text-decoration:none;\">Logout</a></div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</nav><main class=\"cd-main\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -50,7 +103,7 @@ func Layout(title string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</main></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</main></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

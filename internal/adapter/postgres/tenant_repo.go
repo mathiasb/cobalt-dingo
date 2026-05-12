@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/mathiasb/cobalt-dingo/internal/adapter/postgres/pgstore"
 	"github.com/mathiasb/cobalt-dingo/internal/domain"
 )
 
@@ -25,6 +26,16 @@ func (r *TenantRepo) Get(ctx context.Context, id domain.TenantID) (domain.Tenant
 		return domain.Tenant{}, fmt.Errorf("get tenant: %w", err)
 	}
 	return domain.Tenant{ID: domain.TenantID(row.ID), Name: row.Name}, nil
+}
+
+// UpsertTenant implements domain.TenantRepository.
+func (r *TenantRepo) UpsertTenant(ctx context.Context, t domain.Tenant) error {
+	if err := r.s.queries.UpsertTenant(ctx, pgstore.UpsertTenantParams{
+		ID: string(t.ID), Name: t.Name,
+	}); err != nil {
+		return fmt.Errorf("upsert tenant: %w", err)
+	}
+	return nil
 }
 
 // DefaultDebtorAccount implements domain.TenantRepository.

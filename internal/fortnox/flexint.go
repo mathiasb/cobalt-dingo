@@ -9,6 +9,7 @@ import (
 // or a quoted string (and sometimes an empty string meaning zero).
 type FlexInt int
 
+// UnmarshalJSON handles Fortnox responses that send ints as bare numbers or quoted strings.
 func (f *FlexInt) UnmarshalJSON(data []byte) error {
 	// Try bare number first.
 	var n int
