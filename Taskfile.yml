@@ -136,6 +136,20 @@ tasks:
     cmds:
       - source .env && FORTNOX_MODE=sandbox go run ./cmd/fortnox-check
 
+  e2e:
+    desc: Run Playwright E2E tests against a running dev server (BASE_URL default :8080)
+    dir: e2e
+    cmds:
+      - npx playwright test {{.CLI_ARGS}}
+    env:
+      BASE_URL: "http://localhost:8080"
+
+  e2e:ui:
+    desc: Open Playwright interactive UI mode
+    dir: e2e
+    cmds:
+      - npx playwright test --ui
+
   e2e:seed:
     desc: Seed sandbox with [E2E]-tagged test data (sandbox-only by precondition)
     cmds:
