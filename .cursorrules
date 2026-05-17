@@ -39,9 +39,18 @@ These rules apply to every task across every project, regardless of harness.
 4. **Goal-driven execution.** Define clear success criteria up front for every task.
    Loop — implement, verify, refine — until those criteria are met. Don't claim
    completion without evidence (tests pass, command output, observed behavior).
-5. **Branch-per-task for multi-agent repos.** When another agent may be active on
-   the same repo, create a branch (`agent/<description>`), commit there, and open a
-   PR. Do not merge without explicit instruction from Mathias.
+5. **Trunk-Based Development — commit directly to main.** Every commit is one
+   logical change (one tool, one fix, one test) with passing tests. Main is always
+   deployable. Never create long-lived feature branches.
+
+   **Exception — parallel agents on same repo:** If another agent is known to be
+   actively working on the same repo simultaneously, create a short-lived branch
+   (`agent/<description>`), finish the task, and merge to main within the same
+   session. Do not leave agent branches open between sessions.
+
+   **Exception — external contributor or client four-eyes requirement:** Use
+   PR flow only when a human reviewer outside the project is required. Document
+   the reason in PROJECT.md.
 
 ## Default stack
 
@@ -52,9 +61,10 @@ These rules apply to every task across every project, regardless of harness.
 | Build | Task (taskfile.dev) | Make | — |
 | Containers | Docker Compose (dev), k3s (prod) | — | — |
 | DB | PostgreSQL + sqlc | SQLite | — |
-| Search | Qdrant (vector), BM25 | — | — |
+| Search | pgvector (vector), BM25 | Qdrant (when >1M vectors or hybrid retrieval) | — |
 | Logging | slog (structured) | — | — |
 | Testing | Table-driven, testify | — | — |
+| Agents (Go) | google.golang.org/adk + pkg/litellm adapter | — | — |
 
 Exploratory: Rust, Zig — I'll tell you when I want these.
 
@@ -64,9 +74,12 @@ Exploratory: Rust, Zig — I'll tell you when I want these.
 - **Errors**: `fmt.Errorf("operation: %w", err)` — never naked, never log-and-return
 - **Naming**: stdlib conventions, no stuttering
 - **Architecture**: prefer stdlib over frameworks, constructor injection, env-var config parsed into typed structs
-- **Git**: conventional commits (`feat:`, `fix:`, `chore:`), one concern per PR, PR describes *why* not *what*
+- **Git**: conventional commits (`feat:`, `fix:`, `chore:`), commit directly to main,
+  one logical change per commit, CI is the quality gate
+- **Never**: long-lived feature branches, PRs for solo work, direct push without
+  passing `task check` locally first
 - **Security**: no secrets in code, govulncheck before adding deps, SOPS for encrypted config
-- **Dependencies**: prefer stdlib. testify, slog, templ, sqlc are pre-approved; anything else needs justification in the commit message
+- **Dependencies**: prefer stdlib. testify, slog, templ, sqlc, google.golang.org/adk (agent projects only) are pre-approved; anything else needs justification in the commit message
 
 ## Infrastructure
 
@@ -74,7 +87,7 @@ Three machines on Tailscale:
 
 | Machine | Role | Key specs |
 |---------|------|-----------|
-| koala | GPU inference, heavy compute | RTX 5070, runs llama-swap, Qdrant |
+| koala | GPU inference, heavy compute | RTX 5070, runs k3s + llama-swap + shared postgres18/pgvector |
 | iguana | Services, builds | M2 Ultra Mac |
 | flamingo | Daily driver, edge | Mac mini, ~/dev is here |
 
@@ -106,18 +119,64 @@ See `~/dev/PROJECT_SUMMARY.md` for detailed descriptions of each project.
 - **koala-ai-stack** (`AGENTS/`) — local AI server infrastructure management
 - **klimatkollen** (`XT/`) — Swedish municipal climate data platform
 
-## Knowledge base
+## Knowledge base — actively use it
 
-When available, agents can query the shared knowledge base:
+A persistent brain (BM25 search + LLM-synthesised Q&A) survives across sessions,
+hosts, and harnesses. It holds 100+ hard-won entries: infra incident postmortems,
+Go pitfalls, framework gotchas, design principles, ADRs. **It is not optional
+reference material — query it actively, not just when explicitly told.**
 
-- **MCP**: `mcp://hyperguild.<TAILNET>.ts.net:3100/knowledge`
-- **HTTP**: `http://hyperguild.<TAILNET>.ts.net:3100/api/v1/search`
+### When to query (treat as a reflex)
 
-<!-- TODO: replace <TAILNET> placeholder with the real Tailscale tailnet
-     name once hyperguild is deployed. Until then, agents that try to
-     reach the knowledge service on a host where it isn't running will
-     get DNS NXDOMAIN, which is the desired fail-loudly behavior. -->
-- **Scoping**: defaults to `public` collection; client projects filter to `{client}` + `public`
+- **Before** starting a non-trivial task — search for prior art with the symptom
+  AND the system component ("how did we solve X in Y?"). 5 seconds beats 5 hours.
+- **When debugging** — search for the error string, the stack frame, the affected
+  service. Past you may have already paid this tax.
+- **Before adopting** a pattern, library, framework, or model name — check if it
+  was tried and rejected, or what the integration footguns are.
+- **When making architectural decisions** — search for the domain + "ADR" or
+  "decision" to find prior reasoning before re-deriving it.
+- **When a recommendation feels novel** — challenge yourself: "has this been
+  documented?" The brain often has it.
+
+### When to write
+
+After you discover something that **future-you would forget** and that **isn't
+recoverable from the code, git log, or PR description alone**:
+
+- Bugs whose root cause is non-obvious and generalisable beyond this project.
+- Framework / library / model-name quirks that bit you and would bite anyone.
+- Design principles validated under fire (e.g. "every `_get` needs a `_list`").
+- Postmortems for incidents: what broke, why, how diagnosed, what to do next time.
+
+DON'T write project status, sprint progress, PR summaries, or "what I did this
+session" — those rot fast and the originals are in git/gitea anyway. Brain
+entries that age well are about *why*, *how to avoid*, and *what to do when*.
+
+### How to access (per harness)
+
+| Harness | Query | Write |
+|---------|-------|-------|
+| **Claude Code, Claude Desktop** | `brain_query` (BM25), `brain_answer` (LLM-synth + sources) MCP tools | `brain_write` MCP tool |
+| **Crush, Pi, Antigravity, other MCP-capable** | same MCP server: `ingestion-brain` (via the `mcp__*_brain__*` namespace once authenticated) | same |
+| **Anything HTTP-only (curl, scripts)** | `POST https://brain-mcp.d-ma.be/query` with `{"query":"..."}` (auth via `BRAIN_MCP_TOKEN`) | `POST .../write` with `{"content":"...","filename":"..."}` |
+| **Browser / human inspection** | `https://gitea.d-ma.be/mathias/hyperguild` → `knowledge/` and `wiki/` markdown files |
+
+- **Scoping**: defaults to `public` collection; client projects filter to `{client}` + `public`.
+- **Routing**: brain_answer's LLM uses berget.ai as primary, iguana ollama as
+  fallback. Both are configurable in the `supervisor/ingestion-deployment.yaml`
+  on the koala k3s cluster; don't hardcode local-only model names into the
+  berget URL (see knowledge entry on namespace mismatches).
+
+### Quick reflex checks
+
+If you find yourself about to say any of these out loud, you owe yourself a brain query first:
+
+- "I think the issue might be..."
+- "Let me try X and see..."
+- "I'll just write a script to..."
+- "This is probably a new bug..."
+- "Has anyone done this before?" — *yes, probably, go check.*
 
 ## Client work rules
 
