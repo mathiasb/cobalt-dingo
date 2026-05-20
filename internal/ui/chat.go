@@ -16,20 +16,21 @@ import (
 
 // ChatHandler serves the LLM-backed financial chat endpoints.
 type ChatHandler struct {
-	deps   mcpserver.Deps
-	llmCfg config.LLM
-	mode   config.Mode
-	log    *slog.Logger
+	deps         mcpserver.Deps
+	llmCfg       config.LLM
+	mode         config.Mode
+	allowsWrites bool
+	log          *slog.Logger
 }
 
 // NewChatHandler wires a ChatHandler with the given MCP dependencies and LLM config.
-func NewChatHandler(deps mcpserver.Deps, llmCfg config.LLM, mode config.Mode, log *slog.Logger) *ChatHandler {
-	return &ChatHandler{deps: deps, llmCfg: llmCfg, mode: mode, log: log}
+func NewChatHandler(deps mcpserver.Deps, llmCfg config.LLM, mode config.Mode, allowsWrites bool, log *slog.Logger) *ChatHandler {
+	return &ChatHandler{deps: deps, llmCfg: llmCfg, mode: mode, allowsWrites: allowsWrites, log: log}
 }
 
 // PageHandler serves GET /chat — renders the chat template.
 func (h *ChatHandler) PageHandler(w http.ResponseWriter, r *http.Request) {
-	render(w, r, ChatPage(h.mode, h.llmCfg, userNavFrom(r)))
+	render(w, r, ChatPage(h.mode, h.llmCfg, h.allowsWrites, userNavFrom(r)))
 }
 
 type llmMessage struct {

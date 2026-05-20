@@ -165,15 +165,15 @@ tasks:
   # The Client.do() write gate refuses any non-GET request locally as defense
   # in depth on top of the OAuth scope.
 
-  fortnox:auth:real-ro:
-    desc: OAuth2 flow against the real (read-only) Fortnox connected app
+  fortnox:auth:production:
+    desc: OAuth2 flow against the production Fortnox connected app
     cmds:
-      - source .env && go run ./cmd/fortnox-auth --mode=real_readonly
+      - source .env && go run ./cmd/fortnox-auth --mode=production
 
-  fortnox:check:real-ro:
-    desc: Verify the real read-only Fortnox connection
+  fortnox:check:production:
+    desc: Verify the production Fortnox connection
     cmds:
-      - source .env && FORTNOX_MODE=real_readonly go run ./cmd/fortnox-check
+      - source .env && FORTNOX_MODE=production go run ./cmd/fortnox-check
 
   # ── Database ────────────────────────────────────────────────────────────────
 
@@ -225,10 +225,10 @@ tasks:
     cmds:
       - source .env && FORTNOX_MODE=sandbox go run ./cmd/mcp
 
-  mcp:real-ro:
-    desc: Start MCP server (stdio) against the real Fortnox company in read-only mode
+  mcp:production:
+    desc: Start MCP server (stdio) against the production Fortnox company
     cmds:
-      - source .env && FORTNOX_MODE=real_readonly go run ./cmd/mcp
+      - source .env && FORTNOX_MODE=production go run ./cmd/mcp
 
   mcp:build:
     desc: Build MCP server binary

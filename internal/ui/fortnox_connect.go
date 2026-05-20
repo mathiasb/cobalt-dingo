@@ -16,7 +16,7 @@ import (
 )
 
 // FortnoxConnector handles the web-based Fortnox OAuth flow for a logged-in user.
-// Each mode (sandbox, real_readonly) has its own Fortnox connected-app credentials.
+// Each mode (sandbox, production) has its own Fortnox connected-app credentials.
 type FortnoxConnector struct {
 	configs    map[config.Mode]config.Fortnox
 	tokenStore domain.TokenStore

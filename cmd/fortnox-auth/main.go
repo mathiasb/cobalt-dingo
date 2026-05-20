@@ -1,12 +1,12 @@
 // Command fortnox-auth performs the one-time OAuth2 authorization flow
-// against either the sandbox or real_readonly Fortnox connected app and
+// against either the sandbox or production Fortnox connected app and
 // writes the resulting tokens to a mode-specific token file.
 //
 // Stop the dev server (task dev) before running this — both use port 8080.
 //
 // Mode selection (in order of precedence):
 //
-//  1. --mode CLI flag, e.g. --mode=sandbox or --mode=real_readonly
+//  1. --mode CLI flag, e.g. --mode=sandbox or --mode=production
 //  2. FORTNOX_MODE environment variable (Taskfile targets set this)
 //
 // If neither is set, fortnox-auth refuses to run rather than guessing.
@@ -14,7 +14,7 @@
 // Usage:
 //
 //	source .env && go run ./cmd/fortnox-auth --mode=sandbox
-//	source .env && go run ./cmd/fortnox-auth --mode=real_readonly
+//	source .env && go run ./cmd/fortnox-auth --mode=production
 package main
 
 import (
@@ -38,7 +38,7 @@ func main() {
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
 
 	modeFlag := flag.String("mode", "",
-		"Fortnox mode: sandbox or real_readonly. Overrides FORTNOX_MODE env if set.")
+		"Fortnox mode: sandbox or production. Overrides FORTNOX_MODE env if set.")
 	flag.Parse()
 
 	// Flag takes precedence over env. Setting the env var here keeps the

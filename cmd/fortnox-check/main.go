@@ -42,15 +42,19 @@ func main() {
 	fmt.Printf("  Mode                 : %s\n", cfg.Mode.Label())
 	fmt.Printf("  Token file           : %s\n", cfg.Mode.TokenFile())
 	fmt.Printf("  Base URL             : %s\n", cfg.BaseURL())
-	fmt.Printf("  Writes allowed       : %v\n", cfg.Mode.AllowsWrites())
+	fmt.Printf("  Writes allowed       : %v\n", cfg.AllowsWrites)
 	fmt.Printf("  Unpaid invoices      : %d\n", count)
 	fmt.Println("─────────────────────────────────────")
 
 	switch cfg.Mode {
 	case config.ModeSandbox:
 		fmt.Println("✓ Connected to SANDBOX — safe to write")
-	case config.ModeRealReadonly:
-		fmt.Println("⚠ Connected to LIVE Fortnox in READ-ONLY mode — no writes possible")
+	case config.ModeProduction:
+		if cfg.AllowsWrites {
+			fmt.Println("✓ Connected to PRODUCTION — writes enabled")
+		} else {
+			fmt.Println("⚠ Connected to PRODUCTION — read-only mode (set FORTNOX_PRODUCTION_ALLOW_WRITES=true to enable writes)")
+		}
 	}
 }
 

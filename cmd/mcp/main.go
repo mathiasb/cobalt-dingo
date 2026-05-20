@@ -25,12 +25,12 @@ func main() {
 
 	// Banner goes to stderr because stdout carries the MCP framing.
 	fmt.Fprintf(os.Stderr, "\n  cobalt-dingo MCP — mode: %s | token: %s | writes: %v\n\n",
-		cfg.Mode.Label(), cfg.Mode.TokenFile(), cfg.Mode.AllowsWrites())
+		cfg.Mode.Label(), cfg.Mode.TokenFile(), cfg.AllowsWrites)
 
 	tokenStore := file.NewTokenStore(cfg.Mode.TokenFile())
 	baseURL := cfg.BaseURL()
 	tenantID := domain.TenantID("default")
-	readOnly := !cfg.Mode.AllowsWrites()
+	readOnly := !cfg.AllowsWrites
 
 	gl := adapterfortnox.NewGeneralLedgerAdapter(baseURL, tokenStore, readOnly)
 

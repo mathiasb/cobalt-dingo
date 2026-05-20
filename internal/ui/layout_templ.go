@@ -67,17 +67,17 @@ func Layout(title string, nav *UserNav) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, ">Sandbox</option> <option value=\"real_readonly\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, ">Sandbox</option> <option value=\"production\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			if nav.Mode == config.ModeRealReadonly {
+			if nav.Mode == config.ModeProduction {
 				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, " selected")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, ">Real (read-only)</option></select></form><a href=\"/fortnox/connect\" class=\"cd-nav-sub\" style=\"text-decoration:none;\">Connect Fortnox</a> <span class=\"cd-nav-divider\">·</span> <span class=\"cd-nav-sub\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, ">Production</option></select></form><a href=\"/fortnox/connect\" class=\"cd-nav-sub\" style=\"text-decoration:none;\">Connect Fortnox</a> <span class=\"cd-nav-divider\">·</span> <span class=\"cd-nav-sub\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

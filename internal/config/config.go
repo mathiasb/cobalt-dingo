@@ -21,17 +21,15 @@ const (
 	// e2e-seed and e2e-teardown will run.
 	ModeSandbox Mode = "sandbox"
 
-	// ModeRealReadonly targets the live Fortnox via a connected app
-	// configured with read-only OAuth scopes. Client-side enforcement
-	// (Client.do refusing non-GET) provides defense in depth on top of
-	// the OAuth gate.
-	ModeRealReadonly Mode = "real_readonly"
+	// ModeProduction targets the live Fortnox environment. Write access
+	// requires FORTNOX_PRODUCTION_ALLOW_WRITES=true; otherwise reads only.
+	ModeProduction Mode = "production"
 )
 
 // IsValid reports whether m is a recognized mode.
 func (m Mode) IsValid() bool {
 	switch m {
-	case ModeSandbox, ModeRealReadonly:
+	case ModeSandbox, ModeProduction:
 		return true
 	}
 	return false
@@ -40,12 +38,8 @@ func (m Mode) IsValid() bool {
 // IsSandbox reports whether m targets the Fortnox sandbox environment.
 func (m Mode) IsSandbox() bool { return m == ModeSandbox }
 
-// IsReal reports whether m targets the live Fortnox environment.
-func (m Mode) IsReal() bool { return m == ModeRealReadonly }
-
-// AllowsWrites reports whether write requests (POST/PUT/DELETE/PATCH) are
-// permitted under this mode.
-func (m Mode) AllowsWrites() bool { return m == ModeSandbox }
+// IsProduction reports whether m targets the live Fortnox environment.
+func (m Mode) IsProduction() bool { return m == ModeProduction }
 
 // EnvPrefix returns the env-var prefix used to look up Fortnox credentials
 // for this mode (e.g. "FORTNOX_SANDBOX_").
@@ -53,8 +47,8 @@ func (m Mode) EnvPrefix() string {
 	switch m {
 	case ModeSandbox:
 		return "FORTNOX_SANDBOX_"
-	case ModeRealReadonly:
-		return "FORTNOX_REAL_RO_"
+	case ModeProduction:
+		return "FORTNOX_PRODUCTION_"
 	}
 	return ""
 }
@@ -64,8 +58,8 @@ func (m Mode) TokenFile() string {
 	switch m {
 	case ModeSandbox:
 		return ".fortnox-tokens-sandbox.json"
-	case ModeRealReadonly:
-		return ".fortnox-tokens-real-ro.json"
+	case ModeProduction:
+		return ".fortnox-tokens-production.json"
 	}
 	return ""
 }
@@ -75,8 +69,8 @@ func (m Mode) Label() string {
 	switch m {
 	case ModeSandbox:
 		return "SANDBOX"
-	case ModeRealReadonly:
-		return "REAL (read-only)"
+	case ModeProduction:
+		return "PRODUCTION"
 	}
 	return string(m)
 }
@@ -89,6 +83,7 @@ type Fortnox struct {
 	RedirectURI  string
 	Scopes       string
 	InvoiceInbox string // Arkivplats email for incoming supplier invoices
+	AllowsWrites bool
 }
 
 // BaseURL returns the Fortnox REST API host (no path suffix). Sandbox and
@@ -200,10 +195,10 @@ func LoadLLM() LLM {
 // Used by FortnoxConnector to support multiple modes simultaneously.
 func LoadAllModes() map[Mode]Fortnox {
 	modes := map[Mode]Fortnox{}
-	for _, m := range []Mode{ModeSandbox, ModeRealReadonly} {
+	for _, m := range []Mode{ModeSandbox, ModeProduction} {
 		p := m.EnvPrefix()
 		if id := os.Getenv(p + "CLIENT_ID"); id != "" {
-			modes[m] = Fortnox{
+			f := Fortnox{
 				Mode:         m,
 				ClientID:     id,
 				ClientSecret: os.Getenv(p + "CLIENT_SECRET"),
@@ -211,6 +206,13 @@ func LoadAllModes() map[Mode]Fortnox {
 				Scopes:       os.Getenv(p + "SCOPES"),
 				InvoiceInbox: os.Getenv(p + "INVOICE_INBOX"),
 			}
+			switch m {
+			case ModeSandbox:
+				f.AllowsWrites = true
+			case ModeProduction:
+				f.AllowsWrites = os.Getenv("FORTNOX_PRODUCTION_ALLOW_WRITES") == "true"
+			}
+			modes[m] = f
 		}
 	}
 	return modes
@@ -225,11 +227,11 @@ func LoadAllModes() map[Mode]Fortnox {
 func Load() (Fortnox, error) {
 	raw := os.Getenv("FORTNOX_MODE")
 	if raw == "" {
-		return Fortnox{}, fmt.Errorf("FORTNOX_MODE is not set — must be %q or %q", ModeSandbox, ModeRealReadonly)
+		return Fortnox{}, fmt.Errorf("FORTNOX_MODE is not set — must be %q or %q", ModeSandbox, ModeProduction)
 	}
 	mode := Mode(raw)
 	if !mode.IsValid() {
-		return Fortnox{}, fmt.Errorf("FORTNOX_MODE %q is not recognized — must be %q or %q", raw, ModeSandbox, ModeRealReadonly)
+		return Fortnox{}, fmt.Errorf("FORTNOX_MODE %q is not recognized — must be %q or %q", raw, ModeSandbox, ModeProduction)
 	}
 	p := mode.EnvPrefix()
 	cfg := Fortnox{
@@ -239,6 +241,12 @@ func Load() (Fortnox, error) {
 		RedirectURI:  os.Getenv(p + "REDIRECT_URI"),
 		Scopes:       os.Getenv(p + "SCOPES"),
 		InvoiceInbox: os.Getenv(p + "INVOICE_INBOX"),
+	}
+	switch mode {
+	case ModeSandbox:
+		cfg.AllowsWrites = true
+	case ModeProduction:
+		cfg.AllowsWrites = os.Getenv("FORTNOX_PRODUCTION_ALLOW_WRITES") == "true"
 	}
 	if cfg.ClientID == "" {
 		return Fortnox{}, fmt.Errorf("%sCLIENT_ID is not set (required for FORTNOX_MODE=%s)", p, mode)

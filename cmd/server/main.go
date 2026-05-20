@@ -137,7 +137,7 @@ func main() {
 	}
 
 	// Fortnox web-based OAuth connect (per user, per mode).
-	// Loaded from all configured modes so users can connect sandbox + real_readonly.
+	// Loaded from all configured modes so users can connect sandbox + production.
 	if pgStore != nil {
 		tokenStore := postgres.NewTokenStore(pgStore)
 		connector := ui.NewFortnoxConnector(config.LoadAllModes(), tokenStore, tenantRepo, log)
@@ -157,7 +157,7 @@ func main() {
 			tokenStore = file.NewTokenStore(cfg.Mode.TokenFile())
 		}
 		baseURL := cfg.BaseURL()
-		readOnly := !cfg.Mode.AllowsWrites()
+		readOnly := !cfg.AllowsWrites
 		gl := adapterfortnox.NewGeneralLedgerAdapter(baseURL, tokenStore, readOnly)
 		mcpDeps := mcpserver.Deps{
 			TenantID:    domain.TenantID("default"),
@@ -169,7 +169,7 @@ func main() {
 			AssetReg:    adapterfortnox.NewAssetRegisterAdapter(baseURL, tokenStore, readOnly),
 			CompanyInf:  adapterfortnox.NewCompanyInfoAdapter(baseURL, tokenStore, readOnly),
 		}
-		chatHandler := ui.NewChatHandler(mcpDeps, llmCfg, cfg.Mode, log)
+		chatHandler := ui.NewChatHandler(mcpDeps, llmCfg, cfg.Mode, cfg.AllowsWrites, log)
 		mux.HandleFunc("GET /chat", chatHandler.PageHandler)
 		mux.HandleFunc("POST /chat", chatHandler.MessageHandler)
 		log.Info("chat handler registered")

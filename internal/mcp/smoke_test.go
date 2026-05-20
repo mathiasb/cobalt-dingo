@@ -48,7 +48,7 @@ func TestMain(m *testing.M) {
 	tokenStore := file.NewTokenStore(cfg.Mode.TokenFile())
 	baseURL := cfg.BaseURL()
 	tenantID := domain.TenantID("default")
-	readOnly := !cfg.Mode.AllowsWrites()
+	readOnly := !cfg.AllowsWrites
 
 	gl := adapterfortnox.NewGeneralLedgerAdapter(baseURL, tokenStore, readOnly)
 

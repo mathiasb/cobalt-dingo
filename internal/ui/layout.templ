@@ -82,7 +82,7 @@ templ Layout(title string, nav *UserNav) {
 						<form method="POST" action="/settings/mode" style="display:inline;">
 							<select name="mode" class="cd-mode-select" onchange="this.form.submit()">
 								<option value="sandbox" selected?={ nav.Mode == config.ModeSandbox }>Sandbox</option>
-								<option value="real_readonly" selected?={ nav.Mode == config.ModeRealReadonly }>Real (read-only)</option>
+								<option value="production" selected?={ nav.Mode == config.ModeProduction }>Production</option>
 							</select>
 						</form>
 						<a href="/fortnox/connect" class="cd-nav-sub" style="text-decoration:none;">Connect Fortnox</a>

@@ -13,26 +13,24 @@ import (
 // guarantee drifts with them.
 func TestMode_Predicates(t *testing.T) {
 	tests := []struct {
-		mode         Mode
-		valid        bool
-		sandbox      bool
-		real         bool
-		allowsWrites bool
-		envPrefix    string
-		tokenFile    string
+		mode       Mode
+		valid      bool
+		sandbox    bool
+		production bool
+		envPrefix  string
+		tokenFile  string
 	}{
-		{ModeSandbox, true, true, false, true, "FORTNOX_SANDBOX_", ".fortnox-tokens-sandbox.json"},
-		{ModeRealReadonly, true, false, true, false, "FORTNOX_REAL_RO_", ".fortnox-tokens-real-ro.json"},
-		{Mode("bogus"), false, false, false, false, "", ""},
-		{Mode(""), false, false, false, false, "", ""},
+		{ModeSandbox, true, true, false, "FORTNOX_SANDBOX_", ".fortnox-tokens-sandbox.json"},
+		{ModeProduction, true, false, true, "FORTNOX_PRODUCTION_", ".fortnox-tokens-production.json"},
+		{Mode("bogus"), false, false, false, "", ""},
+		{Mode(""), false, false, false, "", ""},
 	}
 
 	for _, tt := range tests {
 		t.Run(string(tt.mode), func(t *testing.T) {
 			assert.Equal(t, tt.valid, tt.mode.IsValid(), "IsValid")
 			assert.Equal(t, tt.sandbox, tt.mode.IsSandbox(), "IsSandbox")
-			assert.Equal(t, tt.real, tt.mode.IsReal(), "IsReal")
-			assert.Equal(t, tt.allowsWrites, tt.mode.AllowsWrites(), "AllowsWrites")
+			assert.Equal(t, tt.production, tt.mode.IsProduction(), "IsProduction")
 			assert.Equal(t, tt.envPrefix, tt.mode.EnvPrefix(), "EnvPrefix")
 			assert.Equal(t, tt.tokenFile, tt.mode.TokenFile(), "TokenFile")
 		})
@@ -53,11 +51,11 @@ func TestLoad_RequiresMode(t *testing.T) {
 // TestLoad_RejectsInvalidMode verifies the guard against typo'd modes.
 func TestLoad_RejectsInvalidMode(t *testing.T) {
 	clearFortnoxEnv(t)
-	t.Setenv("FORTNOX_MODE", "production")
+	t.Setenv("FORTNOX_MODE", "real_readonly")
 
 	_, err := Load()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), `"production" is not recognized`)
+	assert.Contains(t, err.Error(), `"real_readonly" is not recognized`)
 }
 
 // TestLoad_RejectsMissingCredentials confirms each required field for the
@@ -81,14 +79,14 @@ func TestLoad_RejectsMissingCredentials(t *testing.T) {
 			wantSubstr: "FORTNOX_SANDBOX_CLIENT_ID is not set",
 		},
 		{
-			name: "real_readonly missing CLIENT_SECRET",
+			name: "production missing CLIENT_SECRET",
 			setup: func(t *testing.T) {
 				clearFortnoxEnv(t)
-				t.Setenv("FORTNOX_MODE", "real_readonly")
-				t.Setenv("FORTNOX_REAL_RO_CLIENT_ID", "id")
-				t.Setenv("FORTNOX_REAL_RO_REDIRECT_URI", "http://localhost/cb")
+				t.Setenv("FORTNOX_MODE", "production")
+				t.Setenv("FORTNOX_PRODUCTION_CLIENT_ID", "id")
+				t.Setenv("FORTNOX_PRODUCTION_REDIRECT_URI", "http://localhost/cb")
 			},
-			wantSubstr: "FORTNOX_REAL_RO_CLIENT_SECRET is not set",
+			wantSubstr: "FORTNOX_PRODUCTION_CLIENT_SECRET is not set",
 		},
 		{
 			name: "sandbox missing REDIRECT_URI",
@@ -129,27 +127,26 @@ func TestLoad_HappyPath_Sandbox(t *testing.T) {
 	assert.Equal(t, "sandbox-id", cfg.ClientID)
 	assert.Equal(t, "sandbox-secret", cfg.ClientSecret)
 	assert.True(t, cfg.IsSandbox())
-	assert.True(t, cfg.Mode.AllowsWrites())
+	assert.True(t, cfg.AllowsWrites)
 }
 
-// TestLoad_HappyPath_RealReadonly confirms real_readonly loads from its
+// TestLoad_HappyPath_Production confirms production loads from its
 // own credential keys (no leakage from sandbox keys).
-func TestLoad_HappyPath_RealReadonly(t *testing.T) {
+func TestLoad_HappyPath_Production(t *testing.T) {
 	clearFortnoxEnv(t)
-	t.Setenv("FORTNOX_MODE", "real_readonly")
-	t.Setenv("FORTNOX_REAL_RO_CLIENT_ID", "real-id")
-	t.Setenv("FORTNOX_REAL_RO_CLIENT_SECRET", "real-secret")
-	t.Setenv("FORTNOX_REAL_RO_REDIRECT_URI", "http://localhost:8080/callback")
+	t.Setenv("FORTNOX_MODE", "production")
+	t.Setenv("FORTNOX_PRODUCTION_CLIENT_ID", "prod-id")
+	t.Setenv("FORTNOX_PRODUCTION_CLIENT_SECRET", "prod-secret")
+	t.Setenv("FORTNOX_PRODUCTION_REDIRECT_URI", "http://localhost:8080/callback")
 
-	// Sandbox creds present should be ignored — mode determines which set is read.
 	t.Setenv("FORTNOX_SANDBOX_CLIENT_ID", "should-not-leak")
 
 	cfg, err := Load()
 	require.NoError(t, err)
-	assert.Equal(t, ModeRealReadonly, cfg.Mode)
-	assert.Equal(t, "real-id", cfg.ClientID, "must read from REAL_RO prefix, not SANDBOX")
+	assert.Equal(t, ModeProduction, cfg.Mode)
+	assert.Equal(t, "prod-id", cfg.ClientID, "must read from PRODUCTION prefix, not SANDBOX")
 	assert.False(t, cfg.IsSandbox())
-	assert.False(t, cfg.Mode.AllowsWrites())
+	assert.False(t, cfg.AllowsWrites)
 }
 
 // clearFortnoxEnv unsets every Fortnox-related variable so the test starts
@@ -162,9 +159,10 @@ func clearFortnoxEnv(t *testing.T) {
 		"FORTNOX_SANDBOX_CLIENT_ID", "FORTNOX_SANDBOX_CLIENT_SECRET",
 		"FORTNOX_SANDBOX_REDIRECT_URI", "FORTNOX_SANDBOX_SCOPES",
 		"FORTNOX_SANDBOX_INVOICE_INBOX",
-		"FORTNOX_REAL_RO_CLIENT_ID", "FORTNOX_REAL_RO_CLIENT_SECRET",
-		"FORTNOX_REAL_RO_REDIRECT_URI", "FORTNOX_REAL_RO_SCOPES",
-		"FORTNOX_REAL_RO_INVOICE_INBOX",
+		"FORTNOX_PRODUCTION_CLIENT_ID", "FORTNOX_PRODUCTION_CLIENT_SECRET",
+		"FORTNOX_PRODUCTION_REDIRECT_URI", "FORTNOX_PRODUCTION_SCOPES",
+		"FORTNOX_PRODUCTION_INVOICE_INBOX",
+		"FORTNOX_PRODUCTION_ALLOW_WRITES",
 	}
 	for _, k := range keys {
 		t.Setenv(k, "")

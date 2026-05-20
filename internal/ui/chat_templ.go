@@ -16,13 +16,13 @@ func modeBannerStyle(m config.Mode) string {
 	switch m {
 	case config.ModeSandbox:
 		return "background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;"
-	case config.ModeRealReadonly:
+	case config.ModeProduction:
 		return "background:#fef3c7;color:#78350f;border:1px solid #fcd34d;"
 	}
 	return "background:#fee2e2;color:#7f1d1d;border:1px solid #fca5a5;"
 }
 
-func ChatPage(mode config.Mode, llm config.LLM, nav *UserNav) templ.Component {
+func ChatPage(mode config.Mode, llm config.LLM, allowsWrites bool, nav *UserNav) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -98,7 +98,7 @@ func ChatPage(mode config.Mode, llm config.LLM, nav *UserNav) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			if mode.AllowsWrites() {
+			if allowsWrites {
 				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<span style=\"font-weight:400;opacity:0.8;\">writes enabled</span> ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
