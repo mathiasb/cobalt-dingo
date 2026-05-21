@@ -5,6 +5,7 @@ package file
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 
 	"github.com/mathiasb/cobalt-dingo/internal/domain"
@@ -79,6 +80,17 @@ func (s *TokenStore) AtomicRefresh(_ context.Context, _ domain.TenantID, old, ne
 	}
 	if err := fortnox.SaveToken(s.path, t); err != nil {
 		return fmt.Errorf("file token store write: %w", err)
+	}
+	return nil
+}
+
+// Delete implements domain.TokenStore — removes the token file from disk.
+// tenantID is ignored (single-tenant file store).
+func (s *TokenStore) Delete(_ context.Context, _ domain.TenantID) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := os.Remove(s.path); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("file token store delete: %w", err)
 	}
 	return nil
 }

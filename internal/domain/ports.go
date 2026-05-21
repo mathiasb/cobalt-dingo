@@ -61,6 +61,8 @@ type TokenStore interface {
 	// AtomicRefresh replaces old with newToken only if old.RefreshToken still matches
 	// the stored value. Returns ErrTokenConflict if another process won the race.
 	AtomicRefresh(ctx context.Context, tenantID TenantID, old, newToken OAuthToken) error
+	// Delete removes the token for tenantID. No-op if no token exists.
+	Delete(ctx context.Context, tenantID TenantID) error
 }
 
 // PaymentSubmitter initiates a payment batch via PSD2 PISP.

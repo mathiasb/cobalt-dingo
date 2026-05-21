@@ -43,6 +43,15 @@ func (q *Queries) AtomicRefreshToken(ctx context.Context, arg AtomicRefreshToken
 	return tenant_id, err
 }
 
+const deleteToken = `-- name: DeleteToken :exec
+DELETE FROM fortnox_tokens WHERE tenant_id = $1
+`
+
+func (q *Queries) DeleteToken(ctx context.Context, tenantID string) error {
+	_, err := q.db.ExecContext(ctx, deleteToken, tenantID)
+	return err
+}
+
 const getToken = `-- name: GetToken :one
 SELECT access_token, refresh_token, expires_at
 FROM fortnox_tokens

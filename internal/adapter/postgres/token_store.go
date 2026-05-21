@@ -66,3 +66,11 @@ func (t *TokenStore) AtomicRefresh(ctx context.Context, tenantID domain.TenantID
 	}
 	return nil
 }
+
+// Delete implements domain.TokenStore — removes the token for tenantID.
+func (t *TokenStore) Delete(ctx context.Context, tenantID domain.TenantID) error {
+	if err := t.s.queries.DeleteToken(ctx, string(tenantID)); err != nil {
+		return fmt.Errorf("delete token: %w", err)
+	}
+	return nil
+}

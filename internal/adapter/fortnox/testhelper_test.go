@@ -28,3 +28,7 @@ func (s *stubTokenStore) Save(_ context.Context, _ domain.TenantID, _ domain.OAu
 func (s *stubTokenStore) AtomicRefresh(_ context.Context, _ domain.TenantID, _, _ domain.OAuthToken) error {
 	return nil
 }
+
+func (s *stubTokenStore) Delete(_ context.Context, _ domain.TenantID) error {
+	return nil
+}

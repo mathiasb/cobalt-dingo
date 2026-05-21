@@ -22,3 +22,6 @@ SET access_token  = $3,
     updated_at    = NOW()
 WHERE tenant_id = $1 AND refresh_token = $2
 RETURNING tenant_id;
+
+-- name: DeleteToken :exec
+DELETE FROM fortnox_tokens WHERE tenant_id = $1;
