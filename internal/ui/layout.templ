@@ -18,6 +18,7 @@ templ Layout(title string, nav *UserNav) {
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 			<title>{ title } — cobalt-dingo</title>
 			<link rel="stylesheet" href="/static/css/green-chlorophyll.min.css"/>
+			<script src="https://cdn.tailwindcss.com"></script>
 			<script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
 			<style>
 				body {
@@ -85,7 +86,7 @@ templ Layout(title string, nav *UserNav) {
 								<option value="production" selected?={ nav.Mode == config.ModeProduction }>Production</option>
 							</select>
 						</form>
-						<a href="/fortnox/connect" class="cd-nav-sub" style="text-decoration:none;">Connect Fortnox</a>
+						<a href="/fortnox/" class="cd-nav-sub" style="text-decoration:none;">Fortnox</a>
 						<span class="cd-nav-divider">·</span>
 						<span class="cd-nav-sub">{ nav.Email }</span>
 						<span class="cd-nav-divider">·</span>
