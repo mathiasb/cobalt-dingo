@@ -15,6 +15,13 @@ import (
 	"github.com/mathiasb/cobalt-dingo/internal/domain"
 )
 
+// ModeStatus holds the connection state for one Fortnox mode.
+// Used by FortnoxStatusPage to render mode cards.
+type ModeStatus struct {
+	Mode      config.Mode
+	Connected bool
+}
+
 // FortnoxConnector handles the web-based Fortnox OAuth flow for a logged-in user.
 // Each mode (sandbox, production) has its own Fortnox connected-app credentials.
 type FortnoxConnector struct {
@@ -42,9 +49,70 @@ func NewFortnoxConnector(
 
 // RegisterRoutes wires the connect/callback/status endpoints onto mux.
 func (c *FortnoxConnector) RegisterRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("GET /fortnox/", c.pageHandler)
 	mux.HandleFunc("GET /fortnox/connect", c.connectHandler)
 	mux.HandleFunc("GET /fortnox/callback", c.callbackHandler)
 	mux.HandleFunc("GET /fortnox/status", c.statusHandler)
+	mux.HandleFunc("POST /fortnox/disconnect", c.disconnectHandler)
+}
+
+// pageHandler serves GET /fortnox/ — the Fortnox connection management page.
+func (c *FortnoxConnector) pageHandler(w http.ResponseWriter, r *http.Request) {
+	sess := auth.FromContext(r)
+	if sess == nil {
+		http.Error(w, "not authenticated", http.StatusUnauthorized)
+		return
+	}
+
+	orderedModes := []config.Mode{config.ModeSandbox, config.ModeProduction}
+	var statuses []ModeStatus
+	for _, mode := range orderedModes {
+		if _, ok := c.configs[mode]; !ok {
+			continue
+		}
+		tid := domain.TenantID(sess.Sub + ":" + string(mode))
+		_, err := c.tokenStore.Load(r.Context(), tid)
+		statuses = append(statuses, ModeStatus{Mode: mode, Connected: err == nil})
+	}
+
+	var flash string
+	if m := r.URL.Query().Get("connected"); m != "" {
+		if mode := config.Mode(m); mode.IsValid() {
+			flash = "Successfully connected to " + mode.Label() + "."
+		}
+	} else if m := r.URL.Query().Get("disconnected"); m != "" {
+		if mode := config.Mode(m); mode.IsValid() {
+			flash = "Disconnected from " + mode.Label() + "."
+		}
+	}
+
+	render(w, r, FortnoxStatusPage(statuses, flash, userNavFrom(r)))
+}
+
+// disconnectHandler handles POST /fortnox/disconnect.
+func (c *FortnoxConnector) disconnectHandler(w http.ResponseWriter, r *http.Request) {
+	sess := auth.FromContext(r)
+	if sess == nil {
+		http.Error(w, "not authenticated", http.StatusUnauthorized)
+		return
+	}
+	mode := config.Mode(r.FormValue("mode"))
+	if !mode.IsValid() {
+		http.Error(w, "invalid mode", http.StatusBadRequest)
+		return
+	}
+	if _, ok := c.configs[mode]; !ok {
+		http.Error(w, fmt.Sprintf("no config for mode %s", mode), http.StatusBadRequest)
+		return
+	}
+	tenantID := domain.TenantID(sess.Sub + ":" + string(mode))
+	if err := c.tokenStore.Delete(r.Context(), tenantID); err != nil {
+		c.log.Error("delete fortnox token", "tenant", tenantID, "err", err)
+		http.Error(w, "disconnect failed", http.StatusInternalServerError)
+		return
+	}
+	c.log.Info("fortnox disconnected", "tenant", tenantID, "mode", mode)
+	http.Redirect(w, r, "/fortnox/?disconnected="+string(mode), http.StatusSeeOther)
 }
 
 // connectHandler starts the Fortnox OAuth dance for the session's active mode.
@@ -131,7 +199,7 @@ func (c *FortnoxConnector) callbackHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	c.log.Info("fortnox connected", "tenant", tenantID, "mode", mode)
-	http.Redirect(w, r, "/", http.StatusFound)
+	http.Redirect(w, r, "/fortnox/?connected="+string(mode), http.StatusFound)
 }
 
 // statusHandler returns JSON with which modes have active tokens for the session user.
