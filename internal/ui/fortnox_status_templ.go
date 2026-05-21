@@ -166,7 +166,7 @@ func productionCard(connected bool) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<p class=\"text-sm text-gray-500 mb-4\">Not connected</p><label class=\"flex items-start gap-2 mb-3 cursor-pointer\"><input type=\"checkbox\" id=\"prod-confirm\" class=\"mt-0.5 rounded border-orange-300\" onchange=\"var btn=document.getElementById('prod-btn');btn.classList.toggle('opacity-50',!this.checked);btn.classList.toggle('pointer-events-none',!this.checked);\"> <span class=\"text-sm text-orange-900\">I understand this will connect to my real Fortnox company</span></label> <a id=\"prod-btn\" href=\"/fortnox/connect?mode=production\" class=\"inline-block rounded bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 opacity-50 pointer-events-none\">Connect Production</a>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<p class=\"text-sm text-gray-500 mb-4\">Not connected</p>  <label class=\"flex items-start gap-2 mb-3 cursor-pointer\"><input type=\"checkbox\" id=\"prod-confirm\" class=\"mt-0.5 rounded border-orange-300\" onchange=\"var btn=document.getElementById('prod-btn');btn.classList.toggle('opacity-50',!this.checked);btn.classList.toggle('pointer-events-none',!this.checked);\"> <span class=\"text-sm text-orange-900\">I understand this will connect to my real Fortnox company</span></label> <a id=\"prod-btn\" href=\"/fortnox/connect?mode=production\" class=\"inline-block rounded bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 opacity-50 pointer-events-none\">Connect Production</a>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

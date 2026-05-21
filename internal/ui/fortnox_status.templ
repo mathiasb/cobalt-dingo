@@ -56,6 +56,8 @@ templ productionCard(connected bool) {
 			</form>
 		} else {
 			<p class="text-sm text-gray-500 mb-4">Not connected</p>
+			// Checkbox is a UX friction gate only — not a server-side guard.
+			// The OAuth flow itself (Fortnox consent screen) is the real authorization step.
 			<label class="flex items-start gap-2 mb-3 cursor-pointer">
 				<input
 					type="checkbox"

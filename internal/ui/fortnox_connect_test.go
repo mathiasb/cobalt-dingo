@@ -100,7 +100,7 @@ func TestPageHandler_FlashMessage(t *testing.T) {
 	c.pageHandler(w, r)
 
 	require.Equal(t, http.StatusOK, w.Code)
-	assert.Contains(t, w.Body.String(), "SANDBOX")
+	assert.Contains(t, w.Body.String(), "Successfully connected to")
 }
 
 // TestDisconnectHandler_DeletesTokenAndRedirects verifies the happy path.
