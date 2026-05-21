@@ -227,7 +227,7 @@ jobs:
           echo 'FORTNOX_SANDBOX_CLIENT_ID=${{ secrets.FORTNOX_CLIENT_ID }}'         > .env
           echo 'FORTNOX_SANDBOX_CLIENT_SECRET=${{ secrets.FORTNOX_CLIENT_SECRET }}' >> .env
           echo 'FORTNOX_SANDBOX_REDIRECT_URI=http://localhost:8080/callback'        >> .env
-          echo 'FORTNOX_SANDBOX_SCOPES="companyinformation bookkeeping customer invoice supplier supplierinvoice payment currency project costcenter assets settings"' >> .env
+          echo 'FORTNOX_SANDBOX_SCOPES="companyinformation bookkeeping customer invoice supplier supplierinvoice currency project costcenter assets settings"' >> .env
           echo 'FORTNOX_SANDBOX_INVOICE_INBOX=${{ secrets.FORTNOX_INVOICE_INBOX }}' >> .env
           python3 -c "import json; open('.fortnox-tokens-sandbox.json','w').write(json.dumps({'access_token':'','refresh_token':'${{ secrets.FORTNOX_REFRESH_TOKEN }}','token_type':'bearer','expires_at':'2000-01-01T00:00:00Z'}))"
           chmod 600 .fortnox-tokens-sandbox.json
