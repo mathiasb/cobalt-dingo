@@ -2,6 +2,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
@@ -116,4 +117,9 @@ func (m *SessionManager) sign(data string) string {
 func FromContext(r *http.Request) *Session {
 	s, _ := r.Context().Value(sessionKey).(*Session)
 	return s
+}
+
+// WithSession injects s into ctx. Use in tests only.
+func WithSession(ctx context.Context, s *Session) context.Context {
+	return context.WithValue(ctx, sessionKey, s)
 }
