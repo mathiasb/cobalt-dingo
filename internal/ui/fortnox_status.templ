@@ -1,0 +1,77 @@
+package ui
+
+import "github.com/mathiasb/cobalt-dingo/internal/config"
+
+templ FortnoxStatusPage(statuses []ModeStatus, flash string, nav *UserNav) {
+	@Layout("Fortnox Connections", nav) {
+		if flash != "" {
+			<div class="mb-6 rounded-lg border border-green-300 bg-green-50 px-4 py-3">
+				<p class="text-sm text-green-800">{ flash }</p>
+			</div>
+		}
+		<h1 class="text-2xl font-semibold text-gray-900 mb-6">Fortnox Connections</h1>
+		<div class="space-y-4 max-w-xl">
+			for _, s := range statuses {
+				if s.Mode.IsSandbox() {
+					@sandboxCard(s.Connected)
+				} else {
+					@productionCard(s.Connected)
+				}
+			}
+		</div>
+	}
+}
+
+templ sandboxCard(connected bool) {
+	<div class="rounded-lg border border-green-300 bg-white p-6">
+		<div class="flex items-center justify-between mb-4">
+			<h2 class="text-lg font-medium text-gray-900">Sandbox</h2>
+			<span class="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700">Safe to experiment</span>
+		</div>
+		if connected {
+			<p class="text-sm text-gray-600 mb-4">&#10003; Connected</p>
+			<form method="POST" action="/fortnox/disconnect">
+				<input type="hidden" name="mode" value="sandbox"/>
+				<button type="submit" class="text-sm text-red-600 hover:text-red-800 hover:underline">Disconnect</button>
+			</form>
+		} else {
+			<p class="text-sm text-gray-500 mb-4">Not connected</p>
+			<a href="/fortnox/connect?mode=sandbox" class="inline-block rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">Connect Sandbox</a>
+		}
+	</div>
+}
+
+templ productionCard(connected bool) {
+	<div class="rounded-lg border border-orange-300 bg-orange-50 p-6">
+		<div class="flex items-center justify-between mb-4">
+			<h2 class="text-lg font-medium text-gray-900">Production</h2>
+			<span class="rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-700">Real data &#183; Real money</span>
+		</div>
+		<div class="rounded border border-orange-200 bg-orange-100 px-3 py-2 mb-4">
+			<p class="text-sm text-orange-800">&#9888; This connects to your live Fortnox company. All operations affect real data.</p>
+		</div>
+		if connected {
+			<p class="text-sm text-gray-600 mb-4">&#10003; Connected</p>
+			<form method="POST" action="/fortnox/disconnect">
+				<input type="hidden" name="mode" value="production"/>
+				<button type="submit" class="text-sm text-red-600 hover:text-red-800 hover:underline">Disconnect</button>
+			</form>
+		} else {
+			<p class="text-sm text-gray-500 mb-4">Not connected</p>
+			<label class="flex items-start gap-2 mb-3 cursor-pointer">
+				<input
+					type="checkbox"
+					id="prod-confirm"
+					class="mt-0.5 rounded border-orange-300"
+					onchange="var btn=document.getElementById('prod-btn');btn.classList.toggle('opacity-50',!this.checked);btn.classList.toggle('pointer-events-none',!this.checked);"
+				/>
+				<span class="text-sm text-orange-900">I understand this will connect to my real Fortnox company</span>
+			</label>
+			<a
+				id="prod-btn"
+				href="/fortnox/connect?mode=production"
+				class="inline-block rounded bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 opacity-50 pointer-events-none"
+			>Connect Production</a>
+		}
+	</div>
+}
