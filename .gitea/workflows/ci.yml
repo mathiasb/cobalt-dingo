@@ -229,10 +229,20 @@ jobs:
           echo 'FORTNOX_SANDBOX_REDIRECT_URI=http://localhost:8080/callback'        >> .env
           echo 'FORTNOX_SANDBOX_SCOPES="companyinformation bookkeeping customer invoice supplier supplierinvoice currency project costcenter assets settings"' >> .env
           echo 'FORTNOX_SANDBOX_INVOICE_INBOX=${{ secrets.FORTNOX_INVOICE_INBOX }}' >> .env
-          python3 -c "import json; open('.fortnox-tokens-sandbox.json','w').write(json.dumps({'access_token':'','refresh_token':'${{ secrets.FORTNOX_REFRESH_TOKEN }}','token_type':'bearer','expires_at':'2000-01-01T00:00:00Z'}))"
+          # Read live token from postgres — avoids stale-token races with the
+          # running pod (both would share the same Fortnox refresh token and
+          # rotate it out from under each other). Runner is on koala which has
+          # kubectl access to the cluster.
+          DB_URL=$(kubectl get secret cobalt-dingo-secrets -n cobalt-dingo \
+            -o jsonpath='{.data.DATABASE_URL}' | base64 -d)
+          REFRESH_TOKEN=$(kubectl exec -n databases \
+            $(kubectl get pod -n databases -l app=postgres18 \
+              -o jsonpath='{.items[0].metadata.name}') \
+            -- psql "$DB_URL" -t -A \
+            -c "SELECT refresh_token FROM fortnox_tokens WHERE tenant_id LIKE '%:sandbox' ORDER BY expires_at DESC LIMIT 1;")
+          python3 -c "import json; open('.fortnox-tokens-sandbox.json','w').write(json.dumps({'access_token':'','refresh_token':'${REFRESH_TOKEN}','token_type':'bearer','expires_at':'2000-01-01T00:00:00Z'}))"
           chmod 600 .fortnox-tokens-sandbox.json
           echo ".env lines: $(wc -l < .env)  token bytes: $(wc -c < .fortnox-tokens-sandbox.json)"
-          cat .fortnox-tokens-sandbox.json
 
       # Reset sandbox to a known state before seeding. FORTNOX_MODE is set
       # explicitly per-step so a stray env in the runner cannot misroute.
