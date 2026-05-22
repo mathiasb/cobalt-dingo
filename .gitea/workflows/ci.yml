@@ -253,8 +253,13 @@ jobs:
           FORTNOX_MODE=sandbox go run ./cmd/e2e-teardown
 
       # Seed test suppliers and booked invoices.
+      # Sleep 6s after teardown so Fortnox's server-side 5s sliding-window
+      # resets before seed starts. Teardown and seed are separate processes
+      # (separate rate-limiter state), so their combined request count can
+      # exceed the per-window limit without the sleep.
       - name: Seed E2E fixtures
         run: |
+          sleep 6
           set -a && source .env && set +a
           FORTNOX_MODE=sandbox go run ./cmd/e2e-seed
 
