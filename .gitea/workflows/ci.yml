@@ -229,18 +229,19 @@ jobs:
           echo 'FORTNOX_SANDBOX_REDIRECT_URI=http://localhost:8080/callback'        >> .env
           echo 'FORTNOX_SANDBOX_SCOPES="companyinformation bookkeeping customer invoice supplier supplierinvoice currency project costcenter assets settings"' >> .env
           echo 'FORTNOX_SANDBOX_INVOICE_INBOX=${{ secrets.FORTNOX_INVOICE_INBOX }}' >> .env
-          # Read live token from postgres — avoids stale-token races with the
-          # running pod (both would share the same Fortnox refresh token and
-          # rotate it out from under each other). Runner is on koala which has
-          # kubectl access to the cluster.
+          # Read live token from postgres — write the FULL token (access_token +
+          # actual expires_at) so CI can use it directly without refreshing.
+          # Forcing expires_at=2000 caused CI to always refresh on first use,
+          # racing with the running pod which also holds the same refresh token.
+          # Runner is on koala which has kubectl access to the cluster.
           DB_URL=$(kubectl get secret cobalt-dingo-secrets -n cobalt-dingo \
             -o jsonpath='{.data.DATABASE_URL}' | base64 -d)
-          REFRESH_TOKEN=$(kubectl exec -n databases \
+          TOKEN_JSON=$(kubectl exec -n databases \
             $(kubectl get pod -n databases -l app=postgres18 \
               -o jsonpath='{.items[0].metadata.name}') \
             -- psql "$DB_URL" -t -A \
-            -c "SELECT refresh_token FROM fortnox_tokens WHERE tenant_id LIKE '%:sandbox' ORDER BY expires_at DESC LIMIT 1;")
-          python3 -c "import json; open('.fortnox-tokens-sandbox.json','w').write(json.dumps({'access_token':'','refresh_token':'${REFRESH_TOKEN}','token_type':'bearer','expires_at':'2000-01-01T00:00:00Z'}))"
+            -c "SELECT json_build_object('access_token',access_token,'refresh_token',refresh_token,'token_type','bearer','expires_at',to_char(expires_at AT TIME ZONE 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"')) FROM fortnox_tokens WHERE tenant_id LIKE '%:sandbox' ORDER BY expires_at DESC LIMIT 1;")
+          echo "$TOKEN_JSON" > .fortnox-tokens-sandbox.json
           chmod 600 .fortnox-tokens-sandbox.json
           echo ".env lines: $(wc -l < .env)  token bytes: $(wc -c < .fortnox-tokens-sandbox.json)"
 
