@@ -396,10 +396,11 @@ func main() {
 		state := "unpaid"
 		if inv.paid {
 			if err := client.FullyPayCustomerInvoice(docNumber, inv.paymentDate); err != nil {
-				log.Error("pay customer invoice", "doc", docNumber, "err", err)
-				os.Exit(1)
+				log.Warn("pay customer invoice skipped", "doc", docNumber, "err", err)
+				state = "booked (payment skipped)"
+			} else {
+				state = "paid " + inv.paymentDate
 			}
-			state = "paid " + inv.paymentDate
 		}
 		fmt.Printf("  ✓ %-40s %s %9.2f  due %s  → invoice %s (%s)\n",
 			inv.customerName, inv.currency, inv.total, inv.dueDate, docNumber, state)
