@@ -1,23 +1,18 @@
 # Git-workflow
 
 ## Remotes
-| Remote   | URL                                          | Syfte                        |
-|----------|----------------------------------------------|------------------------------|
-| `origin` | https://gitea.d-ma.be/mathias/coo-agent.git  | Primär – dagligt arbete      |
-| `github` | https://github.com/mathiasb/coo-agent.git    | Sekundär – releases/tags     |
+| Remote   | URL                                                          | Syfte                              |
+|----------|--------------------------------------------------------------|------------------------------------|
+| `origin` | ssh://git@100.109.2.126:30022/mathias/coo-agent.git          | Kanonisk – allt arbete, alla releases |
 
-## Dagligt arbete → Gitea
-```bash
-git push origin main          # vanlig push
-git push origin feature/xyz   # feature branch
-```
-GitHub rörs inte vid dagligt arbete.
+GitHub-kopian (`mathiasb/coo-agent`) är arkiverad 2026-06-01 och read-only. Pusha aldrig dit.
 
-## Release → GitHub
+## Dagligt arbete och releases → Gitea
 ```bash
+git push origin main                              # vanlig push
+git push origin feature/xyz                       # feature branch
 git tag v1.2.0 -m "Release v1.2.0: kort beskrivning"
-git push origin main          # koden till Gitea
-git push github --tags        # taggen till GitHub Releases
+git push origin v1.2.0                            # tagg till Gitea Releases
 ```
 
 ## Branch-strategi
@@ -37,5 +32,4 @@ docs: uppdatera CLAUDE.md med nya BAS-konton
 
 ## Vad Claude aldrig pushar automatiskt
 - Direkt till `main` utan att tester passerar
-- Till `github` remote utan explicit release-beslut från användaren
 - Filer som matchar .gitignore (tokens, .env, loggar)
