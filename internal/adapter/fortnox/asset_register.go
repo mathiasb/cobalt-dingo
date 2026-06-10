@@ -34,7 +34,7 @@ func (a *AssetRegisterAdapter) client(ctx context.Context, tenantID domain.Tenan
 // rowToAsset converts a raw Fortnox AssetRow to a domain.Asset.
 func rowToAsset(r rawfortnox.AssetRow) domain.Asset {
 	return domain.Asset{
-		ID:                  r.ID,
+		ID:                  int(r.ID),
 		Number:              r.Number,
 		Description:         r.Description,
 		AcquisitionDate:     r.AcquisitionDate,

@@ -62,8 +62,8 @@ func (a *SupplierLedgerAdapter) InvoicePayments(ctx context.Context, tenantID do
 	payments := make([]domain.SupplierPayment, len(rows))
 	for i, r := range rows {
 		payments[i] = domain.SupplierPayment{
-			PaymentNumber: r.Number,
-			InvoiceNumber: r.InvoiceNumber,
+			PaymentNumber: int(r.Number),
+			InvoiceNumber: int(r.InvoiceNumber),
 			Amount:        domain.MoneyFromFloat(r.AmountCurrency, r.Currency),
 			CurrencyRate:  r.CurrencyRate,
 			PaymentDate:   r.PaymentDate,

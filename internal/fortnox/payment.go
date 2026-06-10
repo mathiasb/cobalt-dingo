@@ -49,13 +49,13 @@ func (c *Client) RecordPayment(p SupplierInvoicePayment) (int, error) {
 
 	var result struct {
 		SupplierInvoicePayment struct {
-			Number int `json:"Number"`
+			Number FlexInt `json:"Number"`
 		} `json:"SupplierInvoicePayment"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return 0, fmt.Errorf("decode payment response: %w", err)
 	}
-	return result.SupplierInvoicePayment.Number, nil
+	return int(result.SupplierInvoicePayment.Number), nil
 }
 
 // BookkeepPayment calls the bookkeep action for a supplier invoice payment,

@@ -8,9 +8,9 @@ import (
 
 // SupplierRow is the Fortnox JSON representation of a supplier's payment details.
 type SupplierRow struct {
-	SupplierNumber int    `json:"SupplierNumber"`
-	IBAN           string `json:"IBAN"`
-	BIC            string `json:"BIC"`
+	SupplierNumber FlexInt `json:"SupplierNumber"`
+	IBAN           string  `json:"IBAN"`
+	BIC            string  `json:"BIC"`
 }
 
 // SupplierResponse is the top-level envelope returned by GET /3/suppliers/{num}.

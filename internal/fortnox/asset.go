@@ -7,7 +7,7 @@ import (
 
 // AssetRow is the Fortnox JSON representation of a fixed asset.
 type AssetRow struct {
-	ID                        int     `json:"Id"`
+	ID                        FlexInt `json:"Id"`
 	Number                    string  `json:"Number"`
 	Description               string  `json:"Description"`
 	AcquisitionDate           string  `json:"AcquisitionDate"`

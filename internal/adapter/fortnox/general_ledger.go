@@ -47,9 +47,9 @@ func (a *GeneralLedgerAdapter) ChartOfAccounts(ctx context.Context, tenantID dom
 	accounts := make([]domain.Account, len(rows))
 	for i, r := range rows {
 		accounts[i] = domain.Account{
-			Number:      r.Number,
+			Number:      int(r.Number),
 			Description: r.Description,
-			SRU:         r.SRU,
+			SRU:         int(r.SRU),
 			Active:      r.Active,
 			Year:        yearID,
 			BalanceBF:   domain.MoneyFromFloat(r.BalanceBroughtForward, "SEK"),
@@ -163,7 +163,7 @@ func (a *GeneralLedgerAdapter) FinancialYears(ctx context.Context, tenantID doma
 			return nil, fmt.Errorf("general ledger: parse to date %q: %w", r.ToDate, err)
 		}
 		years[i] = domain.FinancialYear{
-			ID:   r.ID,
+			ID:   int(r.ID),
 			From: from,
 			To:   to,
 		}
@@ -197,7 +197,7 @@ func convertVoucher(rv rawfortnox.VoucherJSON) domain.Voucher {
 	rows := make([]domain.VoucherRow, len(rv.VoucherRows))
 	for i, r := range rv.VoucherRows {
 		rows[i] = domain.VoucherRow{
-			Account:     r.Account,
+			Account:     int(r.Account),
 			Debit:       domain.MoneyFromFloat(r.Debit, "SEK"),
 			Credit:      domain.MoneyFromFloat(r.Credit, "SEK"),
 			Description: r.TransactionInformation,
@@ -207,10 +207,10 @@ func convertVoucher(rv rawfortnox.VoucherJSON) domain.Voucher {
 	}
 	return domain.Voucher{
 		Series:          rv.VoucherSeries,
-		Number:          rv.VoucherNumber,
+		Number:          int(rv.VoucherNumber),
 		Description:     rv.Description,
 		TransactionDate: rv.TransactionDate,
-		Year:            rv.Year,
+		Year:            int(rv.Year),
 		Rows:            rows,
 	}
 }

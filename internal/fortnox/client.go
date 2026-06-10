@@ -187,8 +187,8 @@ func (c *Client) Get(requestURL string) (json.RawMessage, error) {
 
 // SupplierInvoicePaymentRow is the Fortnox JSON for a single supplier invoice payment.
 type SupplierInvoicePaymentRow struct {
-	Number         int     `json:"Number"`
-	InvoiceNumber  int     `json:"InvoiceNumber"`
+	Number         FlexInt `json:"Number"`
+	InvoiceNumber  FlexInt `json:"InvoiceNumber"`
 	Amount         float64 `json:"Amount"`
 	AmountCurrency float64 `json:"AmountCurrency"`
 	Currency       string  `json:"Currency"`
@@ -286,8 +286,8 @@ func (c *Client) UnpaidCustomerInvoices() ([]CustomerInvoiceRow, error) {
 
 // CustomerInvoicePaymentRow is the Fortnox JSON for a customer invoice payment.
 type CustomerInvoicePaymentRow struct {
-	Number         int     `json:"Number"`
-	InvoiceNumber  int     `json:"InvoiceNumber"`
+	Number         FlexInt `json:"Number"`
+	InvoiceNumber  FlexInt `json:"InvoiceNumber"`
 	Amount         float64 `json:"Amount"`
 	AmountCurrency float64 `json:"AmountCurrency"`
 	Currency       string  `json:"Currency"`
@@ -346,9 +346,9 @@ func (c *Client) GetFullCustomer(customerNumber int) (FullCustomerRow, error) {
 
 // AccountRow is the Fortnox JSON for a GL account from GET /3/accounts.
 type AccountRow struct {
-	Number                int     `json:"Number"`
+	Number                FlexInt `json:"Number"`
 	Description           string  `json:"Description"`
-	SRU                   int     `json:"SRU"`
+	SRU                   FlexInt `json:"SRU"`
 	Active                bool    `json:"Active"`
 	BalanceBroughtForward float64 `json:"BalanceBroughtForward"`
 	BalanceCarriedForward float64 `json:"BalanceCarriedForward"`
@@ -376,9 +376,9 @@ func (c *Client) ListAccounts(yearID int) ([]AccountRow, error) {
 
 // FinancialYearRow is the Fortnox JSON for a financial year from GET /3/financialyears.
 type FinancialYearRow struct {
-	ID       int    `json:"Id"`
-	FromDate string `json:"FromDate"`
-	ToDate   string `json:"ToDate"`
+	ID       FlexInt `json:"Id"`
+	FromDate string  `json:"FromDate"`
+	ToDate   string  `json:"ToDate"`
 }
 
 // financialYearsResponse is the envelope for GET /3/financialyears.

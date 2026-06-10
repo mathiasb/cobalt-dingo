@@ -83,8 +83,8 @@ func (a *CustomerLedgerAdapter) InvoicePayments(ctx context.Context, tenantID do
 	payments := make([]domain.CustomerPayment, len(rows))
 	for i, row := range rows {
 		payments[i] = domain.CustomerPayment{
-			PaymentNumber: row.Number,
-			InvoiceNumber: row.InvoiceNumber,
+			PaymentNumber: int(row.Number),
+			InvoiceNumber: int(row.InvoiceNumber),
 			Amount:        domain.MoneyFromFloat(row.AmountCurrency, row.Currency),
 			PaymentDate:   row.PaymentDate,
 			Booked:        row.Booked,

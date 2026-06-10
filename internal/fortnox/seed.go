@@ -1073,9 +1073,9 @@ func (c *Client) ListAssetsByPrefix(prefix string) ([]AssetSummary, error) {
 
 	var envelope struct {
 		Assets []struct {
-			ID          int    `json:"Id"`
-			Number      string `json:"Number"`
-			Description string `json:"Description"`
+			ID          FlexInt `json:"Id"`
+			Number      string  `json:"Number"`
+			Description string  `json:"Description"`
 		} `json:"Assets"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
@@ -1085,7 +1085,7 @@ func (c *Client) ListAssetsByPrefix(prefix string) ([]AssetSummary, error) {
 	var result []AssetSummary
 	for _, a := range envelope.Assets {
 		if strings.HasPrefix(a.Description, prefix) {
-			result = append(result, AssetSummary{ID: a.ID, Number: a.Number, Description: a.Description})
+			result = append(result, AssetSummary{ID: int(a.ID), Number: a.Number, Description: a.Description})
 		}
 	}
 	return result, nil
