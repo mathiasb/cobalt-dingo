@@ -51,12 +51,13 @@ type Collector struct {
 	sources []*Source
 	router  *Router
 	dryRun  bool
+	smtp    SMTPConfig
 }
 
 // NewCollector constructs a Collector. When dryRun is true no mail is
-// actually forwarded.
-func NewCollector(sources []*Source, router *Router, dryRun bool) *Collector {
-	return &Collector{sources: sources, router: router, dryRun: dryRun}
+// forwarded and IMAP messages are fetched with PEEK so no flags change.
+func NewCollector(sources []*Source, router *Router, dryRun bool, smtp SMTPConfig) *Collector {
+	return &Collector{sources: sources, router: router, dryRun: dryRun, smtp: smtp}
 }
 
 // Run processes every source account and returns one result per account.
@@ -72,10 +73,11 @@ func (c *Collector) Run(ctx context.Context) ([]CollectorResult, error) {
 	return results, nil
 }
 
-func (c *Collector) processAccount(ctx context.Context, src *Source) (CollectorResult, error) {
+func (c *Collector) processAccount(_ context.Context, src *Source) (CollectorResult, error) {
 	result := CollectorResult{Account: src.Name}
 
-	mails, err := fetchMails(ctx, src)
+	// Peek during dry runs so no \Seen flags are touched.
+	mails, err := fetchMails(src, c.dryRun)
 	if err != nil {
 		return result, err
 	}
@@ -89,7 +91,7 @@ func (c *Collector) processAccount(ctx context.Context, src *Source) (CollectorR
 			continue
 		}
 		if !c.dryRun {
-			if err := deliver(ctx, m, dest); err != nil {
+			if err := c.deliver(m, dest); err != nil {
 				result.Errors = append(result.Errors, fmt.Errorf("vidarebefordra %s: %w", m.MessageID, err))
 				continue
 			}
@@ -97,17 +99,4 @@ func (c *Collector) processAccount(ctx context.Context, src *Source) (CollectorR
 		result.Routed++
 	}
 	return result, nil
-}
-
-// fetchMails connects to an IMAP server and returns unseen messages.
-// Implemented via github.com/emersion/go-imap/v2.
-func fetchMails(_ context.Context, _ *Source) ([]Mail, error) {
-	// TODO: dial TLS, select folder, search UNSEEN, fetch envelope+body
-	return nil, nil
-}
-
-// deliver forwards a mail to its destination (SMTP relay or Fortnox inbox).
-func deliver(_ context.Context, _ Mail, _ *Destination) error {
-	// TODO: smtp.SendMail for type "smtp"; Fortnox /inbox upload for fortnox-*
-	return nil
 }

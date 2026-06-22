@@ -95,8 +95,19 @@ func main() {
 		})
 	}
 
+	smtpCfg := receipts.SMTPConfig{
+		Host:     os.Getenv("SMTP_HOST"),
+		Port:     atoiDefault(os.Getenv("SMTP_PORT"), 465),
+		Username: os.Getenv("SMTP_USER"),
+		Password: os.Getenv("SMTP_PASSWORD"),
+		From:     os.Getenv("SMTP_FROM"),
+	}
+	if !dryRun && smtpCfg.Host == "" {
+		log.Fatal("SMTP_HOST måste sättas när DRY_RUN=false")
+	}
+
 	router := receipts.NewRouter(rules, dests)
-	collector := receipts.NewCollector(sources, router, dryRun)
+	collector := receipts.NewCollector(sources, router, dryRun, smtpCfg)
 
 	if dryRun {
 		fmt.Println("=== DRY RUN – inga mail vidarebefordras ===")
@@ -123,6 +134,13 @@ func main() {
 	}
 
 	os.Exit(exitCode)
+}
+
+func atoiDefault(s string, def int) int {
+	if n, err := strconv.Atoi(s); err == nil {
+		return n
+	}
+	return def
 }
 
 func loadConfig(path string) (*configFile, error) {
