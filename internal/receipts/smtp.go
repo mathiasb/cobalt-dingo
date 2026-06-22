@@ -50,7 +50,7 @@ func buildForwardMessage(from, to string, m Mail) []byte {
 // "fortnox-invoices") are email forwards, so they share this path.
 func (c *Collector) deliver(m Mail, dest *Destination) error {
 	if dest.Address == "" {
-		return fmt.Errorf("destination %q saknar adress", dest.Name)
+		return fmt.Errorf("destination %q saknar adress", dest.Name) //nolint:misspell // svenska: adress
 	}
 	if c.smtp.Host == "" {
 		return fmt.Errorf("SMTP-relä är inte konfigurerat")
