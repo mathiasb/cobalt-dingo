@@ -52,12 +52,22 @@ type Collector struct {
 	router  *Router
 	dryRun  bool
 	smtp    SMTPConfig
+
+	// Seams — overridable in tests. Default to the real IMAP/SMTP impls.
+	fetch     func(src *Source) ([]Mail, error)
+	deliverFn func(m Mail, dest *Destination) error
+	markSeen  func(src *Source, uids []uint32) error
 }
 
 // NewCollector constructs a Collector. When dryRun is true no mail is
-// forwarded and IMAP messages are fetched with PEEK so no flags change.
+// forwarded and nothing is marked \Seen. Mail is always fetched with PEEK;
+// a message is only marked \Seen after it forwards successfully.
 func NewCollector(sources []*Source, router *Router, dryRun bool, smtp SMTPConfig) *Collector {
-	return &Collector{sources: sources, router: router, dryRun: dryRun, smtp: smtp}
+	c := &Collector{sources: sources, router: router, dryRun: dryRun, smtp: smtp}
+	c.fetch = fetchMails
+	c.deliverFn = c.deliver
+	c.markSeen = markSeen
+	return c
 }
 
 // Run processes every source account and returns one result per account.
@@ -76,11 +86,14 @@ func (c *Collector) Run(ctx context.Context) ([]CollectorResult, error) {
 func (c *Collector) processAccount(_ context.Context, src *Source) (CollectorResult, error) {
 	result := CollectorResult{Account: src.Name}
 
-	// Peek during dry runs so no \Seen flags are touched.
-	mails, err := fetchMails(src, c.dryRun)
+	mails, err := c.fetch(src)
 	if err != nil {
 		return result, err
 	}
+
+	// UIDs of mails that forwarded successfully — only these get marked \Seen,
+	// so an unmatched or failed-to-forward mail is never silently consumed.
+	var forwarded []uint32
 
 	for _, m := range mails {
 		result.Processed++
@@ -91,12 +104,19 @@ func (c *Collector) processAccount(_ context.Context, src *Source) (CollectorRes
 			continue
 		}
 		if !c.dryRun {
-			if err := c.deliver(m, dest); err != nil {
+			if err := c.deliverFn(m, dest); err != nil {
 				result.Errors = append(result.Errors, fmt.Errorf("vidarebefordra %s: %w", m.MessageID, err))
 				continue
 			}
+			forwarded = append(forwarded, m.UID)
 		}
 		result.Routed++
+	}
+
+	if !c.dryRun && len(forwarded) > 0 {
+		if err := c.markSeen(src, forwarded); err != nil {
+			result.Errors = append(result.Errors, fmt.Errorf("markera \\Seen: %w", err))
+		}
 	}
 	return result, nil
 }

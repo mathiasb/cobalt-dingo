@@ -13,11 +13,8 @@ import (
 	"github.com/emersion/go-message/mail"
 )
 
-// fetchMails connects to an IMAP server, returns the unseen messages in the
-// configured folder, and (unless peek is true) marks them \Seen so a later
-// run does not process them again. peek is set during dry runs so no flags
-// are touched.
-func fetchMails(src *Source, peek bool) ([]Mail, error) {
+// dialAndSelect connects, logs in, and selects the source's folder.
+func dialAndSelect(src *Source) (*imapclient.Client, error) {
 	folder := src.Folder
 	if folder == "" {
 		folder = "INBOX"
@@ -38,15 +35,28 @@ func fetchMails(src *Source, peek bool) ([]Mail, error) {
 	if err != nil {
 		return nil, fmt.Errorf("imap dial %s: %w", addr, err)
 	}
-	defer func() { _ = c.Close() }()
 
 	if err := c.Login(src.Username, src.Password).Wait(); err != nil {
+		_ = c.Close()
 		return nil, fmt.Errorf("imap login %s: %w", src.Username, err)
 	}
-
 	if _, err := c.Select(folder, nil).Wait(); err != nil {
+		_ = c.Close()
 		return nil, fmt.Errorf("imap select %s: %w", folder, err)
 	}
+	return c, nil
+}
+
+// fetchMails connects to an IMAP server and returns the unseen messages in the
+// configured folder. It always fetches with PEEK so no \Seen flags change —
+// marking a message processed is the caller's job, only after a successful
+// forward (see Collector.markSeen).
+func fetchMails(src *Source) ([]Mail, error) {
+	c, err := dialAndSelect(src)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = c.Close() }()
 
 	// Unseen = messages without the \Seen flag.
 	searchData, err := c.UIDSearch(&imap.SearchCriteria{
@@ -63,7 +73,7 @@ func fetchMails(src *Source, peek bool) ([]Mail, error) {
 	fetchOptions := &imap.FetchOptions{
 		UID:         true,
 		Envelope:    true,
-		BodySection: []*imap.FetchItemBodySection{{Peek: peek}}, // non-peek marks \Seen
+		BodySection: []*imap.FetchItemBodySection{{Peek: true}}, // never alter \Seen
 	}
 	msgs, err := c.Fetch(imap.UIDSetNum(uids...), fetchOptions).Collect()
 	if err != nil {
@@ -81,6 +91,33 @@ func fetchMails(src *Source, peek bool) ([]Mail, error) {
 		mails = append(mails, m)
 	}
 	return mails, nil
+}
+
+// markSeen adds the \Seen flag to the given UIDs so a future run's UNSEEN
+// search skips them. Called only for mails that forwarded successfully, so an
+// unmatched or failed-to-forward mail is never silently consumed.
+func markSeen(src *Source, uids []uint32) error {
+	if len(uids) == 0 {
+		return nil
+	}
+	c, err := dialAndSelect(src)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = c.Close() }()
+
+	imapUIDs := make([]imap.UID, len(uids))
+	for i, u := range uids {
+		imapUIDs[i] = imap.UID(u)
+	}
+	if _, err := c.Store(imap.UIDSetNum(imapUIDs...), &imap.StoreFlags{
+		Op:     imap.StoreFlagsAdd,
+		Flags:  []imap.Flag{imap.FlagSeen},
+		Silent: true,
+	}, nil).Collect(); err != nil {
+		return fmt.Errorf("imap store \\Seen: %w", err)
+	}
+	return nil
 }
 
 // parseMessage converts a fetched IMAP message into our Mail type.
