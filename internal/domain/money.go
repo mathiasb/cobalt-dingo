@@ -2,7 +2,11 @@
 // It has no dependencies on external systems, frameworks, or infrastructure.
 package domain
 
-import "fmt"
+import (
+	"fmt"
+	"strconv"
+	"strings"
+)
 
 // Money is an exact fixed-point monetary amount.
 // MinorUnits stores the value as integer minor currency units (cents, öre, pence)
@@ -27,12 +31,28 @@ func (m Money) Float() float64 {
 	return float64(m.MinorUnits) / 100
 }
 
-// String formats the amount as "EUR 2,450.00".
+// String formats the amount as "EUR 2,450.00" with thousands grouping.
 func (m Money) String() string {
-	major := m.MinorUnits / 100
-	minor := m.MinorUnits % 100
-	if minor < 0 {
-		minor = -minor
+	neg := m.MinorUnits < 0
+	u := m.MinorUnits
+	if neg {
+		u = -u
 	}
-	return fmt.Sprintf("%s %d.%02d", m.Currency, major, minor)
+	major := u / 100
+	minor := u % 100
+
+	s := strconv.FormatInt(major, 10)
+	var b strings.Builder
+	n := len(s)
+	for i, d := range s {
+		if i > 0 && (n-i)%3 == 0 {
+			b.WriteByte(',')
+		}
+		b.WriteRune(d)
+	}
+	sign := ""
+	if neg {
+		sign = "-"
+	}
+	return fmt.Sprintf("%s %s%s.%02d", m.Currency, sign, b.String(), minor)
 }
