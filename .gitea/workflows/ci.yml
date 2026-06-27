@@ -243,6 +243,12 @@ jobs:
             -c "SELECT json_build_object('access_token',access_token,'refresh_token',refresh_token,'token_type','bearer','expires_at',to_char(expires_at AT TIME ZONE 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"')) FROM fortnox_tokens WHERE tenant_id LIKE '%:sandbox' ORDER BY expires_at DESC LIMIT 1;")
           echo "$TOKEN_JSON" > .fortnox-tokens-sandbox.json
           chmod 600 .fortnox-tokens-sandbox.json
+          # Capture the pre-run refresh token for an optimistic-lock (CAS)
+          # write-back after the run — see "Persist refreshed token" (#37).
+          # Token values are base64url/JWT (no double-quote) so this is safe;
+          # never echoed.
+          sed -n 's/.*"refresh_token":"\([^"]*\)".*/\1/p' .fortnox-tokens-sandbox.json > .old-refresh
+          chmod 600 .old-refresh
           echo ".env lines: $(wc -l < .env)  token bytes: $(wc -c < .fortnox-tokens-sandbox.json)"
 
       # Reset sandbox to a known state before seeding. FORTNOX_MODE is set
@@ -269,6 +275,40 @@ jobs:
         run: |
           set -a && source .env && set +a
           FORTNOX_MODE=sandbox go test -race -count=1 -timeout=120s ./internal/acceptance/...
+
+      # Persist a rotated refresh token back to postgres (#37). Fortnox rotates
+      # the refresh token on every refresh; teardown/seed refresh into the
+      # job-local token file, so without this write-back the stored token is
+      # consumed and the NEXT run fails with invalid_grant. CAS via
+      # `WHERE refresh_token = <old>` mirrors TokenStore.AtomicRefresh and won't
+      # clobber a concurrent pod-side refresh (UPDATE 0 = pod already won = ok).
+      # Runs even if a prior step failed, since the token may have rotated during
+      # teardown/seed. Non-fatal: a failed write-back must not red a green E2E.
+      - name: Persist refreshed token to postgres
+        if: always()
+        run: |
+          [ -f .fortnox-tokens-sandbox.json ] || { echo "no token file — skip"; exit 0; }
+          OLD_RT=$(cat .old-refresh 2>/dev/null || true)
+          NEW_AT=$(sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p' .fortnox-tokens-sandbox.json)
+          NEW_RT=$(sed -n 's/.*"refresh_token":"\([^"]*\)".*/\1/p' .fortnox-tokens-sandbox.json)
+          NEW_EXP=$(sed -n 's/.*"expires_at":"\([^"]*\)".*/\1/p' .fortnox-tokens-sandbox.json)
+          if [ -z "$NEW_RT" ] || [ "$NEW_RT" = "$OLD_RT" ]; then
+            echo "sandbox token unchanged — no write-back needed"; exit 0
+          fi
+          DB_URL=$(kubectl get secret cobalt-dingo-secrets -n cobalt-dingo \
+            -o jsonpath='{.data.DATABASE_URL}' | base64 -d)
+          PG=$(kubectl get pod -n databases -l app=postgres18 -o jsonpath='{.items[0].metadata.name}')
+          # Values go to a 0600 temp file then over kubectl-exec stdin — never in
+          # argv or logs. Dollar-quoted so token punctuation can't break the SQL.
+          SQLF=$(mktemp); chmod 600 "$SQLF"
+          printf 'UPDATE fortnox_tokens SET access_token=$$%s$$, refresh_token=$$%s$$, expires_at=$$%s$$, updated_at=NOW() WHERE tenant_id LIKE $$%%:sandbox$$ AND refresh_token=$$%s$$;\n' \
+            "$NEW_AT" "$NEW_RT" "$NEW_EXP" "$OLD_RT" > "$SQLF"
+          if kubectl exec -i -n databases "$PG" -- psql "$DB_URL" -v ON_ERROR_STOP=1 -q < "$SQLF" >/dev/null; then
+            echo "✓ persisted rotated sandbox token back to postgres (CAS on prior refresh_token)"
+          else
+            echo "⚠ token write-back failed — next run may need re-auth (#37)"
+          fi
+          shred -u "$SQLF" 2>/dev/null || rm -f "$SQLF"
 
   # ── 5. Mirror to GitHub ─────────────────────────────────────────────────────
   mirror:
