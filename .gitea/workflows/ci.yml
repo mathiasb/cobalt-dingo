@@ -243,11 +243,17 @@ jobs:
             -c "SELECT json_build_object('access_token',access_token,'refresh_token',refresh_token,'token_type','bearer','expires_at',to_char(expires_at AT TIME ZONE 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"')) FROM fortnox_tokens WHERE tenant_id LIKE '%:sandbox' ORDER BY expires_at DESC LIMIT 1;")
           echo "$TOKEN_JSON" > .fortnox-tokens-sandbox.json
           chmod 600 .fortnox-tokens-sandbox.json
-          # Capture the pre-run refresh token for an optimistic-lock (CAS)
+          # Capture the pre-run refresh token for the optimistic-lock (CAS)
           # write-back after the run — see "Persist refreshed token" (#37).
-          # Token values are base64url/JWT (no double-quote) so this is safe;
-          # never echoed.
-          sed -n 's/.*"refresh_token":"\([^"]*\)".*/\1/p' .fortnox-tokens-sandbox.json > .old-refresh
+          # Read the raw column, NOT the json_build_object output: postgres emits
+          # spaced JSON ("key" : "val"), which a naive JSON regex misses (that
+          # silently no-op'd the first write-back). Never echoed.
+          kubectl exec -n databases \
+            $(kubectl get pod -n databases -l app=postgres18 \
+              -o jsonpath='{.items[0].metadata.name}') \
+            -- psql "$DB_URL" -t -A \
+            -c "SELECT refresh_token FROM fortnox_tokens WHERE tenant_id LIKE '%:sandbox' ORDER BY expires_at DESC LIMIT 1;" \
+            | tr -d '[:space:]' > .old-refresh
           chmod 600 .old-refresh
           echo ".env lines: $(wc -l < .env)  token bytes: $(wc -c < .fortnox-tokens-sandbox.json)"
 
