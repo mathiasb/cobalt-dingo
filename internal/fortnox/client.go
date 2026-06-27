@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -142,9 +143,48 @@ func waitForRate() {
 	}
 }
 
-// do performs an HTTP request after waiting for a free rate-limit slot.
-// All Client methods that hit Fortnox should use this in place of
-// c.httpClient.Do(req) so the 25 req / 5 s ceiling is enforced.
+// Retry policy for HTTP 429 responses. Fortnox's 5 s sliding window can still
+// return 429 even with client-side pacing — most often in CI where teardown
+// and seed run as separate processes (separate rateLimiter state) and their
+// request streams overlap the same server-side window. Retrying with back-off
+// turns those transient 429s from fatal into self-healing.
+const maxRetries = 4
+
+var (
+	retryBaseDelay = 500 * time.Millisecond // base for exponential back-off; overridable in tests
+	retryMaxDelay  = 8 * time.Second        // cap on a single back-off wait
+)
+
+// backoff returns the delay for the given 0-based retry attempt: an exponential
+// retryBaseDelay * 2^attempt, capped at retryMaxDelay.
+func backoff(attempt int) time.Duration {
+	d := retryBaseDelay << attempt
+	if d <= 0 || d > retryMaxDelay {
+		return retryMaxDelay
+	}
+	return d
+}
+
+// retryAfter parses a Retry-After header expressed in whole seconds. Returns 0
+// when absent or unparseable, leaving the caller to fall back to back-off.
+func retryAfter(resp *http.Response) time.Duration {
+	v := strings.TrimSpace(resp.Header.Get("Retry-After"))
+	if v == "" {
+		return 0
+	}
+	if secs, err := strconv.Atoi(v); err == nil && secs >= 0 {
+		return time.Duration(secs) * time.Second
+	}
+	return 0
+}
+
+// do performs an HTTP request after waiting for a free rate-limit slot, with
+// automatic back-off retry on HTTP 429 (up to maxRetries). All Client methods
+// that hit Fortnox should use this in place of c.httpClient.Do(req) so the
+// 25 req / 5 s ceiling is enforced and transient rate-limit 429s self-heal.
+//
+// Requests built with a buffered body (bytes.Reader, via http.NewRequest) carry
+// a GetBody closure, so the body is rewound and resent on each retry.
 //
 // Write gate: when c.readOnly is true, any request whose method is not GET
 // or HEAD is rejected with ErrReadOnlyClient before any HTTP traffic. This
@@ -154,8 +194,39 @@ func (c *Client) do(req *http.Request) (*http.Response, error) {
 	if c.readOnly && req.Method != http.MethodGet && req.Method != http.MethodHead {
 		return nil, fmt.Errorf("%w: attempted %s %s", ErrReadOnlyClient, req.Method, req.URL.Path)
 	}
-	waitForRate()
-	return c.httpClient.Do(req)
+
+	for attempt := 0; ; attempt++ {
+		waitForRate()
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		if resp.StatusCode != http.StatusTooManyRequests || attempt >= maxRetries {
+			return resp, nil
+		}
+
+		// 429 with retries left: wait (Retry-After, else back-off), reset the
+		// local window so we don't immediately re-burst, rewind body, retry.
+		wait := retryAfter(resp)
+		if wait <= 0 {
+			wait = backoff(attempt)
+		}
+		_ = resp.Body.Close()
+
+		rateLimiter.mu.Lock()
+		rateLimiter.count = 0
+		rateLimiter.windowEnd = time.Now().Add(wait)
+		rateLimiter.mu.Unlock()
+		time.Sleep(wait)
+
+		if req.GetBody != nil {
+			body, berr := req.GetBody()
+			if berr != nil {
+				return nil, fmt.Errorf("rewind body for 429 retry: %w", berr)
+			}
+			req.Body = body
+		}
+	}
 }
 
 // Get performs an authenticated, rate-limited GET request and returns the raw
