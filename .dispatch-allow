@@ -1,0 +1,8 @@
+# This repo is opted in to headless dispatch (dispatch#3).
+# Presence of this file = dispatch-eligible. Remove it to refuse all dispatch.
+#
+# NOTE: cobalt-dingo carries real Fortnox/money-path code (venture client tag,
+# no-cloud-egress constraint per cobalt-dingo#23). Repo-level opt-in — task
+# selection discipline (Goldilocks-sized, non-money-path, low-risk) is applied
+# manually per issue, not enforced by this marker. Do not assume every issue
+# in this repo is safe to dispatch just because the repo is eligible.
