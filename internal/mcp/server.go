@@ -71,11 +71,13 @@ type Deps struct {
 	CompanyInf  domain.CompanyInfo
 }
 
-// NewServer creates an MCP server with all tools registered.
-func NewServer(deps Deps) *server.MCPServer {
+// NewServer creates an MCP server with all tools registered. The version is
+// injected by the caller (typically internal/version.Version) so it tracks the
+// build rather than a hardcoded constant.
+func NewServer(deps Deps, version string) *server.MCPServer {
 	s := server.NewMCPServer(
 		"cobalt-dingo",
-		"0.5.0",
+		version,
 		server.WithToolCapabilities(true),
 	)
 	registerAPTools(s, deps)
