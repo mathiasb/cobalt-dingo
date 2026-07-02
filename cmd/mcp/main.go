@@ -12,6 +12,7 @@ import (
 	"github.com/mathiasb/cobalt-dingo/internal/config"
 	"github.com/mathiasb/cobalt-dingo/internal/domain"
 	mcpserver "github.com/mathiasb/cobalt-dingo/internal/mcp"
+	"github.com/mathiasb/cobalt-dingo/internal/version"
 )
 
 func main() {
@@ -45,7 +46,7 @@ func main() {
 		CompanyInf:  adapterfortnox.NewCompanyInfoAdapter(baseURL, tokenStore, readOnly),
 	}
 
-	s := mcpserver.NewServer(deps)
+	s := mcpserver.NewServer(deps, version.Version)
 
 	log.Info("cobalt-dingo MCP server starting", "transport", "stdio", "mode", cfg.Mode)
 	if err := server.ServeStdio(s); err != nil {

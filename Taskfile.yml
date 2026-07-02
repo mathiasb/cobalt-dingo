@@ -233,7 +233,7 @@ tasks:
   mcp:build:
     desc: Build MCP server binary
     cmds:
-      - go build -trimpath -ldflags="-s -w" -o bin/cobalt-dingo-mcp ./cmd/mcp
+      - go build -trimpath -ldflags="-s -w -X github.com/mathiasb/cobalt-dingo/internal/version.Version={{.VERSION}}" -o bin/cobalt-dingo-mcp ./cmd/mcp
 
   # ── Init ────────────────────────────────────────────────────────────────────
 
