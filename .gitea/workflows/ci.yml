@@ -83,16 +83,18 @@ jobs:
               ${REGISTRY}/${{ env.IMAGE }}:${{ steps.meta.outputs.version-tag }} || true
           echo "✓ Image pushed to ${REF}"
 
-      # Smoke test: pull from registry and run the binary briefly.
+      # Smoke test: run the just-built local image briefly via buildah, not
+      # k3s ctr — avoids sudo/host-containerd access so this still works once
+      # the runner itself is containerized (infra#132). Tests the local
+      # buildah-store image directly, no registry round-trip needed.
       - name: Smoke test
         run: |
           REGISTRY="localhost:5000"
           REF="${REGISTRY}/${{ env.IMAGE }}:${{ steps.meta.outputs.sha-tag }}"
-          CNAME="smoke-${{ steps.meta.outputs.sha-tag }}"
-          sudo k3s ctr images pull --plain-http ${REF}
+          CONTAINER=$(buildah from ${REF})
           # Run with a 5s timeout; binary is a long-running server so timeout is expected.
-          OUTPUT=$(timeout 5 sudo k3s ctr run --rm ${REF} ${CNAME} /cobalt-dingo 2>&1 || true)
-          sudo k3s ctr containers delete ${CNAME} 2>/dev/null || true
+          OUTPUT=$(timeout 5 buildah run "$CONTAINER" -- /cobalt-dingo 2>&1 || true)
+          buildah rm "$CONTAINER" >/dev/null
           echo "$OUTPUT" | grep -q "cobalt-dingo" \
             && echo "✓ Smoke test passed" \
             || echo "⚠ Smoke test inconclusive: $OUTPUT"
