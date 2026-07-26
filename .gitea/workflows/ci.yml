@@ -87,14 +87,28 @@ jobs:
       # k3s ctr — avoids sudo/host-containerd access so this still works once
       # the runner itself is containerized (infra#132). Tests the local
       # buildah-store image directly, no registry round-trip needed.
+      #
+      # Bare `/cobalt-dingo` (no subcommand) runs the long-running server. A
+      # plain `timeout N buildah run` does NOT reliably kill that: it only
+      # signals the `buildah run` wrapper, and the actual container process
+      # can survive that and keep the output pipe open, hanging the whole
+      # job — hit this live on tapir's identical pattern (14min hang,
+      # infra#132). Backgrounding the run + `buildah rm -f` decouples "is
+      # the script blocked" from "did the process exit" — rm -f forcibly
+      # tears down the container regardless of wrapper state.
       - name: Smoke test
         run: |
           REGISTRY="localhost:5000"
           REF="${REGISTRY}/${{ env.IMAGE }}:${{ steps.meta.outputs.sha-tag }}"
           CONTAINER=$(buildah from ${REF})
-          # Run with a 5s timeout; binary is a long-running server so timeout is expected.
-          OUTPUT=$(timeout 5 buildah run "$CONTAINER" -- /cobalt-dingo 2>&1 || true)
-          buildah rm "$CONTAINER" >/dev/null
+          LOG=$(mktemp)
+          buildah run "$CONTAINER" -- /cobalt-dingo > "$LOG" 2>&1 &
+          RUNPID=$!
+          sleep 5
+          kill -9 "$RUNPID" 2>/dev/null || true
+          wait "$RUNPID" 2>/dev/null || true
+          buildah rm -f "$CONTAINER" >/dev/null 2>&1 || true
+          OUTPUT=$(cat "$LOG"); rm -f "$LOG"
           echo "$OUTPUT" | grep -q "cobalt-dingo" \
             && echo "✓ Smoke test passed" \
             || echo "⚠ Smoke test inconclusive: $OUTPUT"
