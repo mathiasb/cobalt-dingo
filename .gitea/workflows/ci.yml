@@ -64,54 +64,61 @@ jobs:
             echo "version-tag=${REF#refs/tags/}" >> "$GITHUB_OUTPUT"
           fi
 
+      # infra#241: this was the LAST repo still building with rootless buildah
+      # on the gitea-runner, and it survived only by luck — golang:1.26-alpine
+      # has no layer that chowns outside the single uid/gid mapping the pod's
+      # securityContext allows (drop ALL capabilities, allowPrivilegeEscalation:
+      # false, both deliberate — the pod holds CI secrets). Every other repo on
+      # this runner has already hit the wall and moved: dispatch, tapir,
+      # brain-ingest-ntfy, parallax, macro-research (2026-08-17), agentsquad
+      # (infra#233), segment-embedder (infra#243). A base-image bump here would
+      # have been the next casualty.
+      #
+      # buildctl talks to koala's host buildkitd over the socket the runner pod
+      # already mounts, so the privileged layer work happens in buildkitd on the
+      # host and this pod's posture is irrelevant to whether the build succeeds.
+      #
+      # buildctl has no registry-push flag of its own: it writes an OCI archive
+      # and skopeo pushes it, which is why each tag is a copy of one build
+      # rather than a rebuild.
       - name: Build and push to local registry
         run: |
+          set -euo pipefail
+          BUILDKIT_HOST="unix:///run/buildkit/buildkitd.sock"
           REGISTRY="localhost:5000"
           REF="${REGISTRY}/${{ env.IMAGE }}:${{ steps.meta.outputs.sha-tag }}"
-          buildah build \
-            --label "org.opencontainers.image.revision=${{ github.sha }}" \
-            --label "org.opencontainers.image.source=${{ github.repositoryUrl }}" \
-            -t ${REF} \
-            -t ${REGISTRY}/${{ env.IMAGE }}:latest \
-            .
-          buildah push --tls-verify=false ${REF}
-          buildah push --tls-verify=false ${REGISTRY}/${{ env.IMAGE }}:latest
+          TAR_FILE="$(mktemp)"
+          trap 'rm -f "$TAR_FILE"' EXIT
+
+          buildctl --addr "$BUILDKIT_HOST" build \
+            --frontend dockerfile.v0 \
+            --local context=. \
+            --local dockerfile=. \
+            --opt label:org.opencontainers.image.revision="${{ github.sha }}" \
+            --opt label:org.opencontainers.image.source="${{ github.repositoryUrl }}" \
+            --output type=oci,dest="$TAR_FILE"
+
+          skopeo copy --dest-tls-verify=false \
+            oci-archive:"$TAR_FILE" docker://"${REF}"
+          skopeo copy --dest-tls-verify=false \
+            oci-archive:"$TAR_FILE" docker://"${REGISTRY}/${{ env.IMAGE }}:latest"
           # Tag semver if this is a release
-          [[ -n "${{ steps.meta.outputs.version-tag }}" ]] && \
-            buildah push --tls-verify=false \
-              ${REF} \
-              ${REGISTRY}/${{ env.IMAGE }}:${{ steps.meta.outputs.version-tag }} || true
+          if [[ -n "${{ steps.meta.outputs.version-tag }}" ]]; then
+            skopeo copy --dest-tls-verify=false \
+              oci-archive:"$TAR_FILE" \
+              docker://"${REGISTRY}/${{ env.IMAGE }}:${{ steps.meta.outputs.version-tag }}"
+          fi
           echo "✓ Image pushed to ${REF}"
 
-      # Smoke test: run the just-built local image briefly via buildah, not
-      # k3s ctr — avoids sudo/host-containerd access so this still works once
-      # the runner itself is containerized (infra#132). Tests the local
-      # buildah-store image directly, no registry round-trip needed.
-      #
-      # Bare `/cobalt-dingo` (no subcommand) runs the long-running server. A
-      # plain `timeout N buildah run` does NOT reliably kill that: it only
-      # signals the `buildah run` wrapper, and the actual container process
-      # can survive that and keep the output pipe open, hanging the whole
-      # job — hit this live on tapir's identical pattern (14min hang,
-      # infra#132). Backgrounding the run + `buildah rm -f` decouples "is
-      # the script blocked" from "did the process exit" — rm -f forcibly
-      # tears down the container regardless of wrapper state.
-      - name: Smoke test
-        run: |
-          REGISTRY="localhost:5000"
-          REF="${REGISTRY}/${{ env.IMAGE }}:${{ steps.meta.outputs.sha-tag }}"
-          CONTAINER=$(buildah from ${REF})
-          LOG=$(mktemp)
-          buildah run "$CONTAINER" -- /cobalt-dingo > "$LOG" 2>&1 &
-          RUNPID=$!
-          sleep 5
-          kill -9 "$RUNPID" 2>/dev/null || true
-          wait "$RUNPID" 2>/dev/null || true
-          buildah rm -f "$CONTAINER" >/dev/null 2>&1 || true
-          OUTPUT=$(cat "$LOG"); rm -f "$LOG"
-          echo "$OUTPUT" | grep -q "cobalt-dingo" \
-            && echo "✓ Smoke test passed" \
-            || echo "⚠ Smoke test inconclusive: $OUTPUT"
+      # The buildah smoke test that used to sit here is gone with the buildctl
+      # migration: `buildah from ${REF}` would pull the image back into the
+      # pod's buildah store and hit the exact uid/gid wall the migration exists
+      # to avoid, failing the job for a reason unrelated to the image. The
+      # deploy job's `Verify rollout` is the stronger check anyway — it requires
+      # the real pod to reach Ready in-cluster, not just the entrypoint to print
+      # its own name for 5s. Tag builds lose their only image-level check
+      # (deploy is main-push only); accepted, since a tag is always cut from a
+      # main commit that already deployed. Same trade as tapir's ci.yml.
 
   # ── 3. Deploy via infra repo + Flux ─────────────────────────────────────────
   deploy:
