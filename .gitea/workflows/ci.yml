@@ -245,40 +245,33 @@ jobs:
       # act_runner substitutes ${{ }} before passing the script to bash.
       # Gitea secrets are still named FORTNOX_CLIENT_ID etc; the workflow
       # maps them onto the new FORTNOX_SANDBOX_* keys consumed by config.Load.
+      # Static sandbox credentials come from Gitea Actions secrets; the live
+      # OAuth token comes from postgres via cmd/e2e-token, which connects with
+      # DATABASE_URL (also a Gitea secret) instead of reading the cluster.
+      #
+      # This used to run `kubectl get secret cobalt-dingo-secrets` and
+      # `kubectl exec -n databases <pg-pod> -- psql`. That worked while the
+      # runner was a host process with an admin kubeconfig; since it moved into
+      # a pod with its own ServiceAccount (infra 949b333) it has neither
+      # permission, and the step failed Forbidden on the first push after — see
+      # infra#241's thread. Granting them would have given every CI job in every
+      # dispatch-allowlisted repo an exec shell on the shared postgres pod, so
+      # the credential moved to CI instead of the permission moving to CI.
       - name: Write credentials
+        env:
+          DATABASE_URL: ${{ secrets.COBALT_DINGO_DATABASE_URL }}
         run: |
+          set -euo pipefail
           echo 'FORTNOX_SANDBOX_CLIENT_ID=${{ secrets.FORTNOX_CLIENT_ID }}'         > .env
           echo 'FORTNOX_SANDBOX_CLIENT_SECRET=${{ secrets.FORTNOX_CLIENT_SECRET }}' >> .env
           echo 'FORTNOX_SANDBOX_REDIRECT_URI=http://localhost:8080/callback'        >> .env
           echo 'FORTNOX_SANDBOX_SCOPES="companyinformation bookkeeping customer invoice supplier supplierinvoice currency project costcenter assets settings"' >> .env
           echo 'FORTNOX_SANDBOX_INVOICE_INBOX=${{ secrets.FORTNOX_INVOICE_INBOX }}' >> .env
-          # Read live token from postgres — write the FULL token (access_token +
-          # actual expires_at) so CI can use it directly without refreshing.
-          # Forcing expires_at=2000 caused CI to always refresh on first use,
-          # racing with the running pod which also holds the same refresh token.
-          # Runner is on koala which has kubectl access to the cluster.
-          DB_URL=$(kubectl get secret cobalt-dingo-secrets -n cobalt-dingo \
-            -o jsonpath='{.data.DATABASE_URL}' | base64 -d)
-          TOKEN_JSON=$(kubectl exec -n databases \
-            $(kubectl get pod -n databases -l app=postgres18 \
-              -o jsonpath='{.items[0].metadata.name}') \
-            -- psql "$DB_URL" -t -A \
-            -c "SELECT json_build_object('access_token',access_token,'refresh_token',refresh_token,'token_type','bearer','expires_at',to_char(expires_at AT TIME ZONE 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"')) FROM fortnox_tokens WHERE tenant_id LIKE '%:sandbox' ORDER BY expires_at DESC LIMIT 1;")
-          echo "$TOKEN_JSON" > .fortnox-tokens-sandbox.json
-          chmod 600 .fortnox-tokens-sandbox.json
-          # Capture the pre-run refresh token for the optimistic-lock (CAS)
-          # write-back after the run — see "Persist refreshed token" (#37).
-          # Read the raw column, NOT the json_build_object output: postgres emits
-          # spaced JSON ("key" : "val"), which a naive JSON regex misses (that
-          # silently no-op'd the first write-back). Never echoed.
-          kubectl exec -n databases \
-            $(kubectl get pod -n databases -l app=postgres18 \
-              -o jsonpath='{.items[0].metadata.name}') \
-            -- psql "$DB_URL" -t -A \
-            -c "SELECT refresh_token FROM fortnox_tokens WHERE tenant_id LIKE '%:sandbox' ORDER BY expires_at DESC LIMIT 1;" \
-            | tr -d '[:space:]' > .old-refresh
-          chmod 600 .old-refresh
-          echo ".env lines: $(wc -l < .env)  token bytes: $(wc -c < .fortnox-tokens-sandbox.json)"
+          # Writes .fortnox-tokens-sandbox.json (0600) with the real expires_at,
+          # plus .old-refresh for the post-run CAS write-back. Token values are
+          # never printed — the command reports lengths and timestamps only.
+          go run ./cmd/e2e-token fetch
+          echo ".env lines: $(wc -l < .env)"
 
       # Reset sandbox to a known state before seeding. FORTNOX_MODE is set
       # explicitly per-step so a stray env in the runner cannot misroute.
@@ -315,29 +308,17 @@ jobs:
       # teardown/seed. Non-fatal: a failed write-back must not red a green E2E.
       - name: Persist refreshed token to postgres
         if: always()
+        env:
+          DATABASE_URL: ${{ secrets.COBALT_DINGO_DATABASE_URL }}
         run: |
-          [ -f .fortnox-tokens-sandbox.json ] || { echo "no token file — skip"; exit 0; }
-          OLD_RT=$(cat .old-refresh 2>/dev/null || true)
-          NEW_AT=$(sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p' .fortnox-tokens-sandbox.json)
-          NEW_RT=$(sed -n 's/.*"refresh_token":"\([^"]*\)".*/\1/p' .fortnox-tokens-sandbox.json)
-          NEW_EXP=$(sed -n 's/.*"expires_at":"\([^"]*\)".*/\1/p' .fortnox-tokens-sandbox.json)
-          if [ -z "$NEW_RT" ] || [ "$NEW_RT" = "$OLD_RT" ]; then
-            echo "sandbox token unchanged — no write-back needed"; exit 0
-          fi
-          DB_URL=$(kubectl get secret cobalt-dingo-secrets -n cobalt-dingo \
-            -o jsonpath='{.data.DATABASE_URL}' | base64 -d)
-          PG=$(kubectl get pod -n databases -l app=postgres18 -o jsonpath='{.items[0].metadata.name}')
-          # Values go to a 0600 temp file then over kubectl-exec stdin — never in
-          # argv or logs. Dollar-quoted so token punctuation can't break the SQL.
-          SQLF=$(mktemp); chmod 600 "$SQLF"
-          printf 'UPDATE fortnox_tokens SET access_token=$$%s$$, refresh_token=$$%s$$, expires_at=$$%s$$, updated_at=NOW() WHERE tenant_id LIKE $$%%:sandbox$$ AND refresh_token=$$%s$$;\n' \
-            "$NEW_AT" "$NEW_RT" "$NEW_EXP" "$OLD_RT" > "$SQLF"
-          if kubectl exec -i -n databases "$PG" -- psql "$DB_URL" -v ON_ERROR_STOP=1 -q < "$SQLF" >/dev/null; then
-            echo "✓ persisted rotated sandbox token back to postgres (CAS on prior refresh_token)"
-          else
-            echo "⚠ token write-back failed — next run may need re-auth (#37)"
-          fi
-          shred -u "$SQLF" 2>/dev/null || rm -f "$SQLF"
+          set -euo pipefail
+          # Compare-and-set on the refresh token read at fetch time: if the
+          # running pod refreshed concurrently, the UPDATE matches no row and
+          # leaves that newer token alone rather than clobbering it. Parameter
+          # binding replaces the old dollar-quoted SQL built with printf, so
+          # token punctuation can no longer break (or inject into) the
+          # statement, and no value reaches argv.
+          go run ./cmd/e2e-token persist
 
   # ── 5. Mirror to GitHub ─────────────────────────────────────────────────────
   mirror:
