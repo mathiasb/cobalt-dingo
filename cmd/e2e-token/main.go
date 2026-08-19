@@ -158,6 +158,15 @@ func persist(db *sql.DB) error {
 		return nil
 	}
 
+	// An empty prior refresh token is never a legitimate CAS condition: it binds
+	// "" into the WHERE clause, matches nothing, and reports the benign
+	// concurrent-refresh outcome — exit 0, CI green, rotated token silently
+	// lost. That is the exact failure #41 was filed to remove, one branch over
+	// (found by adversarial verification 2026-08-19).
+	if strings.TrimSpace(string(oldRT)) == "" {
+		return fmt.Errorf("no prior refresh token recorded (%s missing or empty): refusing a compare-and-set that cannot match, the rotated token would be lost silently", oldRTFile)
+	}
+
 	if err := writeBack(db, tok, strings.TrimSpace(string(oldRT))); err != nil {
 		return err
 	}
@@ -184,6 +193,9 @@ type execer interface {
 // That is the same silent-success class dispatch#33/#41 are about, on the money
 // path: a job whose failure mode is indistinguishable from success.
 func writeBack(db execer, tok token, oldRefresh string) error {
+	if strings.TrimSpace(oldRefresh) == "" {
+		return fmt.Errorf("refusing to compare-and-set against an empty prior refresh token: it can never match, so the rotated token would be lost while reporting success")
+	}
 	res, err := db.Exec(
 		`UPDATE fortnox_tokens
 		    SET access_token = $1, refresh_token = $2, expires_at = $3, updated_at = NOW()

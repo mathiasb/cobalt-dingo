@@ -105,3 +105,18 @@ func TestWriteBack_DatabaseErrorIsReturned(t *testing.T) {
 		t.Fatalf("error should carry the cause, got: %v", err)
 	}
 }
+
+// An empty prior refresh token binds "" as the CAS condition, matches no row,
+// and reports the benign "concurrent refresh" outcome — so the command exits 0
+// and CI goes green while the rotated token is gone. Same silent loss #41 was
+// filed to remove, one branch over.
+func TestWriteBack_EmptyPriorTokenIsRefused(t *testing.T) {
+	f := &fakeExecer{rows: 0}
+	err := writeBack(f, token{RefreshToken: "new-rt"}, "")
+	if err == nil {
+		t.Fatal("an empty CAS condition must be refused, not reported as a lost race")
+	}
+	if f.calls != 0 {
+		t.Fatalf("no UPDATE should be attempted, got %d", f.calls)
+	}
+}
