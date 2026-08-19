@@ -158,18 +158,41 @@ func persist(db *sql.DB) error {
 		return nil
 	}
 
+	if err := writeBack(db, tok, strings.TrimSpace(string(oldRT))); err != nil {
+		return err
+	}
+	return nil
+}
+
+// execer is the slice of *sql.DB the write-back needs, so the compare-and-set
+// can be tested without a database. The CAS is the part that can lose a token;
+// before cobalt-dingo#41 it had no test, while the commit shipping it claimed
+// otherwise.
+type execer interface {
+	Exec(query string, args ...any) (sql.Result, error)
+}
+
+// writeBack persists a rotated token, guarded by a compare-and-set on the
+// refresh token read at fetch time.
+//
+// Zero rows affected is a SUCCESS: it means the running pod refreshed
+// concurrently and holds a newer token, which must not be clobbered.
+//
+// A database error is a FAILURE and is returned. It used to be printed and
+// swallowed, so the command exited 0, CI went green, and the rotated token was
+// simply gone — the next run then needed a manual re-auth with no clue why.
+// That is the same silent-success class dispatch#33/#41 are about, on the money
+// path: a job whose failure mode is indistinguishable from success.
+func writeBack(db execer, tok token, oldRefresh string) error {
 	res, err := db.Exec(
 		`UPDATE fortnox_tokens
 		    SET access_token = $1, refresh_token = $2, expires_at = $3, updated_at = NOW()
 		  WHERE tenant_id LIKE $4
 		    AND refresh_token = $5`,
-		tok.AccessToken, tok.RefreshToken, tok.ExpiresAt, sandboxTenant, strings.TrimSpace(string(oldRT)),
+		tok.AccessToken, tok.RefreshToken, tok.ExpiresAt, sandboxTenant, oldRefresh,
 	)
 	if err != nil {
-		// Not fatal: a failed write-back costs a re-auth next run (#37), it
-		// does not invalidate the run that just passed.
-		fmt.Printf("⚠ token write-back failed — next run may need re-auth (#37): %v\n", err)
-		return nil
+		return fmt.Errorf("persist rotated sandbox token (the rotated token is now lost; the next run needs re-auth): %w", err)
 	}
 
 	n, err := res.RowsAffected()
