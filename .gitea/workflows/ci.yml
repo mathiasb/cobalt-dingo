@@ -116,6 +116,13 @@ jobs:
           DEPLOY_KEY: ${{ secrets.INFRA_DEPLOY_KEY }}
         run: |
           set -euo pipefail
+          # infra#311: fail on an empty tag BEFORE patching anything. The
+          # grep verification further down CANNOT catch it -- with IMAGE_TAG
+          # empty its pattern matches the very corruption it exists to reject.
+          # The result is `image: <repo>:` in the manifest, which is invalid
+          # YAML, so Flux fails the ENTIRE apps Kustomization and every app
+          # stops reconciling, not just this one. That happened on 2026-08-25.
+          [ -n "${IMAGE_TAG:-}" ] || { echo "IMAGE_TAG is empty - refusing to patch"; exit 1; }
 
           mkdir -p ~/.ssh
           echo "$DEPLOY_KEY" > ~/.ssh/id_infra
