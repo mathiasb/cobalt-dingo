@@ -103,17 +103,13 @@ jobs:
           fi
           echo "✓ Image pushed to ${REF}"
 
-      - name: Smoke test
-        run: |
-          REGISTRY="localhost:5000"
-          REF="${REGISTRY}/${{ env.IMAGE }}:${{ steps.meta.outputs.sha-tag }}"
-          CNAME="smoke-${{ steps.meta.outputs.sha-tag }}"
-          sudo k3s ctr images pull --plain-http ${REF}
-          OUTPUT=$(timeout 5 sudo k3s ctr run --rm ${REF} ${CNAME} /coo-agent-server 2>&1 || true)
-          sudo k3s ctr containers delete ${CNAME} 2>/dev/null || true
-          echo "$OUTPUT" | grep -q "listening\|coo-agent" \
-            && echo "✓ Smoke test passed" \
-            || echo "⚠ Smoke test inconclusive: $OUTPUT"
+      # No smoke test here. The old one ran `sudo k3s ctr run` against the host's
+      # containerd: written for the Arch host runner, impossible in the
+      # containerized runner (infra#233) which has no sudo, no ctr and no
+      # containerd socket -- it failed with `sudo: command not found` the moment
+      # infra#241's buildctl migration let the build reach it. The deploy job's
+      # `Verify rollout` + `Confirm pod running new image` cover the same ground
+      # more strongly, which is why tapir dropped its smoke test too (infra#241).
 
       # Verify MCP binary cross-compiles for all deployment targets.
       - uses: actions/setup-go@v5
