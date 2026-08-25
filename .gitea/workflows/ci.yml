@@ -66,20 +66,41 @@ jobs:
 
       - name: Build and push to local registry
         run: |
+          set -e
+          # infra#241: buildctl, not buildah. Rootless buildah in gitea-runner's
+          # hardened securityContext (capabilities drop ALL,
+          # allowPrivilegeEscalation false) cannot remap the UID/GID range
+          # newuidmap/newgidmap need on a fresh base-image pull, and the pod has
+          # no OCI runtime at all -- so this Dockerfile's RUN steps could not
+          # execute there either. buildctl is a thin client that hands the build
+          # to the host's buildkitd over a socket, so the privileged layer work
+          # happens on the host and this pod's securityContext stops being in
+          # the picture. Same pattern as mathias/infra's segment-embedder.yml.
+          BUILDKIT_HOST="unix:///run/buildkit/buildkitd.sock"
           REGISTRY="localhost:5000"
           REF="${REGISTRY}/${{ env.IMAGE }}:${{ steps.meta.outputs.sha-tag }}"
-          buildah build \
-            --label "org.opencontainers.image.revision=${{ github.sha }}" \
-            --label "org.opencontainers.image.source=${{ github.repositoryUrl }}" \
-            -t ${REF} \
-            -t ${REGISTRY}/${{ env.IMAGE }}:latest \
-            .
-          buildah push --tls-verify=false ${REF}
-          buildah push --tls-verify=false ${REGISTRY}/${{ env.IMAGE }}:latest
-          [[ -n "${{ steps.meta.outputs.version-tag }}" ]] && \
-            buildah push --tls-verify=false \
-              ${REF} \
-              ${REGISTRY}/${{ env.IMAGE }}:${{ steps.meta.outputs.version-tag }} || true
+          TAR_FILE="$(mktemp)"
+          trap 'rm -f "$TAR_FILE"' EXIT
+
+          buildctl --addr "$BUILDKIT_HOST" build \
+            --frontend dockerfile.v0 \
+            --local context=. \
+            --local dockerfile=. \
+            --opt label:org.opencontainers.image.revision="${{ github.sha }}" \
+            --opt label:org.opencontainers.image.source="${{ github.repositoryUrl }}" \
+            --output type=oci,dest="$TAR_FILE"
+
+          # buildctl has no registry-push equivalent to `buildah push`; skopeo
+          # copies the OCI archive up, once per tag.
+          skopeo copy --dest-tls-verify=false \
+            oci-archive:"$TAR_FILE" docker://${REF}
+          skopeo copy --dest-tls-verify=false \
+            oci-archive:"$TAR_FILE" docker://${REGISTRY}/${{ env.IMAGE }}:latest
+          if [ -n "${{ steps.meta.outputs.version-tag }}" ]; then
+            skopeo copy --dest-tls-verify=false \
+              oci-archive:"$TAR_FILE" \
+              docker://${REGISTRY}/${{ env.IMAGE }}:${{ steps.meta.outputs.version-tag }}
+          fi
           echo "✓ Image pushed to ${REF}"
 
       - name: Smoke test
