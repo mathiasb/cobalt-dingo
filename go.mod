@@ -1,6 +1,6 @@
 module github.com/mathiasb/coo-agent
 
-go 1.25.11
+go 1.25.13
 
 require (
 	github.com/a-h/templ v0.3.1020
