@@ -40,6 +40,15 @@ jobs:
             | sh -s -- -b "$(go env GOPATH)/bin" v2.11.4
           golangci-lint --version
 
+      # `task check` runs govulncheck, which the containerized runner
+      # (infra#233) does not ship -- the "Verify toolchain" step above tolerates
+      # its absence with `|| true`, so the job got as far as `task check` and
+      # died there on exit 127. Install it per run, same as golangci-lint.
+      - name: Install govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck -version
+
       - name: Run checks
         run: task check
 
