@@ -82,33 +82,16 @@ jobs:
       # and skopeo pushes it, which is why each tag is a copy of one build
       # rather than a rebuild.
       - name: Build and push to local registry
-        run: |
-          set -euo pipefail
-          BUILDKIT_HOST="unix:///run/buildkit/buildkitd.sock"
-          REGISTRY="localhost:5000"
-          REF="${REGISTRY}/${{ env.IMAGE }}:${{ steps.meta.outputs.sha-tag }}"
-          TAR_FILE="$(mktemp)"
-          trap 'rm -f "$TAR_FILE"' EXIT
-
-          buildctl --addr "$BUILDKIT_HOST" build \
-            --frontend dockerfile.v0 \
-            --local context=. \
-            --local dockerfile=. \
-            --opt label:org.opencontainers.image.revision="${{ github.sha }}" \
-            --opt label:org.opencontainers.image.source="${{ github.repositoryUrl }}" \
-            --output type=oci,dest="$TAR_FILE"
-
-          skopeo copy --dest-tls-verify=false \
-            oci-archive:"$TAR_FILE" docker://"${REF}"
-          skopeo copy --dest-tls-verify=false \
-            oci-archive:"$TAR_FILE" docker://"${REGISTRY}/${{ env.IMAGE }}:latest"
-          # Tag semver if this is a release
-          if [[ -n "${{ steps.meta.outputs.version-tag }}" ]]; then
-            skopeo copy --dest-tls-verify=false \
-              oci-archive:"$TAR_FILE" \
-              docker://"${REGISTRY}/${{ env.IMAGE }}:${{ steps.meta.outputs.version-tag }}"
-          fi
-          echo "✓ Image pushed to ${REF}"
+      # infra#309: implementation lives in .gitea/build-image.sh, a
+      # byte-identical copy of mathias/infra's ci-templates/build-image.sh.
+      # Do not edit it here -- edit the canonical file, run `task ci:sync`,
+      # and infra's drift gate names any repo still carrying an old copy.
+        env:
+          SHA_TAG: ${{ steps.meta.outputs.sha-tag }}
+          VERSION_TAG: ${{ steps.meta.outputs.version-tag }}
+          GIT_SHA: ${{ github.sha }}
+          IMAGE_SOURCE: ${{ github.repositoryUrl }}
+        run: bash .gitea/build-image.sh
 
       # The buildah smoke test that used to sit here is gone with the buildctl
       # migration: `buildah from ${REF}` would pull the image back into the
