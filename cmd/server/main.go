@@ -62,6 +62,7 @@ func main() {
 		enricher      domain.SupplierEnricher
 		batchSvc      *domain.BatchService
 		erpWriter     domain.ERPWriter
+		tokenStore    domain.TokenStore
 	)
 
 	// Wire postgres adapters when DATABASE_URL is set.
@@ -77,6 +78,7 @@ func main() {
 		}
 		batchRepo = postgres.NewBatchRepo(pgStore)
 		tenantRepo = postgres.NewTenantRepo(pgStore)
+		tokenStore = postgres.NewTokenStore(pgStore)
 		log.Info("postgres connected")
 	}
 
@@ -86,10 +88,7 @@ func main() {
 		invoiceSource = fake.InvoiceSource{}
 		enricher = fake.SupplierEnricher{}
 	} else {
-		var tokenStore domain.TokenStore
-		if pgStore != nil {
-			tokenStore = postgres.NewTokenStore(pgStore)
-		} else {
+		if tokenStore == nil {
 			tokenStore = file.NewTokenStore(cfg.Mode.TokenFile())
 		}
 		connector := adapterfortnox.NewConnector(cfg, tokenStore, log)
@@ -139,7 +138,6 @@ func main() {
 	// Fortnox web-based OAuth connect (per user, per mode).
 	// Loaded from all configured modes so users can connect sandbox + production.
 	if pgStore != nil {
-		tokenStore := postgres.NewTokenStore(pgStore)
 		connector := ui.NewFortnoxConnector(config.LoadAllModes(), tokenStore, tenantRepo, log)
 		connector.RegisterRoutes(mux)
 		log.Info("fortnox connect routes registered")
@@ -150,12 +148,6 @@ func main() {
 
 	llmCfg := config.LoadLLM()
 	if llmCfg.IsEnabled() && fortnoxEnabled {
-		var tokenStore domain.TokenStore
-		if pgStore != nil {
-			tokenStore = postgres.NewTokenStore(pgStore)
-		} else {
-			tokenStore = file.NewTokenStore(cfg.Mode.TokenFile())
-		}
 		baseURL := cfg.BaseURL()
 		readOnly := !cfg.AllowsWrites
 		gl := adapterfortnox.NewGeneralLedgerAdapter(baseURL, tokenStore, readOnly)
