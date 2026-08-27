@@ -27,9 +27,12 @@ name: agent run
 # issue.
 #
 # REQUIRED SECRETS (not yet set on this repo — see the issue that tracks this):
-#   LITELLM_API_KEY   — gateway key
-#   LITELLM_BASE_URL  — e.g. http://koala:30401/v1 (the in-cluster
-#                       litellm.ai-stack.svc URL is NOT reachable from the runner)
+#   LITELLM_API_KEY   — gateway key (1Password: DMABE_LLMAPI_KEY / password)
+#   LITELLM_BASE_URL  — http://litellm.ai-stack.svc.cluster.local:4000/v1
+#
+# The runner is an in-cluster pod (`gitea-runner` namespace), so the service DNS
+# resolves and there are no NetworkPolicies in either namespace to block it.
+# This is the same URL the dispatch CronJob already uses successfully.
 
 on:
   issues:
