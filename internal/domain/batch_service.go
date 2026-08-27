@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 )
@@ -129,7 +130,7 @@ func (svc *BatchService) ConfirmExecution(ctx context.Context, tenantID TenantID
 	}
 
 	if len(errs) > 0 {
-		return fmt.Errorf("confirm execution partial failure (%d errors): %w", len(errs), errs[0])
+		return fmt.Errorf("confirm execution partial failure (%d errors): %w", len(errs), errors.Join(errs...))
 	}
 	return nil
 }
