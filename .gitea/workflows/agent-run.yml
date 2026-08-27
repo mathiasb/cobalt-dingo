@@ -61,10 +61,17 @@ jobs:
       - name: Build the executor
         env:
           GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+        # The runner's filesystem PERSISTS between jobs — a fixed clone path
+        # works on the first run and fails on every one after with
+        # "destination path already exists". Unique dir per run; the binary
+        # path is a file so overwriting it is fine.
         run: |
+          set -euo pipefail
           git config --global credential.helper '!f() { echo username=ci; echo password=$GITEA_TOKEN; }; f'
-          git clone --depth 1 https://git.d-ma.be/mathias/dispatch.git /tmp/dispatch
-          cd /tmp/dispatch && go build -o /tmp/dispatch-bin ./cmd/dispatch
+          src="$(mktemp -d)"
+          git clone --depth 1 https://git.d-ma.be/mathias/dispatch.git "$src"
+          ( cd "$src" && go build -o /tmp/dispatch-bin ./cmd/dispatch )
+          /tmp/dispatch-bin run 2>&1 | head -1 || true
 
       - name: Run the agent
         env:
