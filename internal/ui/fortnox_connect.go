@@ -171,7 +171,7 @@ func (c *FortnoxConnector) callbackHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Exchange code for tokens via Fortnox token endpoint.
-	tok, err := exchangeFortnoxCode(r.Context(), cfg, code)
+	tok, err := exchangeFortnoxCodeFunc(r.Context(), cfg, code)
 	if err != nil {
 		c.log.Error("fortnox token exchange failed", "mode", mode, "err", err)
 		http.Error(w, "token exchange failed", http.StatusBadGateway)
@@ -199,7 +199,7 @@ func (c *FortnoxConnector) callbackHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	c.log.Info("fortnox connected", "tenant", tenantID, "mode", mode)
-	http.Redirect(w, r, "/fortnox/?connected="+string(mode), http.StatusFound)
+	http.Redirect(w, r, "/fortnox/?connected="+string(mode), http.StatusSeeOther)
 }
 
 // statusHandler returns JSON with which modes have active tokens for the session user.
@@ -219,6 +219,8 @@ func (c *FortnoxConnector) statusHandler(w http.ResponseWriter, r *http.Request)
 	}
 	_, _ = fmt.Fprintf(w, "{%s}", strings.Join(parts, ","))
 }
+
+var exchangeFortnoxCodeFunc = exchangeFortnoxCode
 
 // exchangeFortnoxCode performs the OAuth2 code-for-token exchange with Fortnox.
 func exchangeFortnoxCode(ctx context.Context, cfg config.Fortnox, code string) (domain.OAuthToken, error) {

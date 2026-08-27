@@ -144,3 +144,27 @@ func TestDisconnectHandler_InvalidMode(t *testing.T) {
 	c.disconnectHandler(w, r)
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
+
+// TestCallbackHandler_ExchangesCodeAndRedirects verifies successful OAuth callback.
+func TestCallbackHandler_ExchangesCodeAndRedirects(t *testing.T) {
+	old := exchangeFortnoxCodeFunc
+	exchangeFortnoxCodeFunc = func(_ context.Context, _ config.Fortnox, _ string) (domain.OAuthToken, error) {
+		return domain.OAuthToken{AccessToken: "atok", RefreshToken: "rtok"}, nil
+	}
+	defer func() { exchangeFortnoxCodeFunc = old }()
+
+	store := newConnectorTokenStore()
+	c := newTestConnector(store)
+
+	r := requestWithSession("GET", "/fortnox/callback?code=abc123&state=sandbox", "user1")
+	w := httptest.NewRecorder()
+
+	c.callbackHandler(w, r)
+
+	assert.Equal(t, http.StatusSeeOther, w.Code)
+	assert.Contains(t, w.Header().Get("Location"), "connected=sandbox")
+
+	tok, err := store.Load(context.Background(), "user1:sandbox")
+	require.NoError(t, err)
+	assert.Equal(t, "atok", tok.AccessToken)
+}
