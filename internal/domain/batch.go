@@ -38,6 +38,6 @@ type BatchItem struct {
 	SupplierIBAN         string
 	SupplierBIC          string
 	Amount               Money
-	DueDate              string
+	DueDate              string   // YYYY-MM-DD; lexicographic comparison is valid for same-timezone dates
 	ExecutionRate        *float64 // TODO: replace with exact rational type before FX voucher work
 }

@@ -9,8 +9,8 @@ type CustomerInvoice struct {
 	CustomerName   string
 	Amount         Money
 	Balance        Money
-	DueDate        string
-	InvoiceDate    string
+	DueDate        string // YYYY-MM-DD; lexicographic comparison is valid for same-timezone dates
+	InvoiceDate    string // YYYY-MM-DD
 	Booked         bool
 	Cancelled      bool
 	Sent           bool
@@ -22,7 +22,7 @@ type SupplierPayment struct {
 	InvoiceNumber int
 	Amount        Money
 	CurrencyRate  float64
-	PaymentDate   string
+	PaymentDate   string // YYYY-MM-DD
 	Booked        bool
 }
 
@@ -31,7 +31,7 @@ type CustomerPayment struct {
 	PaymentNumber int
 	InvoiceNumber int
 	Amount        Money
-	PaymentDate   string
+	PaymentDate   string // YYYY-MM-DD
 	Booked        bool
 }
 
@@ -88,7 +88,7 @@ type Voucher struct {
 	Series          string
 	Number          int
 	Description     string
-	TransactionDate string
+	TransactionDate string // YYYY-MM-DD
 	Year            int
 	Rows            []VoucherRow
 }
@@ -111,8 +111,8 @@ type Project struct {
 	Number      string
 	Description string
 	Status      string
-	StartDate   string
-	EndDate     string
+	StartDate   string // YYYY-MM-DD
+	EndDate     string // YYYY-MM-DD
 }
 
 // CostCenter is a cost center.
@@ -127,7 +127,7 @@ type Asset struct {
 	ID                  int
 	Number              string
 	Description         string
-	AcquisitionDate     string
+	AcquisitionDate     string // YYYY-MM-DD
 	AcquisitionValue    Money
 	DepreciationMethod  string
 	DepreciationPercent float64

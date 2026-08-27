@@ -9,7 +9,7 @@ type SupplierInvoice struct {
 	SupplierNumber int
 	SupplierName   string
 	Amount         Money
-	DueDate        string
+	DueDate        string // YYYY-MM-DD; lexicographic comparison is valid for same-timezone dates
 }
 
 // IsForeignCurrency reports whether the invoice is denominated in a non-SEK currency.
