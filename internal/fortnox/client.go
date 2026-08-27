@@ -47,7 +47,7 @@ func NewClient(baseURL, token string, readOnly bool) *Client {
 	return &Client{
 		baseURL:    baseURL,
 		token:      token,
-		httpClient: &http.Client{},
+		httpClient: &http.Client{Timeout: 30 * time.Second},
 		readOnly:   readOnly,
 	}
 }
