@@ -1,0 +1,90 @@
+name: agent run
+
+# Prototype of the agent-in-CI substrate (2026-08-27).
+#
+# The bet: the trigger, RBAC, audit trail, isolation and rollback should come
+# from the CI platform rather than from a bespoke dispatcher. dispatch's watcher
+# reimplemented all five and produced three control-plane defects in one day of
+# real use (dispatch#53, #54, #55) plus an eight-week silent outage. Its
+# EXECUTOR, by contrast, produced five commits with green CI — so this keeps the
+# executor (`dispatch run`) and deletes the rest.
+#
+# What the platform gives us for free here:
+#   trigger   — issues.labeled, no polling CronJob to go silently dead
+#   RBAC      — who may apply the label is Gitea's permission model
+#   audit     — one Actions run per attempt, linked to the issue, retained
+#   isolation — the runner, not a shared long-lived pod
+#   rollback  — revert the PR
+#
+# THE AGENT NEVER PUSHES. It edits files in the checkout; this job creates the
+# branch, commits, and opens the PR. That is the important difference from the
+# issue flow, where the agent held a push credential and pushed to main. Agent
+# edits to workflows or tests now arrive as a reviewable diff behind branch
+# protection (dispatch#55).
+#
+# Deliberately NOT `status:dispatch`: this repo is still in dispatch-repos.txt,
+# so reusing that label would fire the CronJob and this workflow for the same
+# issue.
+#
+# REQUIRED SECRETS (not yet set on this repo — see the issue that tracks this):
+#   LITELLM_API_KEY   — gateway key
+#   LITELLM_BASE_URL  — e.g. http://koala:30401/v1 (the in-cluster
+#                       litellm.ai-stack.svc URL is NOT reachable from the runner)
+
+on:
+  issues:
+    types: [labeled]
+
+concurrency:
+  # One agent run per issue. Also stops a label-flap from starting a fleet.
+  group: agent-run-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  run:
+    if: github.event.label.name == 'agent/ci-run'
+    runs-on: self-hosted
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build the executor
+        env:
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+        run: |
+          git config --global credential.helper '!f() { echo username=ci; echo password=$GITEA_TOKEN; }; f'
+          git clone --depth 1 https://git.d-ma.be/mathias/dispatch.git /tmp/dispatch
+          cd /tmp/dispatch && go build -o /tmp/dispatch-bin ./cmd/dispatch
+
+      - name: Run the agent
+        env:
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          LITELLM_BASE_URL: ${{ secrets.LITELLM_BASE_URL }}
+          LITELLM_API_KEY: ${{ secrets.LITELLM_API_KEY }}
+          LITELLM_EXECUTORS: "kimi=berget/kimi-k2.6,qwen=koala/qwen36-35b-a3b,glm=berget/glm-4.7-fp8"
+          DISPATCH_KIMI_MAX_TURNS: "80"
+        # Exit status is the contract: non-zero means no work happened, and the
+        # job stops rather than opening an empty PR.
+        run: /tmp/dispatch-bin run ${{ github.repository }} ${{ github.event.issue.number }} .
+
+      - name: Open a PR if the agent changed anything
+        env:
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+        run: |
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "agent made no changes — nothing to open"
+            exit 0
+          fi
+          branch="agent/issue-${{ github.event.issue.number }}"
+          git config user.name  "agent-ci"
+          git config user.email "agent-ci@d-ma.be"
+          git checkout -b "$branch"
+          git add -A
+          git commit -m "agent: address #${{ github.event.issue.number }}" -m "Opened by the agent-run workflow. Closes nothing automatically — a human reviews, merges and closes."
+          git push origin "$branch"
+          curl -sS -X POST \
+            -H "Authorization: token $GITEA_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"head\":\"$branch\",\"base\":\"main\",\"title\":\"agent: #${{ github.event.issue.number }} ${{ github.event.issue.title }}\",\"body\":\"Opened by \`agent-run\` for #${{ github.event.issue.number }}.\\n\\nCI is the ground-truth verdict. A human reviews, merges and closes — this workflow does none of those.\"}" \
+            "https://git.d-ma.be/api/v1/repos/${{ github.repository }}/pulls"
