@@ -225,3 +225,44 @@ func TestLLM_IsEnabled(t *testing.T) {
 		})
 	}
 }
+
+// TestFortnox_BaseURL covers the injectable-host seam added for cobalt-dingo#30.
+// Production must keep resolving to the live Fortnox host with no configuration
+// present; an explicit override exists so integration tests can point the real
+// adapter.Connector at an httptest server.
+func TestFortnox_BaseURL(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  Fortnox
+		want string
+	}{
+		{"defaults to the live host", Fortnox{}, "https://api.fortnox.se"},
+		{"production mode is unchanged", Fortnox{Mode: ModeProduction}, "https://api.fortnox.se"},
+		{"sandbox shares the live host", Fortnox{Mode: ModeSandbox}, "https://api.fortnox.se"},
+		{"override wins when set", Fortnox{BaseURLOverride: "http://127.0.0.1:1234"}, "http://127.0.0.1:1234"},
+		{"empty override is ignored", Fortnox{BaseURLOverride: ""}, "https://api.fortnox.se"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, tt.cfg.BaseURL())
+		})
+	}
+}
+
+// TestLoad_DoesNotPopulateBaseURLOverride is the guard that keeps the test seam
+// from becoming a production redirect vector: no environment variable may ever
+// set BaseURLOverride, so a live process cannot be pointed away from Fortnox.
+func TestLoad_DoesNotPopulateBaseURLOverride(t *testing.T) {
+	t.Setenv("FORTNOX_MODE", "production")
+	t.Setenv("FORTNOX_PRODUCTION_CLIENT_ID", "id")
+	t.Setenv("FORTNOX_PRODUCTION_CLIENT_SECRET", "secret")
+	t.Setenv("FORTNOX_PRODUCTION_REDIRECT_URI", "https://example.com/callback")
+	t.Setenv("FORTNOX_BASE_URL", "http://evil.example.com")
+	t.Setenv("FORTNOX_BASE_URL_OVERRIDE", "http://evil.example.com")
+
+	cfg, err := Load()
+
+	require.NoError(t, err)
+	assert.Empty(t, cfg.BaseURLOverride)
+	assert.Equal(t, "https://api.fortnox.se", cfg.BaseURL())
+}

@@ -84,12 +84,22 @@ type Fortnox struct {
 	Scopes       string
 	InvoiceInbox string // Arkivplats email for incoming supplier invoices
 	AllowsWrites bool
+
+	// BaseURLOverride redirects API calls away from the live Fortnox host.
+	// It is a test-only seam (see adapter/fortnox connector integration
+	// tests) and is deliberately never populated from the environment by
+	// Load or LoadAllModes — a running process cannot be pointed elsewhere
+	// by configuration. Empty means the live host.
+	BaseURLOverride string
 }
 
 // BaseURL returns the Fortnox REST API host (no path suffix). Sandbox and
 // live use the same host — the environment is distinguished by the OAuth
 // credentials, not the URL.
 func (f Fortnox) BaseURL() string {
+	if f.BaseURLOverride != "" {
+		return f.BaseURLOverride
+	}
 	return "https://api.fortnox.se"
 }
 

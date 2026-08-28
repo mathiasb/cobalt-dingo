@@ -8,39 +8,48 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
+	adapterfortnox "github.com/mathiasb/cobalt-dingo/internal/adapter/fortnox"
 	"github.com/mathiasb/cobalt-dingo/internal/config"
 	"github.com/mathiasb/cobalt-dingo/internal/domain"
-	"github.com/mathiasb/cobalt-dingo/internal/fortnox"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// fortnoxClientAdapter wraps a real *fortnox.Client (pointed at an httptest
-// server) so it satisfies the domain ports the handler depends on. It exists
-// only in tests: it lets the handler drive the genuine Fortnox JSON decode
-// path — including FlexInt — without the production config.Fortnox.BaseURL()
-// hardcode that the real adapter.Connector is bound to.
-type fortnoxClientAdapter struct{ c *fortnox.Client }
+// stubTokenStore is a domain.TokenStore returning a fixed, valid token so the
+// real Connector's token-load path runs without touching disk or the network.
+type stubTokenStore struct{}
 
-func (a fortnoxClientAdapter) UnpaidInvoices(_ context.Context, _ domain.TenantID) ([]domain.SupplierInvoice, error) {
-	return a.c.UnpaidSupplierInvoices()
+func (stubTokenStore) Load(_ context.Context, _ domain.TenantID) (domain.OAuthToken, error) {
+	return domain.OAuthToken{
+		AccessToken:  "test-access-token",
+		RefreshToken: "test-refresh",
+		ExpiresAt:    time.Now().Add(24 * time.Hour),
+	}, nil
 }
 
-func (a fortnoxClientAdapter) SupplierPaymentDetails(_ context.Context, _ domain.TenantID, supplierNumber int) (string, string, error) {
-	return a.c.SupplierPaymentDetails(supplierNumber)
+func (stubTokenStore) Save(_ context.Context, _ domain.TenantID, _ domain.OAuthToken) error {
+	return nil
 }
+
+func (stubTokenStore) AtomicRefresh(_ context.Context, _ domain.TenantID, _, _ domain.OAuthToken) error {
+	return nil
+}
+
+func (stubTokenStore) Delete(_ context.Context, _ domain.TenantID) error { return nil }
 
 // newFortnoxBackedServer builds a Server whose InvoiceSource and
-// SupplierEnricher both delegate to a real fortnox.Client talking to the given
-// fake-Fortnox httptest server. batches and sessions are nil: the read path
-// (/invoices) touches neither.
+// SupplierEnricher are both the real adapter.Connector, pointed at the given
+// fake-Fortnox httptest server through the config base-URL override seam
+// (cobalt-dingo#30). batches and sessions are nil: the read path (/invoices)
+// touches neither.
 func newFortnoxBackedServer(t *testing.T, fortnoxURL string) *Server {
 	t.Helper()
-	client := fortnox.NewClient(fortnoxURL, "test-token", true)
-	adapter := fortnoxClientAdapter{c: client}
+	cfg := config.Fortnox{Mode: config.ModeProduction, BaseURLOverride: fortnoxURL}
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	return NewServer(config.Debtor{}, adapter, adapter, nil, nil, log)
+	conn := adapterfortnox.NewConnector(cfg, stubTokenStore{}, log)
+	return NewServer(config.Debtor{}, conn, conn, nil, nil, log)
 }
 
 // getInvoices drives a GET /invoices request through the full registered route
