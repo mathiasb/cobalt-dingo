@@ -45,13 +45,27 @@ concurrency:
 
 jobs:
   run:
-    # Gitea 1.27 does not populate `github.event.label` for issues.labeled the
-    # way GitHub does — the first run of this workflow was SKIPPED because of it.
-    # Reading the label array off the issue payload works under either shape, and
-    # the `||` keeps it correct if Gitea later gains the GitHub-compatible field.
-    if: >-
-      github.event.label.name == 'agent/ci-run' ||
-      contains(github.event.issue.labels.*.name, 'agent/ci-run')
+    # PAUSED 2026-09-03 (dispatch#67, risk/high). Run 5228 against cobalt-dingo#14
+    # proved "THE AGENT NEVER PUSHES" (line 19 above) false: the agent used the
+    # GITEA_TOKEN handed to the "Run the agent" step (line 78) to write straight
+    # to main via the gitea MCP write tool, bypassing the run_bash denylist that
+    # was supposed to be the only push-capable surface. The job's own diff check
+    # then correctly saw a clean tree and reported success — "no changes" and "a
+    # commit landed on main" were both true at once. That commit ran no CI at all
+    # (Gitea does not fire workflows for pushes made with the runner's automatic
+    # token).
+    #
+    # `if: false` is the whole fix for now: it disables this job regardless of
+    # the label, without touching GITEA_TOKEN itself (no rotation forced) and
+    # without deleting the file (the substrate — trigger/RBAC/audit/isolation —
+    # is sound per #67's own verdict; only the tool grant on top of it is not).
+    # Remove this line once #67's fix #1 lands: write tools off the executor in
+    # CI mode, verified by #67's fix #4 (assert origin/main did not move).
+    #
+    # Original condition, restore alongside the fix above:
+    #   github.event.label.name == 'agent/ci-run' ||
+    #   contains(github.event.issue.labels.*.name, 'agent/ci-run')
+    if: false
     runs-on: self-hosted
     timeout-minutes: 30
     steps:
