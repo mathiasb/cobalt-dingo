@@ -45,32 +45,41 @@ concurrency:
 
 jobs:
   run:
-    # PAUSED 2026-09-03 (dispatch#67, risk/high). Run 5228 against cobalt-dingo#14
-    # proved "THE AGENT NEVER PUSHES" (line 19 above) false: the agent used the
-    # GITEA_TOKEN handed to the "Run the agent" step (line 78) to write straight
-    # to main via the gitea MCP write tool, bypassing the run_bash denylist that
-    # was supposed to be the only push-capable surface. The job's own diff check
-    # then correctly saw a clean tree and reported success — "no changes" and "a
-    # commit landed on main" were both true at once. That commit ran no CI at all
-    # (Gitea does not fire workflows for pushes made with the runner's automatic
-    # token).
+    # RESUMED 2026-09-03 (dispatch#67, risk/high). Was `if: false` after run 5228
+    # against cobalt-dingo#14 proved "THE AGENT NEVER PUSHES" (line 19) false:
+    # the agent used the GITEA_TOKEN handed to the "Run the agent" step to write
+    # straight to main via the gitea MCP write tool, bypassing the run_bash
+    # denylist that was supposed to be the only push-capable surface. Resuming
+    # now that fix #1 has landed (dispatch@0044a4f): `dispatch run`'s CI path
+    # constructs its executors with CIPolicy, not DefaultPolicy, and CIPolicy
+    # has no forge-mutating MCP tool at all — file_write_branch is not merely
+    # denylisted, it is not granted. Fix #4 below is the verifier: it does not
+    # trust that claim, it checks origin/main directly.
     #
-    # `if: false` is the whole fix for now: it disables this job regardless of
-    # the label, without touching GITEA_TOKEN itself (no rotation forced) and
-    # without deleting the file (the substrate — trigger/RBAC/audit/isolation —
-    # is sound per #67's own verdict; only the tool grant on top of it is not).
-    # Remove this line once #67's fix #1 lands: write tools off the executor in
-    # CI mode, verified by #67's fix #4 (assert origin/main did not move).
-    #
-    # Original condition, restore alongside the fix above:
-    #   github.event.label.name == 'agent/ci-run' ||
-    #   contains(github.event.issue.labels.*.name, 'agent/ci-run')
-    if: false
+    # Deliberately NOT done here (issue's fix #2 and #5, both "belt-and-braces"
+    # per the issue's own ordering, fix #1 is "the actual fix"): scoping
+    # GITEA_TOKEN down to read-only needs a new deploy key/PAT minted in 1Password
+    # -- an irreversible-adjacent secret-provisioning action, left for a
+    # deliberate pass rather than folded into this one. Not trusting the agent's
+    # own summary line is a downstream-consumer discipline change, not a
+    # workflow change.
+    if: >-
+      github.event.label.name == 'agent/ci-run' ||
+      contains(github.event.issue.labels.*.name, 'agent/ci-run')
     runs-on: self-hosted
     timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # dispatch#67 fix #4, the verifier for fix #1. "The agent's tools no
+      # longer include a forge write" is a claim about CIPolicy; this checks
+      # the fact CIPolicy exists to guarantee, independent of trusting the
+      # policy code, the executor's own report, or anything the agent said.
+      # Per the estate's own rule, a gate without a case proving it fails when
+      # it should is a claim, not a control -- this is that case.
+      - name: Record origin/main before the agent runs
+        run: git rev-parse origin/main > /tmp/main-before.txt
 
       - name: Build the executor
         env:
@@ -92,19 +101,48 @@ jobs:
           GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
           LITELLM_BASE_URL: ${{ secrets.LITELLM_BASE_URL }}
           LITELLM_API_KEY: ${{ secrets.LITELLM_API_KEY }}
-          LITELLM_EXECUTORS: "kimi=berget/kimi-k2.6,qwen=koala/qwen36-35b-a3b,glm=berget/glm-4.7-fp8"
+          # infra#347/dispatch#68: repointed from the dead berget/kimi-k2.6.
+          LITELLM_EXECUTORS: "kimi=berget/kimi-k3,qwen=koala/qwen36-35b-a3b,glm=berget/glm-4.7-fp8"
           DISPATCH_KIMI_MAX_TURNS: "80"
         # Exit status is the contract: non-zero means no work happened, and the
         # job stops rather than opening an empty PR.
         run: /tmp/dispatch-bin run ${{ github.repository }} ${{ github.event.issue.number }} .
+
+      # dispatch#67 fix #4. Independent of the diff check below: a forge write
+      # does not touch this checkout's working tree at all, so a clean `git
+      # diff` here is exactly what run 5228 saw while a commit was landing on
+      # main through a different door. Fails the job outright -- this is not
+      # "no PR to open", it is "the sandbox did not hold".
+      - name: Assert origin/main did not move
+        # Runs even if "Run the agent" itself failed. A step-failure default
+        # would skip this on exactly the run where an escape is most plausible
+        # -- the agent doing something out-of-band and THEN erroring out never
+        # gets checked otherwise.
+        if: always()
+        run: |
+          git fetch origin main -q
+          before="$(cat /tmp/main-before.txt)"
+          after="$(git rev-parse origin/main)"
+          if [ "$before" != "$after" ]; then
+            echo "::error::origin/main moved during the run ($before -> $after)." \
+                 "The agent wrote to the forge outside this job's own commit/PR path." >&2
+            exit 1
+          fi
 
       - name: Open a PR if the agent changed anything
         env:
           GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
         run: |
           if git diff --quiet && git diff --cached --quiet; then
-            echo "agent made no changes — nothing to open"
-            exit 0
+            # dispatch#67 fix #3: "no changes" used to exit 0. The job cannot
+            # distinguish "the agent did nothing" from "the agent did it
+            # somewhere this checkout can't see" -- run 5228 was the second
+            # case wearing the first case's exit code. Fail and let a human
+            # look; a genuinely idle run costs one red job, which is cheap
+            # next to what a silent one already cost.
+            echo "::error::agent made no changes in the checkout — nothing to open." \
+                 "Verify by hand this was truly a no-op before treating it as one." >&2
+            exit 1
           fi
           branch="agent/issue-${{ github.event.issue.number }}"
           git config user.name  "agent-ci"
