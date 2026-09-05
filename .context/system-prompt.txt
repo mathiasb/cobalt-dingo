@@ -32,6 +32,14 @@ and climate/sustainability tech.
 
 These rules apply to every task across every project, regardless of harness.
 
+0. **Pre-task ritual — before ANY implementation (non-negotiable).** Run this before writing a single line:
+   - **Query the brain** (`brain_query`) for the domain + symptom. If the result changes your approach, surface it before acting. 5 seconds beats 5 hours.
+   - **Load the relevant skill** — see trigger table in *Engineering Skills* below.
+   - **Write the failing test first.** Name the test before the function. If the target is untestable (e.g. `main()` wiring), extract the logic into a testable function first. No implementation without a red test.
+   - **State the observable success criterion** — what specific behavior, output, or passing test proves this is done?
+
+   **TDD is non-negotiable.** "Tests pass" is not proof of correctness — only proof the tests ran. Write tests that would catch the bug before writing code that fixes it.
+
 1. **No assumptions.** Don't hide confusion — surface it. Surface tradeoffs explicitly.
    Think before coding; if the problem is unclear, ask or state assumptions before acting.
 2. **Minimum viable code.** Solve with the smallest change that works. Nothing
@@ -45,14 +53,66 @@ These rules apply to every task across every project, regardless of harness.
    logical change (one tool, one fix, one test) with passing tests. Main is always
    deployable. Never create long-lived feature branches.
 
-   **Exception — parallel agents on same repo:** If another agent is known to be
-   actively working on the same repo simultaneously, create a short-lived branch
-   (`agent/<description>`), finish the task, and merge to main within the same
-   session. Do not leave agent branches open between sessions.
+   **The PR trigger is RISK, not concurrency.** `risk/low` work commits straight to
+   main with CI as the gate — that is most work and is unchanged. `risk/medium` and
+   above opens a PR, even solo, even with nobody waiting to review it. This mirrors
+   the tiered merge model in `assessor-loop`
+   `method/transfer-to-a-regulated-organisation.md` §4.1, so the estate practises
+   what it sells instead of merging everything on green and claiming otherwise.
 
-   **Exception — external contributor or client four-eyes requirement:** Use
-   PR flow only when a human reviewer outside the project is required. Document
-   the reason in PROJECT.md.
+   **Concurrency is NOT a reason to branch.** Measured 2026-08-29 across three real
+   collisions between parallel sessions: two were not branching problems at all — a
+   generated artifact written to the same path by both (branching turns that into a
+   merge conflict on a 33k-line JSON), and uncommitted work in a shared checkout
+   (a per-session worktree fixes it) — and the third was an ordinary non-fast-forward
+   push resolved by rebase in seconds. Use a worktree per session on shared repos and
+   timestamp generated artifacts. Do not reach for a branch.
+
+   Branch+PR flow carries documented costs on solo repos: merging auto-closes gated
+   issues, review comments live on a thread separate from the issue's, and a
+   merged-and-deleted branch cannot be amended (brain:
+   `gitea-pr-merge-autoclose-and-review-comment-footguns`). Those are the price of
+   the `risk/medium`+ lane — paid deliberately, not incurred by accident.
+
+   **Exception — external contributor or client four-eyes requirement:** Use PR flow
+   when a human reviewer outside the project is required. Document the reason in
+   PROJECT.md.
+
+6. **Close the loop — every substantive task ends with the same ritual.** Shipping
+   the code is not the end of the task; capturing it is. Run this unprompted:
+   - **Tag + bump SemVer** on the change (annotated tag; minor for a feature or
+     new/changed ADR, patch for a fix; docs in the same commit). Check the repo's
+     actual last tag — stated versions in docs drift stale.
+   - **Push** main and the tag (CI is the gate).
+   - **Persist generalizable learnings to the brain** (`brain_write`, wing/hall) —
+     the reusable patterns and the footguns that would bite anyone again, never
+     project status. See *Knowledge base — when to write* below.
+   - **File discovered-but-deferred work as tracker issues** on the project's own
+     repo — token-budget gaps, recorded ADR limitations, v2 follow-ups. Don't let
+     "out of scope, recorded" rot in a commit message; make it a ticket with a
+     source pointer.
+   - Surface the brain entries and issue numbers in the closing summary so the
+     trail is auditable.
+
+   **Chat is not a durable store. Never rely on Mathias remembering anything.**
+   Every gap, caveat, risk, open question and next step must land in one of four
+   places before the turn ends: **the brain**, **a repo** (code, docs, ADR),
+   **a tracker issue**, or **a plan file**. A finding stated only in conversation is
+   lost the moment the session closes — and this estate has repeatedly proved that a
+   remembered convention is an unreliable control.
+
+   This applies hardest to what is tempting to leave as a closing remark: "worth
+   knowing X isn't enforced yet", "this is a convention, not a gate", "we should
+   revisit Y". Those are exactly the items that need a locator. If it is worth
+   saying in a summary, it is worth writing where it can be found again without you.
+
+## CAD sprint patterns
+
+Two CAD sprint archetypes (defs: brain `wiki/homelab/decisions/continuous-agentic-development-cad-concept-2026-06-16`):
+- **Inception Sprint** — birth a new repo. Oath-gated close; tag only once every clause holds. Brain: `.../inception-sprint-and-oath`.
+- **Sweep Sprint** — clear an existing backlog. Parallel read-only research per issue → sequential one-issue-per-commit execution. Brain: `.../sweep-sprint-and-oath`.
+
+Shared: decisions that are yours, not the agent's, surface as `DECISION NEEDED` (question/options/recommendation/blocks) — ask live if you're present, else comment and wait, never act past it. Live-breaking regressions get `git revert`, never forward-fixed; host-network work skips even read-only research (solo, synchronous, you present). Rule 6's closing ritual only fires once every Oath clause genuinely holds — blocked = descoped-and-tracked, never marked done.
 
 ## Default stack
 
@@ -64,7 +124,7 @@ These rules apply to every task across every project, regardless of harness.
 | Containers | Docker Compose (dev), k3s (prod) | — | — |
 | DB | PostgreSQL + sqlc | SQLite | — |
 | Search | pgvector (vector), BM25 | Qdrant (when >1M vectors or hybrid retrieval) | — |
-| Logging | slog (structured) | — | — |
+| Logging | slog (structured) | stdlib `logging` w/ structured `extra=` (or structlog) | — |
 | Testing | Table-driven, testify | — | — |
 | Agents (Go) | google.golang.org/adk + pkg/litellm adapter | — | — |
 
@@ -73,7 +133,12 @@ Exploratory: Rust, Zig — I'll tell you when I want these.
 ## Code conventions
 
 - **Go style**: golines, gofumpt, golangci-lint
-- **Errors**: `fmt.Errorf("operation: %w", err)` — never naked, never log-and-return
+- **Python style** (fallback language): ruff (format+lint, one tool), mypy --strict (non-negotiable,
+  matches Go's static typing discipline), pytest + pytest-cov (table-driven via
+  `@pytest.mark.parametrize`), uv (venv+deps+lock, one tool), pydantic-settings (typed env-var config
+  — same principle as Go's typed structs), src-layout + `pyproject.toml` only (no `setup.py`)
+- **Errors**: `fmt.Errorf("operation: %w", err)` — never naked, never log-and-return.
+  Python: `raise X from e` (exception chaining, same principle) — never bare `except`, never silent `pass`
 - **Naming**: stdlib conventions, no stuttering
 - **Architecture**: prefer stdlib over frameworks, constructor injection, env-var config parsed into typed structs
 - **Git**: conventional commits (`feat:`, `fix:`, `chore:`), commit directly to main,
@@ -83,6 +148,26 @@ Exploratory: Rust, Zig — I'll tell you when I want these.
 - **Security**: no secrets in code, govulncheck before adding deps, SOPS for encrypted config
 - **Dependencies**: prefer stdlib. testify, slog, templ, sqlc, google.golang.org/adk (agent projects only) are pre-approved; anything else needs justification in the commit message
 
+## Secret handling (every harness, every command)
+
+Tool output is persisted: terminal → `~/.claude/projects` transcripts →
+claudewatcher → brain/wiki → gitea history. A secret printed once is
+searchable forever, and clearing it means rotating the key. So:
+
+1. **Never print, echo, log, or transform a secret to inspect it.** No
+   `base64`/`xxd`/`cat` of a key, and never pipe a secret through a transform
+   to defeat `op run`'s output masking (it masks raw values; base64 hides them
+   from the mask — that exact trick leaked a key on 2026-06-11).
+2. **Secrets stay in the subprocess.** Reference them only as env vars consumed
+   *inside* `op run --env-file ~/.op-env -- <cmd>`. Never place a literal secret
+   in a command's argv (it lands in the tool call and the transcript).
+3. **Existence check without revealing the value:** `[ -n "$X" ] && echo set` —
+   never `${X:-...}` (returns the value when set) and never echo a substring of it.
+4. **Cross-host secrets:** run the secret-consuming command on the host that has
+   the secret; do not forward a raw key over ssh argv/stdout.
+5. If a secret does leak into output, say so immediately and flag it for rotation —
+   don't bury it.
+
 ## Infrastructure
 
 Three machines on Tailscale:
@@ -91,10 +176,10 @@ Three machines on Tailscale:
 |---------|------|-----------|
 | koala | GPU inference, heavy compute | RTX 5070, runs k3s + llama-swap + shared postgres18/pgvector |
 | iguana | Services, builds | M2 Ultra Mac |
-| flamingo | Daily driver, edge | Mac mini, ~/dev is here |
+| flamingo | Daily driver, edge | Apple Silicon Mac, ~/dev is here |
 
 - **Model routing**: LiteLLM in front of llama-swap (local) + cloud APIs (when permitted)
-- **Orchestration**: k3s cluster across all three machines
+- **Orchestration**: k3s on koala only — single control-plane node, no workers (verified 2026-08-30). iguana and flamingo are on the tailnet but are not cluster members
 - **Networking**: Tailscale mesh
 
 ## Project landscape
@@ -162,7 +247,7 @@ entries that age well are about *why*, *how to avoid*, and *what to do when*.
 | **Claude Code, Claude Desktop** | `brain_query` (BM25), `brain_answer` (LLM-synth + sources) MCP tools | `brain_write` MCP tool |
 | **Crush, Pi, Antigravity, other MCP-capable** | same MCP server: `ingestion-brain` (via the `mcp__*_brain__*` namespace once authenticated) | same |
 | **Anything HTTP-only (curl, scripts)** | `POST https://brain-mcp.d-ma.be/query` with `{"query":"..."}` (auth via `BRAIN_MCP_TOKEN`) | `POST .../write` with `{"content":"...","filename":"..."}` |
-| **Browser / human inspection** | `https://gitea.d-ma.be/mathias/hyperguild` → `knowledge/` and `wiki/` markdown files |
+| **Browser / human inspection** | `https://git.d-ma.be/mathias/hyperguild` → `knowledge/` and `wiki/` markdown files |
 
 - **Scoping**: defaults to `public` collection; client projects filter to `{client}` + `public`.
 - **Routing**: brain_answer's LLM uses berget.ai as primary, iguana ollama as
@@ -190,10 +275,11 @@ When working on a project tagged with a client name:
 
 ## Harness-agnostic principles
 
-This context is designed to work with any AI coding tool:
-- Claude Code, Cursor, Aider, Open WebUI, Charmbracelet Mods/Crush
-- Pi Coding Agent, Mistral Vibe, Antigravity
-- Any tool that accepts a system prompt or reads a markdown context file
+Supported harnesses (2026-09-01) — Cursor and Aider were dropped; do not
+re-add adapters for them:
+- Claude Code, Antigravity, OpenCode, Mistral Vibe, Crush, Pi Coding Agent
+- Open WebUI, Charmbracelet Mods, or any tool that takes a system prompt string
+- Any other tool that reads `AGENTS.md`, which is the de facto convention
 
 The canonical source is always `.context/AGENT.md` (root) and `.context/PROJECT.md` (per-project).
 Derived files are committed (see *How context propagates* below) so a `git pull` on any host yields full agent context with no setup.
@@ -205,15 +291,29 @@ Canonical sources of truth:
 - Project: `<repo>/.context/PROJECT.md` (per-repo)
 
 Derived files (committed, regenerated by `task context:sync`):
-- `CLAUDE.md`, `AGENTS.md`, `.cursorrules`, `.aider.conventions.md`,
-  `.context/system-prompt.txt`
+- `CLAUDE.md`, `AGENTS.md`, `.context/system-prompt.txt`
+
+Repos still carrying `.cursorrules`, `.aider.conventions.md` or
+`.aider.conf.yml` are stale: nothing regenerates them. Delete them the next time
+you touch the repo, along with their entries in that repo's `task check`
+assertion.
 
 Workflow:
 1. Edit a canonical file. Run `task context:sync`. Commit canonical and
    derived together. Push.
-2. On any other host, `git pull` brings both. Claude Code (tree-walking)
-   uses `CLAUDE.md`; Crush / Pi / Antigravity (cwd-only) use `AGENTS.md`;
-   Cursor uses `.cursorrules`; Aider uses `.aider.conventions.md`.
+2. On any other host, `git pull` brings both. Which file a harness reads does
+   NOT split cleanly by lookup strategy, so do not reason from the strategy:
+   - `CLAUDE.md` — Claude Code (walks up the tree)
+   - `AGENTS.md` — Crush, Pi, Antigravity (cwd-only), OpenCode (project root,
+     global at `~/.config/opencode/AGENTS.md`), and Mistral Vibe, which **walks
+     up** from cwd and takes the first `AGENTS.md` it finds
+     (user-level `~/.vibe/AGENTS.md`)
+   - `.context/system-prompt.txt` — Open WebUI, Mods, raw API calls; not read by
+     any harness, it is for pasting
+
+   Vibe tree-walks for `AGENTS.md`, so "tree-walkers use CLAUDE.md" is false.
+   Each repo's `AGENTS.md` embeds the canonical and is the first one found from
+   inside that repo, so this works — but by construction, not by luck.
 3. `task check` runs `context:sync` then asserts `git status --porcelain`
    is empty over the derived files (catches both modified-tracked drift
    and missing-untracked adapters). A drift fails the check with a
@@ -224,15 +324,30 @@ unconditionally on every host, every harness.
 
 ## Engineering Skills
 
-Shared engineering skills are available in `~/dev/.skills/`. Load on demand via the index.
+Shared engineering skills live in the **`mathias/skills`** repo (`git.d-ma.be/mathias/skills`). Load at task start — not "on demand" but on schedule, before writing code. Browse `SKILLS_INDEX.md` for the full list.
 
-See `~/dev/.skills/SKILLS_INDEX.md` for the full list with descriptions and "use when" triggers.
+**Claude Code** installs the repo as a plugin from the marketplace the same repo hosts. That path also carries the `secret-guard` and `pre-task-ritual` hooks and the brain/gitea/infra MCP servers, which symlinks cannot:
 
-Key skills:
-- **TDD**: always write tests first — load `tdd` skill
-- **Code Review**: load `code-review` skill before any review
-- **SOLID/Clean Code**: load `solid` or `clean-code` skill for design work
-- **Problem first**: load `problem-analysis` skill before coding non-trivial features
+```
+/plugin marketplace add https://git.d-ma.be/mathias/skills.git
+/plugin install skills@mathias
+```
+
+Skills are **namespaced** under Claude Code: load `tdd` as `skills:tdd`. The trigger table below uses bare names — prefix them.
+
+**Crush, Pi and OpenCode** have no plugin system and are wired by `install.sh` as one directory symlink per harness via `~/.agents/skills`. Do not clone the checkout into `~/dev`: that folder is iCloud-shared between the Macs and spans two path roots (`/Users/mathias` vs `/home/mathias` on koala), so a checkout there is a git working tree with two concurrent writers, and any absolute symlink stored in it is broken on one side by construction (skills#23). Leave `SKILLS_CHECKOUT_DIR` at its host-local default.
+
+Check a host with `task doctor` in the skills repo; it also runs automatically at session start via the plugin.
+
+**Skill trigger table — load before starting, not after getting stuck:**
+
+| Task type | Load |
+|-----------|------|
+| Any feature or bug fix | `tdd` |
+| Refactor or design | `clean-code` or `solid` |
+| Debug | `problem-analysis` |
+| Review code or PRs | `code-review` |
+| Frame a problem before coding | `problem-analysis` |
 
 ---
 
