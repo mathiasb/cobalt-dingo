@@ -56,13 +56,28 @@ jobs:
     # denylisted, it is not granted. Fix #4 below is the verifier: it does not
     # trust that claim, it checks origin/main directly.
     #
-    # Deliberately NOT done here (issue's fix #2 and #5, both "belt-and-braces"
-    # per the issue's own ordering, fix #1 is "the actual fix"): scoping
-    # GITEA_TOKEN down to read-only needs a new deploy key/PAT minted in 1Password
-    # -- an irreversible-adjacent secret-provisioning action, left for a
-    # deliberate pass rather than folded into this one. Not trusting the agent's
-    # own summary line is a downstream-consumer discipline change, not a
-    # workflow change.
+    # Fix #2 landed 2026-09-05: the two steps that hand a credential to the
+    # UNTRUSTED agent now use `secrets.DISPATCH_BOT_TOKEN_RO`, a token owned by
+    # the dedicated `dispatch-bot` account and scoped `read:repository` +
+    # `read:issue`. Read-only comes from the SCOPE, not from per-repo
+    # permission: scope is the half that travels with the token, so a
+    # read-only-by-permission credential would still be push-capable against
+    # every other repo its account can write to -- the escape would relocate
+    # rather than close. Verified before wiring: GetIssue 200, clone OK, and a
+    # real `git push` REFUSED.
+    #
+    # The "Open a PR" step below deliberately KEEPS the write-capable
+    # secrets.GITEA_TOKEN. That credential is the JOB's, used after the agent
+    # has finished, and opening the PR is the one thing the design requires be
+    # writable. Do not "tidy" it to the read-only token.
+    #
+    # The secret is NOT named GITEA_TOKEN_RO as dispatch#67 originally proposed:
+    # Gitea reserves the GITEA_/GITHUB_ secret-name prefix and rejects creating
+    # one with 400 invalid variable or secret name. The env var inside each step
+    # is still GITEA_TOKEN, which is what `dispatch run` reads.
+    #
+    # Still not done here (issue's fix #5): not trusting the agent's own summary
+    # line is a downstream-consumer discipline change, not a workflow change.
     if: >-
       github.event.label.name == 'agent/ci-run' ||
       contains(github.event.issue.labels.*.name, 'agent/ci-run')
@@ -83,7 +98,7 @@ jobs:
 
       - name: Build the executor
         env:
-          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          GITEA_TOKEN: ${{ secrets.DISPATCH_BOT_TOKEN_RO }}
         # The runner's filesystem PERSISTS between jobs — a fixed clone path
         # works on the first run and fails on every one after with
         # "destination path already exists". Unique dir per run; the binary
@@ -98,7 +113,7 @@ jobs:
 
       - name: Run the agent
         env:
-          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          GITEA_TOKEN: ${{ secrets.DISPATCH_BOT_TOKEN_RO }}
           LITELLM_BASE_URL: ${{ secrets.LITELLM_BASE_URL }}
           LITELLM_API_KEY: ${{ secrets.LITELLM_API_KEY }}
           # infra#347/dispatch#68: repointed from the dead berget/kimi-k2.6.
