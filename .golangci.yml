@@ -1,30 +1,52 @@
+# Canonical golangci-lint configuration for the estate's Go repos (infra#309
+# pattern: one canonical file here, a byte-identical copy in each adopter,
+# and the drift gate in THIS repo comparing sha256).
+#
+# Why this exists: 26 Go repos, 3 had a lint config, and all three were
+# different. The 23 without one ran golangci-lint's v2 default set, which
+# does NOT include a formatter -- so gofmt/gofumpt drift went uncaught until
+# it was found by hand (dma-cli#12: two files drifted, nothing flagged them).
+#
+# The two configs this replaces (cobalt-dingo, coo-agent) were near-identical
+# copies of each other AND both invalid under v2: they carried v1-style
+# `linters-settings` and `issues.exclude-rules` keys, which `golangci-lint
+# config verify` rejects outright. Their revive settings and test exclusions
+# were therefore not in effect. Consolidating fixes that too.
+#
+# Per-repo variation does NOT belong here -- this file must stay byte-identical
+# across adopters so the gate is a checksum, not a diff a human has to judge.
+# A repo with a genuine exception (agentsquad excludes its seeded-bug fixture
+# tree, which exists precisely to contain broken code) keeps its own config and
+# is not listed as an adopter.
+
 version: "2"
 
 linters:
   default: none
   enable:
-    - errcheck       # unchecked errors
-    - govet          # suspicious constructs
-    - staticcheck    # broad static analysis
-    - unused         # unused code
-    - misspell       # spelling
-    - revive         # idiomatic Go
-    - exhaustive     # exhaustive switch on enums
+    - errcheck # unchecked errors
+    - govet # suspicious constructs
+    - staticcheck # broad static analysis
+    - unused # unused code
+    - misspell # spelling
+    - revive # idiomatic Go
+    - exhaustive # exhaustive switch on enums
+
+  settings:
+    revive:
+      rules:
+        - name: var-naming
+          severity: warning
+
+  exclusions:
+    rules:
+      # Test files: table-driven cases legitimately carry unused struct fields
+      # and long functions.
+      - path: _test\.go
+        linters:
+          - revive
+          - unused
 
 formatters:
   enable:
     - gofumpt
-
-linters-settings:
-  revive:
-    rules:
-      - name: exported
-        severity: warning
-      - name: var-naming
-        severity: warning
-
-issues:
-  exclude-rules:
-    # Test files: allow longer functions, unused params in step defs
-    - path: "_test\\.go"
-      linters: [revive, unused]
