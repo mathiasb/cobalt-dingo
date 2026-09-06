@@ -1,0 +1,30 @@
+# Credentials och secrets – committas ALDRIG
+.env
+.env.local
+.env.production
+*.enc
+tokens/
+credentials/
+
+# Loggar (runtime-filer utanför repot, aldrig källkod)
+*.log
+~/.coo-agent/
+
+# Go
+bin/
+coo-agent
+receipt-collector
+*.test
+*.out
+coverage.html
+
+# Personliga Claude-inställningar
+.claude/settings.local.json
+CLAUDE.local.md
+
+# Konfiguration med känsliga uppgifter (mailadresser, env-refs)
+config/receipt-sources.yml
+
+# Temporärt
+*.tmp
+.DS_Store

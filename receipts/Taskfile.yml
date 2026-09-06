@@ -1,0 +1,79 @@
+version: "3"
+
+vars:
+  BINARY: coo-agent
+  VERSION:
+    sh: git describe --tags --always --dirty 2>/dev/null || echo "dev"
+  LDFLAGS: -ldflags="-X main.version={{.VERSION}}"
+
+tasks:
+  # ── Code generation ─────────────────────────────────────────────────────────
+  generate:
+    desc: Run all code generators (templ)
+    cmds:
+      - templ generate ./internal/httpserver/ui/templates/
+
+  # ── Quality gate (used by CI) ────────────────────────────────────────────────
+  check:
+    desc: Run all quality checks (vet, lint, vuln, test)
+    cmds:
+      - task: generate
+      - go vet ./...
+      - golangci-lint run ./...
+      - govulncheck ./...
+      - go test -race -count=1 ./...
+
+  # ── Build ────────────────────────────────────────────────────────────────────
+  build:
+    desc: Build for current platform
+    cmds:
+      - go build {{.LDFLAGS}} -o bin/{{.BINARY}} ./cmd/coo-agent
+
+  build:linux-amd64:
+    desc: Cross-compile for koala (linux/amd64)
+    cmds:
+      - GOOS=linux GOARCH=amd64 go build {{.LDFLAGS}} -o bin/{{.BINARY}}-linux-amd64 ./cmd/coo-agent
+
+  build:linux-arm64:
+    desc: Cross-compile for piguard (linux/arm64)
+    cmds:
+      - GOOS=linux GOARCH=arm64 go build {{.LDFLAGS}} -o bin/{{.BINARY}}-linux-arm64 ./cmd/coo-agent
+
+  build:darwin-arm64:
+    desc: Cross-compile for iguana/flamingo (darwin/arm64)
+    cmds:
+      - GOOS=darwin GOARCH=arm64 go build {{.LDFLAGS}} -o bin/{{.BINARY}}-darwin-arm64 ./cmd/coo-agent
+
+  build:all:
+    desc: Build for all deployment targets
+    cmds:
+      - task: build:linux-amd64
+      - task: build:linux-arm64
+      - task: build:darwin-arm64
+      - ls -lh bin/
+
+  # ── Test ────────────────────────────────────────────────────────────────────
+  test:
+    desc: Run tests with race detector
+    cmds:
+      - go test -race -count=1 ./...
+
+  test:verbose:
+    cmds:
+      - go test -race -v -count=1 ./...
+
+  coverage:
+    desc: Generate HTML coverage report
+    cmds:
+      - go test -race -coverprofile=coverage.out ./...
+      - go tool cover -html=coverage.out -o coverage.html
+      - 'echo "Coverage report: coverage.html"'
+
+  # ── Utilities ───────────────────────────────────────────────────────────────
+  tidy:
+    cmds:
+      - go mod tidy
+
+  clean:
+    cmds:
+      - rm -rf bin/ coverage.out coverage.html

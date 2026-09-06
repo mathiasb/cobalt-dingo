@@ -1,0 +1,206 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "claude/**", "feature/**", "fix/**", "chore/**"]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+
+env:
+  IMAGE: coo-agent
+
+jobs:
+  # ── 1. Quality gate ─────────────────────────────────────────────────────────
+  check:
+    name: Lint / Test / Vet
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false   # self-hosted runner: Go cache persists on disk between runs
+
+      - name: Verify toolchain
+        run: |
+          go version
+          task --version
+          govulncheck -version 2>&1 || true
+
+      - name: Install templ
+        run: |
+          go install github.com/a-h/templ/cmd/templ@latest
+          templ --version
+
+      - name: Install golangci-lint
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh \
+            | sh -s -- -b "$(go env GOPATH)/bin" v2.11.4
+          golangci-lint --version
+
+      # `task check` runs govulncheck, which the containerized runner
+      # (infra#233) does not ship -- the "Verify toolchain" step above tolerates
+      # its absence with `|| true`, so the job got as far as `task check` and
+      # died there on exit 127. Install it per run, same as golangci-lint.
+      - name: Install govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck -version
+
+      - name: Run checks
+        run: task check
+
+  # ── 2. Build ─────────────────────────────────────────────────────────────────
+  build:
+    name: Build & Import
+    needs: check
+    runs-on: self-hosted
+    if: github.event_name != 'pull_request'
+    outputs:
+      image-tag: ${{ steps.meta.outputs.sha-tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Derive image tags
+        id: meta
+        run: |
+          SHA=$(git rev-parse --short HEAD)
+          echo "sha-tag=${SHA}" >> "$GITHUB_OUTPUT"
+          REF="${{ github.ref }}"
+          if [[ "$REF" == refs/tags/v* ]]; then
+            echo "version-tag=${REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and push to local registry
+      # infra#309: implementation lives in .gitea/build-image.sh, a
+      # byte-identical copy of mathias/infra's ci-templates/build-image.sh.
+      # Do not edit it here -- edit the canonical file, run `task ci:sync`,
+      # and infra's drift gate names any repo still carrying an old copy.
+        env:
+          SHA_TAG: ${{ steps.meta.outputs.sha-tag }}
+          VERSION_TAG: ${{ steps.meta.outputs.version-tag }}
+          GIT_SHA: ${{ github.sha }}
+          IMAGE_SOURCE: ${{ github.repositoryUrl }}
+        run: bash .gitea/build-image.sh
+
+      # No smoke test here. The old one ran `sudo k3s ctr run` against the host's
+      # containerd: written for the Arch host runner, impossible in the
+      # containerized runner (infra#233) which has no sudo, no ctr and no
+      # containerd socket -- it failed with `sudo: command not found` the moment
+      # infra#241's buildctl migration let the build reach it. The deploy job's
+      # `Verify rollout` + `Confirm pod running new image` cover the same ground
+      # more strongly, which is why tapir dropped its smoke test too (infra#241).
+
+      # Verify MCP binary cross-compiles for all deployment targets.
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Build MCP binary (all platforms)
+        run: task build:all
+
+  # ── 3. Deploy via infra repo + Flux ─────────────────────────────────────────
+  deploy:
+    name: Deploy via GitOps
+    needs: build
+    runs-on: self-hosted
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: staging
+    steps:
+      - name: Update image tag in infra repo
+        env:
+          IMAGE_TAG: ${{ needs.build.outputs.image-tag }}
+          DEPLOY_KEY: ${{ secrets.INFRA_DEPLOY_KEY }}
+        run: |
+          set -euo pipefail
+          # infra#311: fail on an empty tag BEFORE patching anything. The
+          # grep verification further down CANNOT catch it -- with IMAGE_TAG
+          # empty its pattern matches the very corruption it exists to reject.
+          # The result is `image: <repo>:` in the manifest, which is invalid
+          # YAML, so Flux fails the ENTIRE apps Kustomization and every app
+          # stops reconciling, not just this one. That happened on 2026-08-25.
+          [ -n "${IMAGE_TAG:-}" ] || { echo "IMAGE_TAG is empty - refusing to patch"; exit 1; }
+
+          mkdir -p ~/.ssh
+          echo "$DEPLOY_KEY" > ~/.ssh/id_infra
+          chmod 600 ~/.ssh/id_infra
+          ssh-keyscan -p 30022 10.0.1.20 >> ~/.ssh/known_hosts 2>/dev/null
+
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/id_infra -o IdentitiesOnly=yes"
+          rm -rf /tmp/infra-coo
+          git clone -b main ssh://git@10.0.1.20:30022/mathias/infra.git /tmp/infra-coo
+          cd /tmp/infra-coo
+
+          DEPLOYMENT="k3s/apps/coo-agent/deployment.yaml"
+          sed -i "s|image: localhost:5000/coo-agent:.*|image: localhost:5000/coo-agent:${IMAGE_TAG}|" "$DEPLOYMENT"
+
+          grep -q "localhost:5000/coo-agent:${IMAGE_TAG}" "$DEPLOYMENT" \
+            || { echo "✗ image tag patch failed"; exit 1; }
+
+          if git diff --quiet "$DEPLOYMENT"; then
+            echo "ℹ image tag unchanged — skipping push"
+          else
+            git -c user.name="coo-agent CI" \
+                -c user.email="ci@coo-agent.local" \
+                commit -m "chore(deploy): coo-agent → ${IMAGE_TAG}" "$DEPLOYMENT"
+            git push origin main
+            echo "✓ pushed to infra repo"
+          fi
+
+          shred -u ~/.ssh/id_infra
+
+      - name: Trigger Flux reconcile (immediate)
+        run: |
+          kubectl -n flux-system annotate gitrepository flux-system \
+            reconcile.fluxcd.io/requestedAt="$(date +%s)" --overwrite
+          kubectl -n flux-system annotate kustomization apps \
+            reconcile.fluxcd.io/requestedAt="$(date +%s)" --overwrite
+
+      - name: Wait for Flux to apply new image
+        env:
+          IMAGE_TAG: ${{ needs.build.outputs.image-tag }}
+        run: |
+          EXPECTED="localhost:5000/coo-agent:${IMAGE_TAG}"
+          for i in $(seq 1 60); do
+            CURRENT=$(kubectl get deploy coo-agent -n coo-agent \
+              -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || echo "")
+            if [ "$CURRENT" = "$EXPECTED" ]; then
+              echo "✓ Flux applied new image after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+          kubectl get deploy coo-agent -n coo-agent \
+            -o jsonpath='{.spec.template.spec.containers[0].image}' \
+            | grep -qx "$EXPECTED" \
+            || { echo "✗ Flux did not apply new image within 60s"; exit 1; }
+
+      - name: Verify rollout
+        run: |
+          kubectl rollout status deployment/coo-agent \
+            --namespace coo-agent \
+            --timeout=120s \
+          || {
+            echo "── pod status ──"
+            kubectl get pods -n coo-agent -o wide
+            echo "── events ──"
+            kubectl get events -n coo-agent --sort-by='.lastTimestamp' | tail -20
+            echo "── describe ──"
+            kubectl describe pods -n coo-agent -l app=coo-agent | tail -40
+            exit 1
+          }
+
+      - name: Confirm pod running new image
+        env:
+          IMAGE_TAG: ${{ needs.build.outputs.image-tag }}
+        run: |
+          kubectl get pods -n coo-agent \
+            -l app=coo-agent \
+            --field-selector=status.phase=Running \
+            -o jsonpath='{.items[*].spec.containers[0].image}' \
+          | grep -q "localhost:5000/coo-agent:${IMAGE_TAG}" \
+          && echo "✓ pod running new image" \
+          || { echo "✗ pod image mismatch"; exit 1; }

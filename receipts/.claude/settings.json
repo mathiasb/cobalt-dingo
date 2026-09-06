@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl:*api.fortnox.se/3/*)",
+      "Bash(python:src/**)",
+      "Bash(pytest:tests/**)",
+      "Bash(cat:*)",
+      "Bash(ls:*)",
+      "Bash(grep:*)"
+    ],
+    "deny": [
+      "Bash(rm:*)",
+      "Bash(curl:*DELETE*)",
+      "Bash(curl:*skatteverket.se*)"
+    ]
+  },
+  "env": {
+    "FORTNOX_ENV": "sandbox",
+    "LOG_LEVEL": "INFO",
+    "AUDIT_LOG_PATH": "~/.coo-agent/audit.log",
+    "TOKEN_PATH": "~/.coo-agent/tokens.enc"
+  },
+  "notes": {
+    "FORTNOX_ENV": "Byt till 'production' när sandbox-tester är godkända",
+    "permissions": "Alla POST/PUT till Fortnox kräver bekräftelse via bookkeeper-agenten"
+  }
+}

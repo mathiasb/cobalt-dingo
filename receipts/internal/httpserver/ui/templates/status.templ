@@ -1,0 +1,26 @@
+package templates
+
+templ Status(d StatusData) {
+	@Layout("Status") {
+		<h1 class="text-xl font-semibold mb-6">Systemstatus</h1>
+		<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+			<div class="rounded-lg border bg-white p-4">
+				<p class="text-sm text-gray-500 mb-1">Databas</p>
+				@Badge(d.DB, "Ansluten", "Ej ansluten")
+			</div>
+			<div class="rounded-lg border bg-white p-4">
+				<p class="text-sm text-gray-500 mb-1">Fortnox API</p>
+				@Badge(d.Fortnox, "Nåbar", "Ej nåbar")
+			</div>
+			<div class="rounded-lg border bg-white p-4">
+				<p class="text-sm text-gray-500 mb-1">OAuth-token</p>
+				@Badge(d.Token.Connected, "Giltig", "Saknas")
+				if d.Token.Connected {
+					<p class="mt-1 text-xs text-gray-500">
+						Går ut om { itoa(d.Token.DaysUntilExpiry()) } dagar
+					</p>
+				}
+			</div>
+		</div>
+	}
+}
