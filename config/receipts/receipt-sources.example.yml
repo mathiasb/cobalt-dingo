@@ -1,63 +1,170 @@
-# Kopiera till config/receipt-sources.yml och fyll i dina värden.
-# receipt-sources.yml committas ALDRIG – den finns i .gitignore.
+# Receipt Collector – konfigurationsschema
 #
-# Schema:
-#   sources       – IMAP-konton att bevaka
-#   destinations  – Vidarebefordransmål (smtp / fortnox-receipts / fortnox-invoices)
-#   rules         – Routingsregler, utvärderas i ordning (första träff gäller)
+# Kopiera till config/receipt-sources.yml och fyll i dina värden.
+# Lägg ALDRIG in lösenord här – använd miljövariabler eller secrets-store.
+# Se .env.example för tillgängliga env-variabler.
 
-sources:
-  - name: kvitton
-    host: imap.gmail.com
-    port: 993
-    username: kvitton@example.com
-    # Lösenordet hämtas från miljövariabel – aldrig i klartext här.
-    password_env: IMAP_PASSWORD_KVITTON
-    folder: INBOX
-    tls: true
+# ---------------------------------------------------------------------------
+# Mailkonton (IMAP)
+# ---------------------------------------------------------------------------
+accounts:
+  - id: personal-gmail           # Unikt ID, används i routing-regler
+    label: "Privat Gmail"
+    imap:
+      host: imap.gmail.com
+      port: 993
+      tls: true
+      username: "${GMAIL_USER}"         # env-variabel
+      password: "${GMAIL_APP_PASSWORD}" # App-lösenord, inte vanligt lösenord
+    search_folder: INBOX
+    processed_label: coo-agent/processed  # Gmail-label som sätts efter hantering
 
+  # Exempel: ytterligare konto (Fastmail, Proton, etc.)
+  # - id: work-fastmail
+  #   label: "Jobbmail"
+  #   imap:
+  #     host: imap.fastmail.com
+  #     port: 993
+  #     tls: true
+  #     username: "${FASTMAIL_USER}"
+  #     password: "${FASTMAIL_APP_PASSWORD}"
+  #   search_folder: INBOX
+  #   processed_label: coo-agent/processed
+
+# ---------------------------------------------------------------------------
+# Destinations
+# ---------------------------------------------------------------------------
 destinations:
-  # Mynt – kvitton matchas mot korttransaktioner
-  - name: mynt
-    type: smtp
-    address: mynt-inbox@mynt.se   # ersätt med din faktiska Mynt-adress
+  mynt:
+    type: email_forward
+    address: "${MYNT_RECEIPT_EMAIL}"   # kvitto+<hash>@mynt.se
 
-  # Fortnox kvitto-inbox (scannade kvitton)
-  - name: fortnox-receipts
-    type: fortnox-receipts
-    address: ""
+  fortnox_receipt:
+    type: email_forward
+    address: "${FORTNOX_RECEIPT_EMAIL}" # inbox.ver.<ditt-orgnr>@arkivplats.se
 
-  # Fortnox faktura-inbox (leverantörsfakturor)
-  - name: fortnox-invoices
-    type: fortnox-invoices
-    address: ""
+  fortnox_invoice:
+    type: email_forward
+    address: "${FORTNOX_INVOICE_EMAIL}" # inbox.lev.<ditt-orgnr>@arkivplats.se
 
+# ---------------------------------------------------------------------------
+# Routing-regler
+# Utvärderas i ordning – första match vinner.
+# Fält: from_domain, from_address, subject_contains, subject_matches (regex)
+# Destination: mynt | fortnox_receipt | fortnox_invoice | null (ignorera)
+# ---------------------------------------------------------------------------
 rules:
-  # Mynt-transaktionsmail
-  - name: mynt-transaktioner
-    match_from:
-      - noreply@mynt.se
-      - kvitto@mynt.se
+  # --- Leverantörsfakturor → Fortnox faktura ---
+  - id: hetzner-invoice
+    description: "Hetzner månads-/årsräkning"
+    match:
+      from_domain: hetzner.com
+      subject_contains: "Invoice"
+    destination: fortnox_invoice
+
+  - id: bahnhof-invoice
+    description: "Bahnhof bredbandsräkning"
+    match:
+      from_domain: bahnhof.se
+    destination: fortnox_invoice
+
+  # --- Korttransaktioner → Mynt ---
+  - id: google-play-receipt
+    description: "Google Play prenumerationskvitto"
+    match:
+      from_domain: google.com
+      subject_contains: "Kvitto på din beställning från Google Play"
     destination: mynt
 
-  # Vanliga leverantörsfakturor (Telenor, Telia, Bahnhof m.fl.)
-  - name: leverantörsfakturor
-    match_from:
-      - "*@telenor.se"
-      - "*@telia.se"
-      - "*@bahnhof.se"
-    destination: fortnox-invoices
+  - id: apple-receipt
+    description: "Apple App Store / iCloud-faktura"
+    match:
+      from_domain: email.apple.com
+      subject_contains_any:
+        - "Your invoice from Apple"
+        - "Din faktura från Apple"
+    destination: mynt
 
-  # Allt med "faktura" eller "invoice" i ämnesraden
-  - name: faktura-i-amne
-    match_subject:
-      - faktura
-      - invoice
-    destination: fortnox-invoices
+  - id: amazon-receipt
+    description: "Amazon orderbekräftelse"
+    match:
+      from_domain_any:
+        - amazon.se
+        - amazon.com
+      subject_contains_any:
+        - "Your order"
+        - "Din beställning"
+        - "order confirmation"
+    destination: mynt
 
-  # Övriga bifogade kvitton – hamnar i Fortnox kvitto-inbox
-  - name: kvitton-fallback
-    match_subject:
-      - kvitto
-      - receipt
-    destination: fortnox-receipts
+  - id: spotify-receipt
+    description: "Spotify månadskvitto"
+    match:
+      from_domain: spotify.com
+      subject_contains: "receipt"
+    destination: mynt
+
+  - id: nextory-receipt
+    match:
+      from_domain: nextory.com
+    destination: mynt
+
+  - id: svd-receipt
+    description: "Svenska Dagbladet / Bonnier prenumeration"
+    match:
+      from_domain_any:
+        - bonniernews.se
+        - svd.se
+    destination: mynt
+
+  - id: sats-receipt
+    match:
+      from_domain: sats.com
+    destination: mynt
+
+  - id: berget-receipt
+    match:
+      from_domain: berget.ai
+    destination: mynt
+
+  - id: easypark-receipt
+    match:
+      from_domain: easypark.net
+    destination: mynt
+
+  - id: parkster-receipt
+    match:
+      from_domain: parkster.com
+    destination: mynt
+
+  - id: anthropic-receipt
+    description: "Claude Pro / Anthropic"
+    match:
+      from_domain: anthropic.com
+      subject_contains: "receipt"
+    destination: mynt
+
+  - id: elevenlabs-receipt
+    match:
+      from_domain: elevenlabs.io
+    destination: mynt
+
+  - id: perplexity-receipt
+    match:
+      from_domain: perplexity.ai
+    destination: mynt
+
+  # --- Kvitton utan kortknytning → Fortnox kvitto ---
+  - id: wolt-receipt
+    description: "Wolt matleverans – representationskostnad"
+    match:
+      from_domain: wolt.com
+    destination: fortnox_receipt
+
+  # --- Ignorera (ej kvitton) ---
+  - id: ignore-apple-price-change
+    description: "Prisändringsavisering från Apple – inte ett kvitto"
+    match:
+      from_domain: email.apple.com
+      subject_contains: "price change"
+    destination: null
