@@ -23,7 +23,7 @@ https://api.fortnox.se/3/
 | Momsrapport      | /vatreports              | GET           |
 
 ## Rate limiting
-- Max 250 anrop/sekund per klient
+- Max 25 anrop per 5 sekunder per klient (ej 250/sekund — verifierat mot Fortnox dokumentation)
 - Vid 429: exponentiell backoff, max 3 försök
 - Vid 503: retry efter 5 sekunder, max 2 försök
 
