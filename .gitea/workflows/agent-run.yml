@@ -78,9 +78,19 @@ jobs:
     #
     # Still not done here (issue's fix #5): not trusting the agent's own summary
     # line is a downstream-consumer discipline change, not a workflow change.
-    if: >-
-      github.event.label.name == 'agent/ci-run' ||
-      contains(github.event.issue.labels.*.name, 'agent/ci-run')
+    # PAUSED AGAIN 2026-09-07 (dispatch#67 reopened). Run 5915 on issue #11
+    # escaped a second time: the "Assert origin/main did not move" verifier
+    # fired correctly (a2a969bf -> ca5bd654), proving fix #4 works and fix #1
+    # does not. dispatch-bot holds only 'read' on this repo and its token was
+    # the only credential in the agent's env, so the write did not come from
+    # this job — the executor still reaches the forge through a hosted MCP
+    # server carrying its own credential. Restore the condition below once
+    # that path is closed and a run proves it.
+    #
+    #   if: >-
+    #     github.event.label.name == 'agent/ci-run' ||
+    #     contains(github.event.issue.labels.*.name, 'agent/ci-run')
+    if: false
     runs-on: self-hosted
     timeout-minutes: 30
     steps:
