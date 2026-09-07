@@ -24,8 +24,10 @@ type Token struct {
 	ExpiresAt    time.Time `json:"expires_at"`
 }
 
-// Valid reports whether the access token is present and not expired.
-func (t Token) Valid() bool {
+// TokenValid reports whether the access token is present and not expiring
+// within 30 seconds. This is the single source of truth for token validity
+// across the fortnox and domain packages.
+func TokenValid(t Token) bool {
 	return t.AccessToken != "" && time.Now().Before(t.ExpiresAt.Add(-30*time.Second))
 }
 

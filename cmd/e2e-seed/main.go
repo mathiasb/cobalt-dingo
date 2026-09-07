@@ -510,7 +510,7 @@ func loadValidToken(cfg config.Fortnox, log *slog.Logger) (fortnox.Token, error)
 	if err != nil {
 		return fortnox.Token{}, fmt.Errorf("no saved token at %s — run fortnox-auth for mode %s: %w", tokenPath, cfg.Mode, err)
 	}
-	if t.Valid() {
+	if fortnox.TokenValid(t) {
 		return t, nil
 	}
 	log.Info("access token expired, refreshing")
