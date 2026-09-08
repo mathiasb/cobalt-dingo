@@ -29,7 +29,18 @@ jobs:
         run: |
           go version
           task --version
-          govulncheck -version 2>&1 || true
+
+      # Built from source with THIS job's Go, not the runner's pre-installed
+      # copy. The pre-installed one is built against go1.25's source-processing
+      # packages while `go list` is go1.26, so it exits 1 on every invocation —
+      # the same toolchain skew that already forces golangci-lint to be
+      # installed below. That failure was invisible while Taskfile.yml suffixed
+      # the scan with `|| true` (#70): the gate could not fail, so nobody
+      # noticed the tool had stopped working.
+      - name: Install govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
+          govulncheck -version
 
       - name: Install golangci-lint
         run: |

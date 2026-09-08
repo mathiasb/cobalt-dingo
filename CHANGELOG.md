@@ -42,6 +42,15 @@ the domain model or port interfaces will be called out explicitly.
   invisible behind `|| true`. The scan is now clean, so the gate starts from
   green rather than from a known exception.
 
+- CI now builds `govulncheck` from source (pinned v1.7.0) with the job's own Go,
+  instead of using the runner's pre-installed copy. That copy is built against
+  go1.25's source-processing packages while `go list` is go1.26, so it exits **1
+  — a tool error, not a finding** — on every invocation. Removing `|| true`
+  turned that into a red build immediately, which is the correct behaviour: a
+  scanner that cannot run is not a pass. The same toolchain skew already forces
+  golangci-lint to be installed per-job. The `|| true` had been hiding a tool
+  that stopped working, not the noise it was added to suppress.
+
 ---
 
 ## [0.19.1] — 2026-09-08
