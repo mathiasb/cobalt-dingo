@@ -14,6 +14,36 @@ the domain model or port interfaces will be called out explicitly.
 
 ---
 
+## [0.20.0] — 2026-09-08
+
+### Fixed
+
+- **`govulncheck` is a real gate again** (#70). `Taskfile.yml` ran
+  `govulncheck ./... || true`, so `task check` reported green regardless of what
+  the scan found, locally and in CI. `.context/AGENT.md` asks for "govulncheck
+  before adding deps"; that was a convention with nothing behind it — the same
+  vacuous-gate shape `infra` ADR-0020 was written about, and the third one found
+  in this repo this week.
+
+  Chose option 1 from #70: drop `|| true` outright. Verified empirically first,
+  because the whole objection to doing this was noise — govulncheck exits 0 on
+  an advisory in a module you merely *require* and non-zero only when your code
+  calls a vulnerable symbol, so the common case stays quiet without any extra
+  flags. Reversible: option 3 (advisory + a comment saying so) is the fallback
+  if it proves noisy in practice.
+
+  Proved the gate discriminates rather than assuming it: a throwaway module
+  calling `norm.NFC.String` (one of GO-2026-5970's listed symbols) exits **3**,
+  while merely requiring the module exits **0**. A gate that can only pass is
+  the thing being removed here, so it is not enough for the new one to be green.
+
+- Bumped `golang.org/x/text` v0.31.0 → v0.39.0 (indirect), clearing
+  `GO-2026-5970`. Not called by this code, which is why the advisory was
+  invisible behind `|| true`. The scan is now clean, so the gate starts from
+  green rather than from a known exception.
+
+---
+
 ## [0.19.1] — 2026-09-08
 
 ### Changed

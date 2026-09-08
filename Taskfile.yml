@@ -73,7 +73,12 @@ tasks:
   vet:
     cmds:
       - go vet ./...
-      - govulncheck ./... || true
+      # NOT suffixed with `|| true`. govulncheck exits non-zero only when your
+      # code actually CALLS a vulnerable symbol; an advisory in a module you
+      # merely require exits 0, so this is the tightest gate that stays quiet on
+      # the common case. It was advisory-only until 2026-09-08, which meant
+      # `task check` reported green regardless of what the scan found — see #70.
+      - govulncheck ./...
 
   # ── Image build (buildah + k3s containerd, no registry on single-node) ──────
 
