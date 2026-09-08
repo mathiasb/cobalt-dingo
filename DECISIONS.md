@@ -1,4 +1,16 @@
-# Decisions log
+# Decisions log — FROZEN LEGACY
+
+> **Do not add to this file.** The live decision series is
+> [`docs/adr/`](docs/adr/README.md), numbered from `0001` and carrying
+> machine-readable frontmatter plus an executable `verify:` assertion per
+> `infra` ADR-0020. Estate-wide decisions live in `mathias/infra`
+> `docs/decisions/`.
+>
+> The fifteen entries below, dated 2026-04-08 to 2026-04-27, are kept because
+> they remain the reasoning of record for the choices they describe — Go+HTMX,
+> Task over Make, the PISP-partner boundary, the ERP-agnostic core. They predate
+> the ADR format and have no status field, so treat any of them as current only
+> after checking the code.
 
 Record *why* things are the way they are. Future-you will thank present-you.
 
