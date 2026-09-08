@@ -92,15 +92,15 @@ func (t Transaction) SignedMinorUnits() int64 {
 // deliberately excluded: the same transaction delivered by a different route is
 // still the same transaction, which is what makes switching sources safe.
 func (t Transaction) IdempotencyKey() string {
-	h := sha256.New()
-	fmt.Fprintf(h, "%s|%s|%d|%s|%s",
+	key := fmt.Sprintf("%s|%s|%d|%s|%s",
 		t.Account,
 		t.BookingDate.UTC().Format("2006-01-02"),
 		t.SignedMinorUnits(),
 		t.Amount.Currency,
 		t.BankRef,
 	)
-	return hex.EncodeToString(h.Sum(nil))
+	sum := sha256.Sum256([]byte(key))
+	return hex.EncodeToString(sum[:])
 }
 
 // Statement is one account's booked activity over a period, with the balances
