@@ -14,6 +14,36 @@ the domain model or port interfaces will be called out explicitly.
 
 ---
 
+## [0.19.0] — 2026-09-08
+
+### Fixed
+
+- **Corrected a safety control the repo documented but that does not exist.**
+  Fortnox connected-app scopes are *resource*-scoped, not *verb*-scoped —
+  granting `supplierinvoice` grants read **and** write. There is no read-only
+  Fortnox scope. `.env.example` previously claimed "Fortnox itself will refuse
+  writes at the API gateway. Belt and braces." and listed a "read-only" scope
+  set identical to the sandbox's minus `payment`.
+- `.env.example` also still used the pre-rename `real_readonly` /
+  `FORTNOX_REAL_RO_*` names and a Taskfile target that no longer exists.
+
+### Changed
+
+- **ADR-0001 amended** (decision unchanged). Production has **two** enforcement
+  layers, not three, and both live in this repository. The client-side gate is
+  the only thing between this application and the live company's books.
+- New guidance: the only lever Fortnox offers is *which resources* to grant.
+  Grant the narrowest set the read paths need; never grant `payment`.
+
+### Added
+
+- `TestProductionWiring_ERPWriterCannotWrite` pins the money path —
+  `ERPWriter.RecordAndBookkeep`, the only code here that POSTs and PUTs to
+  Fortnox. `BuildMCPDeps` never constructs it, so the existing wiring test did
+  not reach it. Verified by mutation.
+
+---
+
 ## [0.18.1] — 2026-09-08
 
 ### Fixed
