@@ -13,7 +13,15 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const configPath = "config/receipt-sources.yml"
+const (
+	configPath = "config/receipt-sources.yml"
+
+	// exampleConfigPath is the template users copy. It is asserted to load into
+	// the structs below by TestExampleConfigLoadsIntoTheStructsThisBinaryUses —
+	// yaml.v3 ignores unknown fields, so a drifted example produces an empty
+	// config and a collector that silently does nothing.
+	exampleConfigPath = "../../config/receipts/receipt-sources.example.yml"
+)
 
 type configFile struct {
 	Sources      []sourceConfig      `yaml:"sources"`

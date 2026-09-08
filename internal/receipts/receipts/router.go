@@ -44,14 +44,54 @@ func (r *Router) Route(m Mail) (*Destination, bool) {
 	return nil, false
 }
 
+// ruleMatches reports whether m satisfies every criterion the rule names.
+//
+// Criteria are ANDed; alternatives WITHIN a criterion are ORed. So a rule
+// naming both a sender and a subject means "from this sender AND about this",
+// which is how the routing config is written:
+//
+//   - name: hetzner-invoice
+//     match_from:    ["*@hetzner.com"]
+//     match_subject: ["Invoice"]
+//
+// A criterion left empty is simply not a constraint, so single-criterion rules
+// behave exactly as before.
+//
+// This was previously an OR across both criteria, which made the sender
+// constraint decorative: any mail with "Invoice" in the subject, from anyone,
+// routed to Fortnox as a supplier invoice. Nothing caught it because every
+// existing rule in the tests named only one criterion.
 func ruleMatches(rule Rule, m Mail) bool {
-	for _, pattern := range rule.MatchFrom {
-		if matchesAddress(m.From, pattern) {
+	if len(rule.MatchFrom) == 0 && len(rule.MatchSubject) == 0 {
+		return false // a rule that constrains nothing must not match everything
+	}
+	return matchesAnyAddress(m.From, rule.MatchFrom) &&
+		containsAnySubject(m.Subject, rule.MatchSubject)
+}
+
+// matchesAnyAddress reports whether addr matches any pattern. No patterns means
+// the rule does not constrain the sender.
+func matchesAnyAddress(addr string, patterns []string) bool {
+	if len(patterns) == 0 {
+		return true
+	}
+	for _, p := range patterns {
+		if matchesAddress(addr, p) {
 			return true
 		}
 	}
-	for _, pattern := range rule.MatchSubject {
-		if strings.Contains(strings.ToLower(m.Subject), strings.ToLower(pattern)) {
+	return false
+}
+
+// containsAnySubject reports whether subject contains any pattern,
+// case-insensitively. No patterns means the rule does not constrain the subject.
+func containsAnySubject(subject string, patterns []string) bool {
+	if len(patterns) == 0 {
+		return true
+	}
+	lower := strings.ToLower(subject)
+	for _, p := range patterns {
+		if strings.Contains(lower, strings.ToLower(p)) {
 			return true
 		}
 	}

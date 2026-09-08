@@ -25,6 +25,12 @@ secrets/
 .fortnox-tokens*.json
 .task/
 
+# Real receipt-collector config. Carries IMAP usernames and the Mynt/Fortnox
+# inbox addresses; the example beside it is the committed template.
+config/receipt-sources.yml
+config/receipts/receipt-sources.yml
+!config/receipts/receipt-sources.example.yml
+
 # IDE
 .idea/
 .vscode/
