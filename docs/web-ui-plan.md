@@ -113,6 +113,57 @@ own authorize request. Forward-auth would solve P1 and leave P3 unsolvable.
 
 ---
 
+## Reuse from tapir
+
+Compared against `mathias/tapir` `internal/web/oidc` at `4bafd5f`, 2026-09-08.
+
+**The session mechanism is already the same design**, arrived at independently:
+a stateless HMAC-SHA256 signed cookie carrying self-contained claims
+(`sub`, `email`, `exp`), `HttpOnly`, `Secure`, `SameSite=Lax`, no server-side
+session table. tapir's ADR-029 records why the table was removed — an in-memory
+store was wiped on every pod restart, logging everyone out on each deploy.
+cobalt-dingo already carries `Email` in its session struct, so ADR-0003's
+resolution input is present today.
+
+So there is nothing to port structurally. What is worth lifting is the parts
+tapir has and cobalt-dingo does not:
+
+| Lift | Why it matters here |
+|---|---|
+| `WithSessionTTL` functional option | cobalt-dingo hardcodes 24h **inside `Set()`** — a setter owning policy, and untestable without a clock. Phase D needs to construct aged sessions |
+| `WithInsecureCookies` (test-only) | `Secure: true` is hardcoded, so `httptest` (plain http) cannot exercise any cookie flow. Phase C's route test and Phase D's step-up test both need this seam |
+| A `web.Auth` interface + `StubAuth` | cobalt-dingo has a concrete `*SessionManager` and no seam, so UI handlers cannot be tested with a fake signed-in user |
+| **Nonce generation and verification** | cobalt-dingo has **none** — see the gap below |
+
+### The gap this comparison found
+
+tapir generates a nonce, stores it against `state` with a TTL, sends
+`AuthCodeURL(state, oidc.Nonce(nonce))`, and rejects the callback on
+`idToken.Nonce != nonce`. cobalt-dingo calls `AuthCodeURL(state)` and never
+checks a nonce after `verifier.Verify`.
+
+The nonce binds the ID token to the authorize request that asked for it. Without
+it, `state` alone defends CSRF on the callback but nothing binds the returned
+token to this login attempt. On the money path that is worth closing, and tapir
+already has the reference implementation. Tracked separately — it is a fix to
+the live login flow and independent of this plan.
+
+### What must NOT be copied
+
+- **tapir's 30-day sliding session TTL.** It is correct for a "check back
+  tomorrow" reading app and wrong for a credential console. Sliding is the worse
+  half: a session that renews on every request never expires while someone keeps
+  browsing. This plan's Phase D goes the other way.
+- **tapir's answer to the IdP-swap problem** — `sub_mode=user_email` plus an
+  accepted one-time re-register. tapir could absorb a re-register because its
+  downstream state is cheap to rebuild. cobalt-dingo cannot: "re-register" here
+  means re-running Fortnox OAuth, and per ADR-0003 the UI would render
+  "Not connected" and silently fork credential state rather than surfacing the
+  mismatch. Same problem, different cost, different answer.
+
+The general shape: **reuse tapir's session plumbing and test seams; reject its
+session policy and its identity model.**
+
 ## Phases
 
 Ordered so the security holes close before the features land.
