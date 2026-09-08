@@ -14,6 +14,35 @@ the domain model or port interfaces will be called out explicitly.
 
 ---
 
+## [0.18.1] — 2026-09-08
+
+### Fixed
+
+- **OIDC login now sends and verifies a `nonce`** (#68, PR #69). `state` proves
+  this browser started a login; the nonce binds the returned ID token to the
+  authorize request that asked for it. Neither was previously present.
+  An empty nonce in the token is rejected as well as a mismatched one, so a
+  provider that silently stopped returning the parameter cannot disable the
+  check. Both login cookies are cleared on callback.
+
+### Changed
+
+- ID-token verification sits behind a small `idTokenVerifier` interface
+  returning a `verifiedIdentity` this package owns. Signature verification
+  stays inside `go-oidc`; only the result is reshaped. This existed to make the
+  nonce comparison reachable from a test — `gooidc.IDToken` keeps its claims
+  unexported, so a hand-built one always fails `Claims()`.
+
+---
+
+## [0.18.0] — 2026-09-08
+
+Plan and decisions for the Authentik-backed credential UI: `docs/web-ui-plan.md`,
+ADR-0003 (credential identity is not the OIDC subject) and ADR-0004 (one
+authenticated front end), both proposed.
+
+---
+
 ## [0.17.1] — 2026-09-08
 
 ### Fixed
