@@ -14,6 +14,73 @@ the domain model or port interfaces will be called out explicitly.
 
 ---
 
+## [0.17.0] — 2026-09-08
+
+Statement ingestion. Implements the structural requirement from
+[ADR-0002](docs/adr/0002-ingest-files-not-vendor-integrations.md).
+
+### Added
+
+- **`internal/statements`** — a `Parse` port plus a **camt.053** parser, the
+  first independent source of transactions. Fortnox's API exposes no bank
+  endpoint, so a reconciliation reading Fortnox alone checks Fortnox against
+  itself; this is what it gets checked against.
+- **`Statement.CheckBalance()`** — opening balance plus the net of every booked
+  transaction must equal closing. The only check that catches a parser silently
+  dropping a row.
+- **`Transaction.IdempotencyKey()`** — excludes provenance deliberately, so
+  re-ingesting an overlapping export cannot double-count and switching from a
+  manual export to an aggregator does not re-key existing rows.
+
+### Notes
+
+Only `BOOK` entries are ingested; pending entries break the balance identity
+while looking correct. Amounts are parsed from the decimal string exactly,
+never via `float64`.
+
+---
+
+## [0.16.0] — 2026-09-08
+
+ADR-0001 and ADR-0002 accepted by Mathias. Phase 0 (live production Fortnox
+OAuth, issue #50) unblocked.
+
+---
+
+## [0.15.0] — 2026-09-08
+
+### Added
+
+- **`docs/adr/`** — a repo-local ADR series, each record carrying an executable
+  `verify:` assertion per `infra` ADR-0020. `DECISIONS.md` frozen with a pointer.
+- **`docs/live-financial-data.md`** — problem analysis for reading the live
+  company's data: source access matrix, phases, assumptions, risks.
+- **`BuildMCPDeps`** — one wiring point for the Fortnox adapters, deriving
+  read-only capability from config instead of accepting it from callers, and
+  refusing to build a write-capable client in production mode.
+
+### Fixed
+
+- The eight-adapter construction block was duplicated verbatim in `cmd/server`
+  and `cmd/mcp`, each threading `readOnly` as an anonymous positional bool. The
+  read-only guarantee rested on ten call sites being individually correct.
+
+---
+
+## [0.7.0] – [0.14.0]
+
+**Not documented here.** These releases shipped between 2026-05-01 and
+2026-09-07 while this file went unmaintained — including the coo-agent
+consumption (`infra` ADR-0021), the MCP server consolidation, the CI agent-run
+pause, and the Fortnox mode rename from `real_readonly` to `production`.
+
+Backfilling nine reconstructed summaries nobody verified would be a second
+unreliable source of truth, so the gap is marked rather than filled. For this
+range, read `git log` between tags and `docs/adr/`. Discipline restarts at
+0.15.0 above. See issue #64.
+
+---
+
 ## [0.6.0] — 2026-05-01
 
 Mode separation — explicit `FORTNOX_MODE` selects between the sandbox
