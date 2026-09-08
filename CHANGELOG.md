@@ -51,6 +51,23 @@ the domain model or port interfaces will be called out explicitly.
   golangci-lint to be installed per-job. The `|| true` had been hiding a tool
   that stopped working, not the noise it was added to suppress.
 
+- **The gate then found real vulnerabilities on its first working run.** `go.mod`
+  pinned `go 1.26.1` exactly, so CI's `setup-go` resolved to precisely that
+  toolchain, and go1.26.1's standard library carries six advisories reachable
+  from this code via `validator.ValidationError.Error`: `GO-2026-6218`
+  (`net/url`), `GO-2026-6090` and `GO-2026-5856` (`crypto/tls`), `GO-2026-6089`
+  (`net/http`), `GO-2026-6088` (`encoding/xml`) and `GO-2026-5972`
+  (`encoding/asn1`). All fixed in go1.26.6; `go.mod` now floors there.
+
+  These were invisible for as long as the scan was suffixed with `|| true` —
+  `net/http` and `crypto/tls` findings in an internet-facing app.
+
+  **They are also invisible from a local `task check`.** govulncheck reports
+  standard-library vulnerabilities against the toolchain it is run with, and the
+  development host is on go1.27.0, which is unaffected. A green local scan says
+  nothing about CI or about the shipped image. The only honest verification for
+  a stdlib finding is the environment that builds the artifact.
+
 ---
 
 ## [0.19.1] — 2026-09-08
