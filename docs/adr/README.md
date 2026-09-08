@@ -41,6 +41,8 @@ yet built, is the wrong assertion.
 |---|---|---|---|
 | [0001](0001-read-only-live-financial-data.md) | Live company data is read-only; the write path stays sandbox-only | accepted | `scripts/assert-live-readonly.sh` |
 | [0002](0002-ingest-files-not-vendor-integrations.md) | Financial sources arrive as parsed files on an ingest channel, not as per-vendor API clients | accepted | `scripts/assert-no-vendor-clients.sh` |
+| [0003](0003-credential-identity-is-not-the-oidc-subject.md) | Downstream credentials are keyed by an internal user ID, never by the OIDC subject | proposed | `scripts/assert-credential-key-stability.sh` |
+| [0004](0004-one-authenticated-front-end.md) | One authenticated web front end; the receipts server serves only `/health` | proposed | `scripts/assert-single-front-end.sh` |
 
 Both were accepted by Mathias on 2026-09-08, each with a stated direction of
 travel recorded in its Status section: 0001 anticipates controlled *reversible*
