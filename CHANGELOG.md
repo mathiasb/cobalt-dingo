@@ -14,6 +14,42 @@ the domain model or port interfaces will be called out explicitly.
 
 ---
 
+## [0.22.0] — 2026-09-08
+
+### Security
+
+- **`internal/receipts/httpserver` mounts the admin UI behind an authenticator**
+  (#66). It previously mounted `/ui/token/refresh`, `/ui/token`, `/ui/keys`,
+  `/ui/keys/{id}` and `/ui/audit` with no middleware at all — Fortnox token
+  refresh and revocation, API-key issuance and revocation, and the audit log.
+
+  Latent rather than an incident: verified 2026-09-08 that `cmd/receipts` has no
+  Deployment, Service or Ingress on the cluster and is wired to `ui/stub` fakes.
+  Fixed now because #57 is an open decision about deploying it, and the gap
+  between "someone decides to deploy this" and "someone notices it has no auth"
+  is one `kubectl apply`.
+
+- `New` returns `(*Server, error)` and yields `ErrNoAuthenticator` — and no
+  `Server` — when `cfg.Auth` is nil. Returning nothing constructible is the
+  point: a `Server` value that exists can be `Start`ed.
+
+- `cmd/receipts` requires `RECEIPTS_ADMIN_TOKEN` and exits non-zero naming it.
+
+### Added
+
+- `httpserver.Authenticator` and `httpserver.BearerToken`, which compares
+  SHA-256 digests with `hmac.Equal` so the comparison is constant-time over
+  fixed-length input. Tokens shorter than 24 characters are rejected at
+  construction: a config value that silently degrades the control is the same
+  hole with a plausible-looking value in it.
+
+- The health probe is registered on an outer mux and the admin mux is mounted
+  wholesale behind the middleware, so a route added later is protected by
+  default rather than by the author remembering. Pinned by a table-driven test
+  over all ten routes; all three guards are mutation-verified.
+
+---
+
 ## [0.21.0] — 2026-09-08
 
 ### Security
@@ -50,6 +86,8 @@ the domain model or port interfaces will be called out explicitly.
   is reachable from a test; the same structural cause, and the same repair, as
   `BuildMCPDeps` in ADR-0001. Both guards are mutation-verified: restoring the
   fail-open, or dropping the middleware wrapping, each turn the suite red.
+
+---
 
 ## [0.20.0] — 2026-09-08
 

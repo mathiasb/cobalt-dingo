@@ -20,6 +20,7 @@ type Server struct {
 // Config holds server configuration.
 type Config struct {
 	Addr   string // e.g. ":8080"
+	Auth   Authenticator
 	Tokens ui.TokenChecker
 	Keys   ui.APIKeyStore
 	Audit  ui.AuditReader
@@ -27,11 +28,16 @@ type Config struct {
 }
 
 // New constructs a Server wired with the provided dependencies.
-func New(cfg Config) *Server {
-	mux := http.NewServeMux()
+//
+// It returns ErrNoAuthenticator, and no Server, when cfg.Auth is nil. Returning
+// nothing constructible is the point: a Server value that exists can be Started,
+// and an unauthenticated admin server starts and serves without complaint.
+func New(cfg Config) (*Server, error) {
+	if cfg.Auth == nil {
+		return nil, ErrNoAuthenticator
+	}
 
-	// Health probe (used by k8s liveness/readiness).
-	mux.HandleFunc("GET /health", healthHandler(cfg.Health))
+	mux := http.NewServeMux()
 
 	// Redirect root to UI.
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -46,16 +52,27 @@ func New(cfg Config) *Server {
 	uiHandler := ui.NewHandler(cfg.Tokens, cfg.Keys, cfg.Audit, cfg.Health)
 	uiHandler.Register(mux, "/ui")
 
+	// Everything registered above is behind the authenticator. The health probe
+	// is registered on the outer mux below so a future admin route cannot be
+	// added outside the guard by mistake — the default is protected.
+	outer := http.NewServeMux()
+	outer.HandleFunc("GET /health", healthHandler(cfg.Health))
+	outer.Handle("/", requireAuth(cfg.Auth, mux))
+
 	return &Server{
 		srv: &http.Server{
 			Addr:         cfg.Addr,
-			Handler:      mux,
+			Handler:      outer,
 			ReadTimeout:  15 * time.Second,
 			WriteTimeout: 30 * time.Second,
 			IdleTimeout:  60 * time.Second,
 		},
-	}
+	}, nil
 }
+
+// Handler exposes the fully wired handler, including the auth middleware, so
+// tests exercise the same request path the listener serves.
+func (s *Server) Handler() http.Handler { return s.srv.Handler }
 
 // Start begins listening. It returns when the context is cancelled.
 func (s *Server) Start(ctx context.Context) error {

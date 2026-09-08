@@ -25,14 +25,27 @@ func main() {
 		addr = ":8080"
 	}
 
+	// The admin UI can refresh and revoke the Fortnox token, issue and revoke
+	// API keys, and read the audit log. It does not start without credentials.
+	auth, err := httpserver.BearerToken(os.Getenv("RECEIPTS_ADMIN_TOKEN"))
+	if err != nil {
+		slog.Error("refusing to start: RECEIPTS_ADMIN_TOKEN is missing or too short", "err", err)
+		os.Exit(1)
+	}
+
 	// Stub backends — replaced by real PostgreSQL implementations in issue #2.
-	srv := httpserver.New(httpserver.Config{
+	srv, err := httpserver.New(httpserver.Config{
 		Addr:   addr,
+		Auth:   auth,
 		Tokens: stub.ConnectedTokens(),
 		Keys:   stub.SeedKeys(2),
 		Audit:  stub.SeedAudit(20),
 		Health: stub.AllHealthy(),
 	})
+	if err != nil {
+		slog.Error("refusing to start", "err", err)
+		os.Exit(1)
+	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
