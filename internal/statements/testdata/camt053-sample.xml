@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.02">
+  <BkToCstmrStmt>
+    <GrpHdr>
+      <MsgId>STMT-2026-08</MsgId>
+      <CreDtTm>2026-09-01T03:15:00</CreDtTm>
+    </GrpHdr>
+    <Stmt>
+      <Id>1234567890-2026-08</Id>
+      <LglSeqNb>8</LglSeqNb>
+      <FrToDt>
+        <FrDtTm>2026-08-01T00:00:00</FrDtTm>
+        <ToDtTm>2026-08-31T23:59:59</ToDtTm>
+      </FrToDt>
+      <Acct>
+        <Id><IBAN>SE4550000000058398257466</IBAN></Id>
+        <Ccy>SEK</Ccy>
+      </Acct>
+      <Bal>
+        <Tp><CdOrPrtry><Cd>OPBD</Cd></CdOrPrtry></Tp>
+        <Amt Ccy="SEK">12500.00</Amt>
+        <CdtDbtInd>CRDT</CdtDbtInd>
+        <Dt><Dt>2026-08-01</Dt></Dt>
+      </Bal>
+      <Bal>
+        <Tp><CdOrPrtry><Cd>CLBD</Cd></CdOrPrtry></Tp>
+        <Amt Ccy="SEK">11175.50</Amt>
+        <CdtDbtInd>CRDT</CdtDbtInd>
+        <Dt><Dt>2026-08-31</Dt></Dt>
+      </Bal>
+      <Ntry>
+        <Amt Ccy="SEK">1499.00</Amt>
+        <CdtDbtInd>DBIT</CdtDbtInd>
+        <Sts>BOOK</Sts>
+        <BookgDt><Dt>2026-08-05</Dt></BookgDt>
+        <ValDt><Dt>2026-08-05</Dt></ValDt>
+        <AcctSvcrRef>REF-0001</AcctSvcrRef>
+        <NtryDtls>
+          <TxDtls>
+            <Refs><EndToEndId>E2E-HETZNER-08</EndToEndId></Refs>
+            <RltdPties><Cdtr><Nm>Hetzner Online GmbH</Nm></Cdtr></RltdPties>
+            <RmtInf><Ustrd>Invoice R0012345</Ustrd></RmtInf>
+          </TxDtls>
+        </NtryDtls>
+      </Ntry>
+      <Ntry>
+        <Amt Ccy="SEK">325.50</Amt>
+        <CdtDbtInd>DBIT</CdtDbtInd>
+        <Sts>BOOK</Sts>
+        <BookgDt><Dt>2026-08-12</Dt></BookgDt>
+        <ValDt><Dt>2026-08-12</Dt></ValDt>
+        <AcctSvcrRef>REF-0002</AcctSvcrRef>
+        <NtryDtls>
+          <TxDtls>
+            <RltdPties><Cdtr><Nm>Bahnhof AB</Nm></Cdtr></RltdPties>
+            <RmtInf><Ustrd>Bredband augusti</Ustrd></RmtInf>
+          </TxDtls>
+        </NtryDtls>
+      </Ntry>
+      <Ntry>
+        <Amt Ccy="SEK">500.00</Amt>
+        <CdtDbtInd>CRDT</CdtDbtInd>
+        <Sts>BOOK</Sts>
+        <BookgDt><Dt>2026-08-20</Dt></BookgDt>
+        <ValDt><Dt>2026-08-21</Dt></ValDt>
+        <AcctSvcrRef>REF-0003</AcctSvcrRef>
+        <NtryDtls>
+          <TxDtls>
+            <RltdPties><Dbtr><Nm>Kund AB</Nm></Dbtr></RltdPties>
+            <RmtInf><Ustrd>Faktura 2026-114</Ustrd></RmtInf>
+          </TxDtls>
+        </NtryDtls>
+      </Ntry>
+      <Ntry>
+        <Amt Ccy="SEK">99.00</Amt>
+        <CdtDbtInd>DBIT</CdtDbtInd>
+        <Sts>PDNG</Sts>
+        <BookgDt><Dt>2026-08-31</Dt></BookgDt>
+        <ValDt><Dt>2026-09-01</Dt></ValDt>
+        <AcctSvcrRef>REF-PENDING</AcctSvcrRef>
+        <NtryDtls>
+          <TxDtls>
+            <RltdPties><Cdtr><Nm>Reserverat kortköp</Nm></Cdtr></RltdPties>
+          </TxDtls>
+        </NtryDtls>
+      </Ntry>
+    </Stmt>
+  </BkToCstmrStmt>
+</Document>
