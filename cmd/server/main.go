@@ -16,7 +16,6 @@ import (
 	"github.com/mathiasb/cobalt-dingo/internal/auth"
 	"github.com/mathiasb/cobalt-dingo/internal/config"
 	"github.com/mathiasb/cobalt-dingo/internal/domain"
-	mcpserver "github.com/mathiasb/cobalt-dingo/internal/mcp"
 	"github.com/mathiasb/cobalt-dingo/internal/ui"
 )
 
@@ -148,18 +147,10 @@ func main() {
 
 	llmCfg := config.LoadLLM()
 	if llmCfg.IsEnabled() && fortnoxEnabled {
-		baseURL := cfg.BaseURL()
-		readOnly := !cfg.AllowsWrites
-		gl := adapterfortnox.NewGeneralLedgerAdapter(baseURL, tokenStore, readOnly)
-		mcpDeps := mcpserver.Deps{
-			TenantID:    domain.TenantID("default"),
-			SupplierLdg: adapterfortnox.NewSupplierLedgerAdapter(baseURL, tokenStore, readOnly),
-			CustomerLdg: adapterfortnox.NewCustomerLedgerAdapter(baseURL, tokenStore, readOnly),
-			GeneralLdg:  gl,
-			ProjectLdg:  adapterfortnox.NewProjectLedgerAdapter(baseURL, tokenStore, gl, readOnly),
-			CostCtrLdg:  adapterfortnox.NewCostCenterLedgerAdapter(baseURL, tokenStore, gl, readOnly),
-			AssetReg:    adapterfortnox.NewAssetRegisterAdapter(baseURL, tokenStore, readOnly),
-			CompanyInf:  adapterfortnox.NewCompanyInfoAdapter(baseURL, tokenStore, readOnly),
+		mcpDeps, err := adapterfortnox.BuildMCPDeps(cfg, tokenStore, domain.TenantID("default"))
+		if err != nil {
+			log.Error("refusing to start", "err", err)
+			os.Exit(1)
 		}
 		chatHandler := ui.NewChatHandler(mcpDeps, llmCfg, cfg.Mode, cfg.AllowsWrites, log)
 		mux.HandleFunc("GET /chat", chatHandler.PageHandler)

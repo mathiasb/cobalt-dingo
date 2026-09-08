@@ -29,21 +29,11 @@ func main() {
 		cfg.Mode.Label(), cfg.Mode.TokenFile(), cfg.AllowsWrites)
 
 	tokenStore := file.NewTokenStore(cfg.Mode.TokenFile())
-	baseURL := cfg.BaseURL()
-	tenantID := domain.TenantID("default")
-	readOnly := !cfg.AllowsWrites
 
-	gl := adapterfortnox.NewGeneralLedgerAdapter(baseURL, tokenStore, readOnly)
-
-	deps := mcpserver.Deps{
-		TenantID:    tenantID,
-		SupplierLdg: adapterfortnox.NewSupplierLedgerAdapter(baseURL, tokenStore, readOnly),
-		CustomerLdg: adapterfortnox.NewCustomerLedgerAdapter(baseURL, tokenStore, readOnly),
-		GeneralLdg:  gl,
-		ProjectLdg:  adapterfortnox.NewProjectLedgerAdapter(baseURL, tokenStore, gl, readOnly),
-		CostCtrLdg:  adapterfortnox.NewCostCenterLedgerAdapter(baseURL, tokenStore, gl, readOnly),
-		AssetReg:    adapterfortnox.NewAssetRegisterAdapter(baseURL, tokenStore, readOnly),
-		CompanyInf:  adapterfortnox.NewCompanyInfoAdapter(baseURL, tokenStore, readOnly),
+	deps, err := adapterfortnox.BuildMCPDeps(cfg, tokenStore, domain.TenantID("default"))
+	if err != nil {
+		log.Error("refusing to start", "err", err)
+		os.Exit(1)
 	}
 
 	s := mcpserver.NewServer(deps, version.Version)
