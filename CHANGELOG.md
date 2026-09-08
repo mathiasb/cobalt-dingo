@@ -14,6 +14,23 @@ the domain model or port interfaces will be called out explicitly.
 
 ---
 
+## [0.19.1] — 2026-09-08
+
+### Changed
+
+- The "no read-only Fortnox scope" finding in 0.19.0 was recorded on report.
+  Now **cited** from Fortnox's own documentation, which states it without
+  qualification: *"All scopes gives both read and write access to an endpoint
+  and it is not possible to only have read access through the API."*
+  ([source](https://www.fortnox.se/developer/guides-and-good-to-know/scopes),
+  retrieved 2026-09-08). ADR-0001's premise had already been wrong once by
+  being taken from an unchecked document; replacing one unverified claim with
+  another would have repeated that.
+- Full Fortnox scope set recorded in ADR-0001 and `.env.example`, so the
+  narrowest grant can be chosen deliberately rather than guessed.
+
+---
+
 ## [0.19.0] — 2026-09-08
 
 ### Fixed

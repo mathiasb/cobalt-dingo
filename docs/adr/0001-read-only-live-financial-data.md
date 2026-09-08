@@ -36,11 +36,30 @@ decisions, not one.
 the correction makes the decision more load-bearing rather than less.**
 
 This ADR describes three enforcement layers and names the OAuth scope as the
-first. Mathias reports, and `.env.example` confirms by its own contents, that
-**Fortnox connected-app scopes cannot be set read-only**. They are
-*resource*-scoped, not *verb*-scoped: granting `supplierinvoice` grants read and
-write on supplier invoices. There is no portal setting that produces a read-only
-live app.
+first. **Fortnox connected-app scopes cannot be set read-only.** Fortnox's own
+developer documentation states it without qualification:
+
+> "All scopes gives both read and write access to an endpoint and it is not
+> possible to only have read access through the API."
+>
+> — <https://www.fortnox.se/developer/guides-and-good-to-know/scopes>, retrieved
+> 2026-09-08
+
+Scopes are *resource*-scoped, not *verb*-scoped: granting `supplierinvoice`
+grants read and write on supplier invoices. There is no portal setting, scope
+suffix or per-scope permission that produces a read-only live app.
+
+Raised by Mathias, then verified against the vendor's documentation rather than
+accepted on report — this ADR's premise had already been wrong once by being
+taken from a document nobody checked, and replacing one unverified claim with
+another would have repeated the failure rather than fixed it.
+
+The full scope set, for reference when choosing the narrowest grant: `archive`,
+`article`, `assets`, `bookkeeping`, `connectfile`, `costcenter`, `currency`,
+`customer`, `developerapi`, `inbox`, `invoice`, `noxfinansinvoice`, `offer`,
+`order`, `payment`, `price`, `print`, `profile`, `project`, `salary`,
+`settings`, `supplier`, `supplierinvoice`, `timereporting`, `warehouse`,
+`warehousecustomdocument`.
 
 The repo actively asserted the opposite. `.env.example` said:
 
