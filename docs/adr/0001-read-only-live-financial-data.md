@@ -30,6 +30,53 @@ Fortnox voucher can be reversed by a counter-voucher; a supplier payment
 submitted to a bank cannot. Any successor ADR should treat those as two separate
 decisions, not one.
 
+### Amendment, 2026-09-08 — layer 1 does not exist
+
+**The decision is unchanged. One of the facts it was argued from was wrong, and
+the correction makes the decision more load-bearing rather than less.**
+
+This ADR describes three enforcement layers and names the OAuth scope as the
+first. Mathias reports, and `.env.example` confirms by its own contents, that
+**Fortnox connected-app scopes cannot be set read-only**. They are
+*resource*-scoped, not *verb*-scoped: granting `supplierinvoice` grants read and
+write on supplier invoices. There is no portal setting that produces a read-only
+live app.
+
+The repo actively asserted the opposite. `.env.example` said:
+
+> "Configure it with READ-ONLY scopes only. Even if cobalt-dingo's local gate
+> fails open by accident, Fortnox itself will refuse writes at the API gateway.
+> Belt and braces."
+
+and then listed a "read-only" scope set identical to the sandbox's full set
+minus `payment` — the same grants, no verb distinction. Corrected in the same
+commit as this amendment.
+
+**Consequences of the correction:**
+
+- There are **two** enforcement layers in production, not three: config
+  (`AllowsWrites` false unless explicitly `"true"`) and the client-side gate
+  (`ErrReadOnlyClient` before any HTTP traffic). Both live in this repository.
+- The "why not rely on the scope alone" section below is now moot. The question
+  was never live: there is no scope to rely on.
+- **The client-side gate is the only thing between this application and the live
+  company's books.** That is a materially different risk posture from the one
+  this ADR was accepted under, and it is why the wiring test matters more than
+  it appeared to at acceptance.
+- The only real lever Fortnox offers is **which resources to grant**. Grant the
+  narrowest set the read paths need and accept that each carries write
+  capability. Do not grant `payment`.
+- Coverage was extended accordingly: `TestProductionWiring_ERPWriterCannotWrite`
+  now pins the money path itself — `ERPWriter.RecordAndBookkeep`, the only code
+  here that POSTs and PUTs to Fortnox. `BuildMCPDeps` never constructs it, so the
+  original wiring test did not reach it. Verified by mutation: forcing the
+  Connector to build a writable client fails the test.
+
+This does not change the decision, so it is recorded as an amendment rather than
+a superseding ADR — per the `adr` skill's status discipline. But a reader
+deciding whether to perform production OAuth should weigh the two-layer reality,
+not the three-layer claim above.
+
 ## Context
 
 cobalt-dingo has been developed entirely against the Fortnox **sandbox**. The
