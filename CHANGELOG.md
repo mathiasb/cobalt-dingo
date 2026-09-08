@@ -14,6 +14,43 @@ the domain model or port interfaces will be called out explicitly.
 
 ---
 
+## [0.21.0] — 2026-09-08
+
+### Security
+
+- **`cmd/server` no longer fails open when OIDC setup fails** (#71). When
+  `auth.NewOIDCHandler` returned an error the process logged
+  *"OIDC setup failed — running without auth"* and served anyway, with no
+  middleware at all — exposing `/invoices`, `/chat`, the payment endpoints and
+  the Fortnox connect routes on `books.d-ma.be` to anyone who could reach the
+  ingress, with `tenantID()` resolving to `"default"`. `/healthz` is a static
+  200 handler, so the liveness probe reported the pod healthy throughout.
+
+  The trigger is known to occur on this estate: `gooidc.NewProvider` performs
+  one-shot discovery at boot, and a koala host reboot on 2026-07-17 restarted
+  every pod at once, putting gitea-mcp's discovery ~12s ahead of Authentik
+  serving (brain: `homelab/failures/gitea-mcp-oidc-coboot-race-silent-jwt-degradation`).
+  gitea-mcp degraded to rejecting valid tokens — noisy. cobalt-dingo degraded
+  to accepting everyone — silent.
+
+  Now a startup failure. A co-boot race produces `CrashLoopBackOff` until
+  Authentik serves, then recovers unattended. Visible and self-healing, rather
+  than invisible and public.
+
+- **Serving with no authenticator at all now also requires an explicit opt-in**
+  (`COBALT_ALLOW_UNAUTHENTICATED=true`, development only). A dropped
+  `OIDC_ISSUER_URL` secret previously produced the same public deployment by
+  omission. The opt-in is honoured *only* when no issuer is configured — it
+  cannot launder an issuer that was asked for and failed.
+
+### Added
+
+- `secureHandler` (`cmd/server/wiring.go`) — the auth wiring extracted from
+  `main()`, with tests. The fail-open survived because nothing inside `main()`
+  is reachable from a test; the same structural cause, and the same repair, as
+  `BuildMCPDeps` in ADR-0001. Both guards are mutation-verified: restoring the
+  fail-open, or dropping the middleware wrapping, each turn the suite red.
+
 ## [0.20.0] — 2026-09-08
 
 ### Fixed

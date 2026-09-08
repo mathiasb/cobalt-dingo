@@ -269,3 +269,11 @@ func Load() (Fortnox, error) {
 	}
 	return cfg, nil
 }
+
+// AllowUnauthenticated reports whether the server may serve without any
+// authenticator in front of it. Development only — it is honoured only when no
+// OIDC issuer is configured at all, never to paper over an IdP that failed to
+// initialise. See cmd/server/wiring.go.
+func AllowUnauthenticated() bool {
+	return os.Getenv("COBALT_ALLOW_UNAUTHENTICATED") == "true"
+}
