@@ -14,6 +14,17 @@ the domain model or port interfaces will be called out explicitly.
 
 ---
 
+## [0.17.1] — 2026-09-08
+
+### Fixed
+
+- `Transaction.IdempotencyKey` built its hash with an unchecked `fmt.Fprintf`.
+  Now built with `Sprintf` and hashed in one call, removing the error path
+  rather than discarding it. Caught by CI — `golangci-lint` cannot run locally
+  on koala at present (`infra#375`).
+
+---
+
 ## [0.17.0] — 2026-09-08
 
 Statement ingestion. Implements the structural requirement from
