@@ -71,7 +71,7 @@ func TestLoginHandler_SendsNonceAndStoresIt(t *testing.T) {
 	h.LoginHandler(w, httptest.NewRequest(http.MethodGet, "/auth/login", nil))
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	require.Equal(t, http.StatusFound, res.StatusCode)
 
 	redirect, err := url.Parse(res.Header.Get("Location"))
@@ -114,7 +114,7 @@ func TestLoginHandler_NonceDiffersEveryTime(t *testing.T) {
 
 func nonceFromRedirect(t *testing.T, res *http.Response) string {
 	t.Helper()
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	u, err := url.Parse(res.Header.Get("Location"))
 	require.NoError(t, err)
 	return u.Query().Get("nonce")
@@ -140,7 +140,7 @@ func TestCallbackHandler_RejectsNonceMismatch(t *testing.T) {
 	h.CallbackHandler(w, callbackRequest("state-1", "nonce-we-issued"))
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, res.StatusCode,
 		"an ID token whose nonce does not match this login must be refused")
 	assertRejectedByNonceCheck(t, res)
@@ -156,7 +156,7 @@ func TestCallbackHandler_RejectsEmptyNonceInToken(t *testing.T) {
 	h.CallbackHandler(w, callbackRequest("state-1", "nonce-we-issued"))
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, res.StatusCode)
 	assertRejectedByNonceCheck(t, res)
 	assert.Empty(t, sessionCookie(res))
@@ -171,7 +171,7 @@ func TestCallbackHandler_RejectsMissingNonceCookie(t *testing.T) {
 	h.CallbackHandler(w, callbackRequest("state-1", ""))
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, res.StatusCode)
 	assertRejectedByNonceCheck(t, res)
 	assert.Empty(t, sessionCookie(res))
@@ -185,7 +185,7 @@ func TestCallbackHandler_AcceptsMatchingNonce(t *testing.T) {
 	h.CallbackHandler(w, callbackRequest("state-1", n))
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	require.Equal(t, http.StatusFound, res.StatusCode, "a matching nonce must complete the login")
 	assert.NotEmpty(t, sessionCookie(res), "a session must be issued")
 
