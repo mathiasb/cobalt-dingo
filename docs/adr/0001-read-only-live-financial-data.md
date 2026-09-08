@@ -1,9 +1,9 @@
 ---
 adr:           0001
 title:         "Live company data is read-only; the write path stays sandbox-only until a later ADR opens it"
-status:        proposed
+status:        accepted
 date:          2026-09-08
-deciders:      "pending: Mathias"
+deciders:      Mathias
 supersedes:    null
 verify:        "scripts/assert-live-readonly.sh"
 ---
@@ -12,9 +12,23 @@ verify:        "scripts/assert-live-readonly.sh"
 
 ## Status
 
-**Proposed.** Drafted by an agent. Pointing this system at the live books of a
-real company is a decision with financial and tax consequences, and is not an
-agent's to take. Awaiting Mathias.
+**Accepted by Mathias, 2026-09-08.**
+
+Accepted with a stated direction of travel: **controlled, reversible writes to
+the live company are wanted eventually — but only once the system is very
+proven.** Read-only is the starting position, not the permanent one.
+
+That intent does not change this decision, and it is recorded here rather than
+in Decision for a reason: as written, *"very proven"* is not an observable
+trigger, and the `adr` skill is explicit that a trigger nobody else can evaluate
+is a decision that quietly becomes permanent. Candidate observable criteria are
+proposed in issue #65; until one is agreed, the revisit condition in Validation
+below stands as the operative one.
+
+Note the word **reversible**, which narrows the eventual scope usefully. A
+Fortnox voucher can be reversed by a counter-voucher; a supplier payment
+submitted to a bank cannot. Any successor ADR should treat those as two separate
+decisions, not one.
 
 ## Context
 
@@ -157,3 +171,9 @@ workflow genuinely requires writing to the live company — the most likely
 candidate is automated voucher creation, currently open as issue #45. At that
 point the question is not "flip the flag" but "which specific endpoints, gated
 how, confirmed by whom".
+
+Per the Status section, the accepted direction is controlled *reversible* writes
+once the system is proven. That successor ADR is pre-filed as issue #65 with
+candidate observable criteria, because "proven" left undefined is how a
+provisional read-only boundary becomes a permanent one by accident — or worse,
+gets crossed on a feeling.

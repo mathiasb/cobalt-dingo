@@ -1,9 +1,9 @@
 ---
 adr:           0002
 title:         "Financial sources arrive as parsed files on one ingest channel, not as per-vendor API clients"
-status:        proposed
+status:        accepted
 date:          2026-09-08
-deciders:      "pending: Mathias"
+deciders:      Mathias
 supersedes:    null
 verify:        "scripts/assert-no-vendor-clients.sh"
 ---
@@ -12,8 +12,34 @@ verify:        "scripts/assert-no-vendor-clients.sh"
 
 ## Status
 
-**Proposed.** Drafted by an agent, alongside [ADR-0001](0001-read-only-live-financial-data.md).
-Awaiting Mathias.
+**Accepted by Mathias, 2026-09-08**, explicitly **as a start**, alongside
+[ADR-0001](0001-read-only-live-financial-data.md).
+
+The stated direction of travel is **towards real APIs and MCP servers**. File
+parsing is not the destination. But establishing the business-value process
+comes first, and getting entangled in technical dependencies before that value
+is proven is the more expensive mistake — so where a source can be "hacked"
+cheaply, hack it.
+
+This reframes the ADR usefully and is worth stating plainly: the file-first
+design is not merely what the vendors forced on us (Findings 2 and 3), it is
+what we would choose anyway while the value is unproven. Those two arguments
+happen to point the same way, which is why this decision is safe to take now.
+
+### Where the hack is allowed, and where it is not
+
+The distinction that keeps "hack it" from becoming the trap:
+
+- **Acquisition may be hacked.** A file downloaded by hand, a mail forward, a
+  CSV of unknown provenance — all fine. That layer is expected to be replaced.
+- **The schema may not.** The four preservation items in the Decision below —
+  the `Parse` port, the camt.053-shaped `Transaction`, the idempotency key, and
+  source provenance — are precisely what make the acquisition layer disposable.
+  Hack the input; do not hack the model the input lands in.
+
+A hack behind a stable seam is a cheap option kept open. A hack that becomes the
+schema is a migration nobody budgeted for, and it is the specific way this
+approach fails.
 
 ## Context
 
@@ -154,6 +180,12 @@ this is it.
   options above lose to the direct bilateral path from Finding 2.
 - Kivra opens self-serve retrieval, or cobalt-dingo becomes a Kivra Partner for
   the SaaS track → Kivra moves from Finding 3 to a real adapter.
+- **The business value is demonstrated** — the reconciliation report has surfaced
+  at least one real discrepancy that would otherwise have been missed, and a
+  period has been closed using it. At that point the direction of travel in
+  Status applies and it is worth paying for real API and MCP integrations,
+  because there is now something concrete to protect. Before that, an API
+  integration is a technical dependency bought on speculation.
 
 ## Consequences
 

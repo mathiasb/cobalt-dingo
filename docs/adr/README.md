@@ -39,8 +39,14 @@ yet built, is the wrong assertion.
 
 | # | Title | Status | Verify |
 |---|---|---|---|
-| [0001](0001-read-only-live-financial-data.md) | Live company data is read-only; the write path stays sandbox-only | proposed | `scripts/assert-live-readonly.sh` |
-| [0002](0002-ingest-files-not-vendor-integrations.md) | Financial sources arrive as parsed files on an ingest channel, not as per-vendor API clients | proposed | `scripts/assert-no-vendor-clients.sh` |
+| [0001](0001-read-only-live-financial-data.md) | Live company data is read-only; the write path stays sandbox-only | accepted | `scripts/assert-live-readonly.sh` |
+| [0002](0002-ingest-files-not-vendor-integrations.md) | Financial sources arrive as parsed files on an ingest channel, not as per-vendor API clients | accepted | `scripts/assert-no-vendor-clients.sh` |
 
-Both are `proposed` and name Mathias as the decider. An agent drafted them; an
-agent does not get to accept them.
+Both were accepted by Mathias on 2026-09-08, each with a stated direction of
+travel recorded in its Status section: 0001 anticipates controlled *reversible*
+writes once the system is proven (successor pre-filed as issue #65), and 0002 is
+accepted **as a start**, with real APIs and MCP servers as the destination once
+business value is demonstrated.
+
+Neither of those intents is a decision yet. Both are recorded where the next
+reader will find them rather than left in a chat log.
