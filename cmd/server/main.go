@@ -114,7 +114,9 @@ func main() {
 		var err error
 		oidcHandler, err = auth.NewOIDCHandler(context.Background(), oidcCfg, sessions, defaultMode, log)
 		if err != nil {
-			log.Error("OIDC setup failed — running without auth", "err", err)
+			// Deliberately NOT a downgrade to unauthenticated serving. See
+			// secureHandler in wiring.go, which turns this nil into a refusal.
+			log.Error("OIDC setup failed", "err", err, "issuer", oidcCfg.IssuerURL)
 		} else {
 			log.Info("OIDC enabled", "issuer", oidcCfg.IssuerURL)
 		}
@@ -160,13 +162,14 @@ func main() {
 		log.Info("chat handler disabled", "reason", "LLM_BASE_URL or DMABE_LLMAPI_KEY not set, or Fortnox not configured")
 	}
 
-	// Wrap with auth middleware when OIDC is active.
-	var handler http.Handler = mux
-	if oidcHandler != nil {
-		handler = sessions.AuthMiddleware(
-			[]string{"/healthz", "/static/", "/auth/"},
-			mux,
-		)
+	handler, err := secureHandler(mux, sessions, oidcCfg, oidcHandler, config.AllowUnauthenticated())
+	if err != nil {
+		log.Error("refusing to start", "err", err)
+		os.Exit(1)
+	}
+	if oidcHandler == nil {
+		log.Warn("SERVING WITHOUT AUTHENTICATION — every route is public",
+			"opt_in", "COBALT_ALLOW_UNAUTHENTICATED")
 	}
 
 	if err := http.ListenAndServe(":"+port, handler); err != nil {
