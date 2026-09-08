@@ -1,9 +1,9 @@
 ---
 adr:           0004
 title:         "One authenticated web front end, in internal/ui; the receipts server serves only /health"
-status:        proposed
+status:        accepted
 date:          2026-09-08
-deciders:      "pending: Mathias"
+deciders:      Mathias
 supersedes:    null
 verify:        "scripts/assert-single-front-end.sh"
 ---
@@ -12,8 +12,24 @@ verify:        "scripts/assert-single-front-end.sh"
 
 ## Status
 
-**Proposed.** Drafted by an agent while planning the credential-management UI
-(`docs/web-ui-plan.md`). Awaiting Mathias.
+**Accepted by Mathias, 2026-09-08** — the "move into `internal/ui`" form, not the
+"delete the receipts server outright" variant that was also offered.
+
+Decided alongside two related answers on the same day, which this ADR's
+reasoning depends on:
+
+- **#57 landed on option C** (shared `internal/receipts` core, exposed both as a
+  standalone CLI and as a hyperguild skill). So the collector is heading toward
+  deployment rather than staying shelved, which is what made this decision
+  urgent rather than theoretical.
+- **#31 landed on step-up authentication for sensitive actions.** That is the
+  requirement this ADR cites to reject a forward-auth outpost, and it is now an
+  agreed requirement rather than an anticipated one.
+
+`internal/receipts/httpserver` keeps `/health` and nothing else. Note that #66
+(merged as v0.22.0) already put the admin routes behind an authenticator as an
+interim guard; that code is deliberately small enough to discard when the move
+happens.
 
 ## Context
 

@@ -14,6 +14,51 @@ the domain model or port interfaces will be called out explicitly.
 
 ---
 
+## [0.23.0] — 2026-09-08
+
+### Decided
+
+- **ADR-0003 accepted** — credentials are keyed by an internal user ID, never by
+  the OIDC subject. Accepted with the migration to run **now**: the re-key must
+  happen while a session under the current `sub` still exists, and the option to
+  defer it was offered and declined.
+- **ADR-0004 accepted** — the receipts admin pages move into `internal/ui` behind
+  the existing Authentik session; `internal/receipts/httpserver` keeps `/health`
+  and nothing else.
+- **#57 → option C** — `internal/receipts` stays a provider-agnostic core exposed
+  both as a standalone CLI and as a hyperguild skill.
+- **#31 → step-up authentication** on sensitive actions only. Browsing rides the
+  30-day Authentik session; approving or submitting a payment forces fresh
+  authentication. This is also the requirement ADR-0004 cites against forward-auth.
+- **#45 → rebuild `create_voucher`, sandbox-only**, with a two-step server-side
+  propose/confirm handle rather than a described convention (infra ADR-0012
+  rule 2). ADR-0001 keeps it away from live books meanwhile.
+- **#8 → per-currency totals with count ordering**, no value-ranking for now.
+  ECB reference rates chosen as the eventual FX source, deferred to its own ADR.
+
+### Fixed
+
+- **The recorded Fortnox scope list was missing `companyinformation`** — 27
+  scopes, not 26. The earlier count came from transcribing the enumeration
+  column by eye rather than reading every row, and it produced a live
+  recommendation to "check whether `companyinformation` exists in the portal".
+  It does; the page maps *Company Information* to it. Corrected in ADR-0001 and
+  `.env.example`, both of which now also record that SIE maps to `bookkeeping`
+  and that both payment resources map to `payment`.
+
+### Added
+
+- `docs/fortnox-integration-model.md` — how Fortnox apps and integrations
+  actually work, read from the vendor portal rather than assumed. The headline
+  for #50: **a private integration works immediately**, with no Fortnox review
+  or partner agreement; only marketplace publication needs those. Also records
+  token lifetimes (authorization code 10 min, access 1 h, **refresh 45 days,
+  rotating**), the 300/min limit that is really **25 requests per 5 seconds**,
+  and that changing an app's scopes requires re-authorization rather than
+  upgrading existing tokens.
+
+---
+
 ## [0.22.0] — 2026-09-08
 
 ### Security

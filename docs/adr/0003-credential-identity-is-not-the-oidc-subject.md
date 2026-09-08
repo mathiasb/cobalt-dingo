@@ -1,9 +1,9 @@
 ---
 adr:           0003
 title:         "Downstream credentials are keyed by an internal user ID, never by the OIDC subject"
-status:        proposed
+status:        accepted
 date:          2026-09-08
-deciders:      "pending: Mathias"
+deciders:      Mathias
 supersedes:    null
 verify:        "scripts/assert-credential-key-stability.sh"
 ---
@@ -12,8 +12,16 @@ verify:        "scripts/assert-credential-key-stability.sh"
 
 ## Status
 
-**Proposed.** Drafted by an agent while planning the credential-management UI
-(`docs/web-ui-plan.md`). Awaiting Mathias.
+**Accepted by Mathias, 2026-09-08**, with the migration to be run **now** rather
+than deferred.
+
+That timing is part of the decision, not an implementation detail. The re-key
+migration must execute while a session under the *current* OIDC subject still
+exists; after the next Authentik change of any kind — `sub_mode`, a recreated
+provider, a new IdP — the old-key-to-user mapping is gone and the existing
+Fortnox token is unrecoverable, leaving re-authorization as the only path. The
+alternative offered was "accept the decision, migrate later", and it was
+explicitly not taken.
 
 ## Context
 

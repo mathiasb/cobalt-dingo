@@ -55,11 +55,26 @@ taken from a document nobody checked, and replacing one unverified claim with
 another would have repeated the failure rather than fixed it.
 
 The full scope set, for reference when choosing the narrowest grant: `archive`,
-`article`, `assets`, `bookkeeping`, `connectfile`, `costcenter`, `currency`,
-`customer`, `developerapi`, `inbox`, `invoice`, `noxfinansinvoice`, `offer`,
-`order`, `payment`, `price`, `print`, `profile`, `project`, `salary`,
-`settings`, `supplier`, `supplierinvoice`, `timereporting`, `warehouse`,
-`warehousecustomdocument`.
+`article`, `assets`, `bookkeeping`, `companyinformation`, `connectfile`,
+`costcenter`, `currency`, `customer`, `developerapi`, `inbox`, `invoice`,
+`noxfinansinvoice`, `offer`, `order`, `payment`, `price`, `print`, `profile`,
+`project`, `salary`, `settings`, `supplier`, `supplierinvoice`,
+`timereporting`, `warehouse`, `warehousecustomdocument`. **27 scopes.**
+
+Corrected 2026-09-08 (second pass over the same page): an earlier revision of
+this amendment listed 26 and omitted `companyinformation`, which led to a
+recommendation that it be checked against the portal because it "is not in the
+documented list". It is — the page's table maps *Company Information* to
+`companyinformation`. The error came from transcribing the enumeration column by
+eye rather than reading every row, which is the same class of mistake as taking
+the read-only claim from a document nobody checked. Re-read, not re-remembered.
+
+Two mappings worth noting because they are not guessable from the scope name:
+
+- **SIE → `bookkeeping`.** Assumption A1 reads account 1930 via `/3/sie/4`, so it
+  needs no scope beyond one already in the recommended grant.
+- **Invoice Payments and Supplier Invoice Payments → `payment`.** This is what
+  makes `payment` the one to withhold: it is the scope that moves money.
 
 The repo actively asserted the opposite. `.env.example` said:
 
