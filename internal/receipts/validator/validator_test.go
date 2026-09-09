@@ -221,3 +221,33 @@ func validatorWithAccounts(t *testing.T, accounts []validator.Account) *validato
 	require.NoError(t, err)
 	return v
 }
+
+// A voucher date is a calendar DAY, not an instant. Comparing it against
+// time.Now() as an instant made "today" look like the future for the ~2 hours
+// each night when Stockholm has crossed midnight and UTC has not — a
+// bookkeeping validator that rejects same-day vouchers between 00:00 and 02:00
+// in summer time.
+//
+// Found 2026-09-10 at 00:0x, when an unrelated gate run went red.
+func TestTodayIsNeverInTheFuture(t *testing.T) {
+	v := validatorWithAccounts(t, knownAccounts)
+
+	for _, loc := range []string{"UTC", "Europe/Stockholm", "Pacific/Auckland", "America/Los_Angeles"} {
+		t.Run(loc, func(t *testing.T) {
+			l, err := time.LoadLocation(loc)
+			require.NoError(t, err)
+
+			voucher := validator.Voucher{
+				Description: "same-day voucher",
+				VoucherDate: time.Now().In(l).Format("2006-01-02"),
+				Rows: []validator.VoucherRow{
+					{Account: 6212, Debit: 360.00},
+					{Account: 2640, Debit: 90.00},
+					{Account: 2893, Credit: 450.00},
+				},
+			}
+			assert.NoError(t, v.ValidateVoucher(context.Background(), voucher),
+				"a voucher dated today must validate regardless of timezone")
+		})
+	}
+}

@@ -88,7 +88,18 @@ func (v *Validator) ValidateVoucher(ctx context.Context, voucher Voucher) error 
 
 func validateDate(date time.Time) []error {
 	var errs []error
-	now := time.Now()
+
+	// A voucher date is a calendar DAY, not an instant. Comparing instants made
+	// "today" read as the future whenever the local calendar had crossed
+	// midnight and UTC had not — roughly 00:00–02:00 in Swedish summer time.
+	// Both sides are reduced to a date before comparison.
+	day := func(t time.Time) time.Time {
+		y, m, d := t.Date()
+		return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+	}
+	date = day(date)
+	now := day(time.Now())
+
 	if date.After(now) {
 		errs = append(errs, fmt.Errorf("datum %s är i framtiden", date.Format("2006-01-02")))
 	}

@@ -66,3 +66,52 @@ func TestScopeDefaultsToEnvelopeOnly(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, s.FetchBodies, "bodies must be fetched only for matched mail, never for the whole search")
 }
+
+// The collector searched UNSEEN in INBOX, so it could only ever see mail
+// Mathias had never touched — which is the mail LEAST likely to be a receipt he
+// cares about. Three real Hetzner invoices were invisible to every scan in the
+// session because he had read them and Gmail had labelled them out of the inbox
+// (#81).
+func TestScopeDefaultsToAllMailNotInbox(t *testing.T) {
+	s, err := receipts.NewScope(receipts.ScopeConfig{
+		Since: time.Now().AddDate(0, -2, 0),
+		Max:   50,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "[Gmail]/All Mail", s.Folder,
+		"a receipt that has been read or archived is still an unrouted receipt")
+}
+
+func TestScopeFolderIsConfigurable(t *testing.T) {
+	s, err := receipts.NewScope(receipts.ScopeConfig{
+		Since: time.Now().AddDate(0, -2, 0), Max: 50, Folder: "INBOX",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "INBOX", s.Folder)
+}
+
+// \Seen is the user's read state. The collector was using it as its own work
+// queue, which fused two meanings: marking a receipt processed also marked it
+// read, and refusing to look at read mail meant it could never revisit anything.
+//
+// Processed-ness now lives in its own label, leaving \Seen to mean what it means
+// to Mathias.
+func TestCollectedMarkerIsALabelNotTheSeenFlag(t *testing.T) {
+	s, err := receipts.NewScope(receipts.ScopeConfig{
+		Since: time.Now().AddDate(0, -2, 0), Max: 50,
+	})
+	require.NoError(t, err)
+	assert.NotEmpty(t, s.CollectedLabel, "processed-ness needs a durable marker of its own")
+	assert.NotContains(t, s.CollectedLabel, "Seen")
+}
+
+// Already-collected mail must be skipped by identity that survives re-labelling
+// and folder moves. UIDs do not: they are per-folder and change on move.
+func TestAlreadyCollectedAreSkippedByMessageID(t *testing.T) {
+	seen := receipts.CollectedSet{"<abc@hetzner.com>": true}
+
+	assert.True(t, seen.Has("<abc@hetzner.com>"))
+	assert.True(t, seen.Has("  <abc@hetzner.com>  "), "whitespace must not defeat the check")
+	assert.False(t, seen.Has("<other@hetzner.com>"))
+	assert.False(t, seen.Has(""), "a message with no id must never count as collected")
+}

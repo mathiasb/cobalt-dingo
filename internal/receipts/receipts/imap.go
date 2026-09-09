@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-imap/v2/imapclient"
@@ -14,8 +15,10 @@ import (
 )
 
 // dialAndSelect connects, logs in, and selects the source's folder.
-func dialAndSelect(src *Source) (*imapclient.Client, error) {
-	folder := src.Folder
+func dialAndSelect(src *Source, folder string) (*imapclient.Client, error) {
+	if folder == "" {
+		folder = src.Folder
+	}
 	if folder == "" {
 		folder = "INBOX"
 	}
@@ -50,20 +53,22 @@ func dialAndSelect(src *Source) (*imapclient.Client, error) {
 // fetchMails connects to an IMAP server and returns the unseen messages in the
 // configured folder. It always fetches with PEEK so no \Seen flags change —
 // marking a message processed is the caller's job, only after a successful
-// forward (see Collector.markSeen).
-func fetchMails(src *Source, scope *Scope) ([]Mail, error) {
-	c, err := dialAndSelect(src)
+// forward (see Collector.markSeen, which now applies a label rather than \Seen).
+func fetchMails(src *Source, scope *Scope, collected CollectedSet) ([]Mail, error) {
+	c, err := dialAndSelect(src, scope.Folder)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = c.Close() }()
 
-	// Unseen AND recent. UNSEEN alone is the wrong queue signal when unread is
-	// the natural resting state of tens of thousands of messages — searching it
-	// unbounded is what made this tool unusable against a real mailbox (#79).
+	// Bounded by date only. UNSEEN is deliberately NOT a criterion: it is the
+	// user's read state, not a work queue, and filtering on it meant the
+	// collector could only ever see mail nobody had touched — three real
+	// Hetzner invoices were invisible for exactly that reason (#81).
+	//
+	// Already-handled mail is excluded below, by its own marker.
 	searchData, err := c.UIDSearch(&imap.SearchCriteria{
-		NotFlag: []imap.Flag{imap.FlagSeen},
-		Since:   scope.Since,
+		Since: scope.Since,
 	}, nil).Wait()
 	if err != nil {
 		return nil, fmt.Errorf("imap search: %w", err)
@@ -93,6 +98,9 @@ func fetchMails(src *Source, scope *Scope) ([]Mail, error) {
 
 	mails := make([]Mail, 0, len(msgs))
 	for _, msg := range msgs {
+		if msg.Envelope != nil && collected.Has(msg.Envelope.MessageID) {
+			continue
+		}
 		m, err := parseMessage(src.Name, msg)
 		if err != nil {
 			// Skip a malformed message rather than aborting the whole account.
@@ -104,14 +112,21 @@ func fetchMails(src *Source, scope *Scope) ([]Mail, error) {
 	return mails, nil
 }
 
-// markSeen adds the \Seen flag to the given UIDs so a future run's UNSEEN
-// search skips them. Called only for mails that forwarded successfully, so an
-// unmatched or failed-to-forward mail is never silently consumed.
-func markSeen(src *Source, uids []uint32) error {
+// markCollected records that these messages have been handled, by copying them
+// into the collector's own label.
+//
+// It no longer sets \Seen. That flag is the user's read state, and using it as
+// a work queue fused two meanings: marking a receipt processed also marked it
+// read, and skipping read mail meant the collector could never revisit anything
+// (#81). A label of its own keeps the two separate.
+//
+// Copy rather than move: in Gmail a copy into a label ADDS the label and leaves
+// the message where it is.
+func markCollected(src *Source, scope *Scope, uids []uint32) error {
 	if len(uids) == 0 {
 		return nil
 	}
-	c, err := dialAndSelect(src)
+	c, err := dialAndSelect(src, scope.Folder)
 	if err != nil {
 		return err
 	}
@@ -121,14 +136,43 @@ func markSeen(src *Source, uids []uint32) error {
 	for i, u := range uids {
 		imapUIDs[i] = imap.UID(u)
 	}
-	if _, err := c.Store(imap.UIDSetNum(imapUIDs...), &imap.StoreFlags{
-		Op:     imap.StoreFlagsAdd,
-		Flags:  []imap.Flag{imap.FlagSeen},
-		Silent: true,
-	}, nil).Collect(); err != nil {
-		return fmt.Errorf("imap store \\Seen: %w", err)
+	if _, err := c.Copy(imap.UIDSetNum(imapUIDs...), scope.CollectedLabel).Wait(); err != nil {
+		return fmt.Errorf("imap copy to %s: %w", scope.CollectedLabel, err)
 	}
 	return nil
+}
+
+// loadCollected reads the Message-IDs already handled, so a run skips them.
+// Keyed by Message-ID because UIDs are per-folder and change when Gmail
+// re-labels a message.
+func loadCollected(src *Source, scope *Scope) (CollectedSet, error) {
+	out := CollectedSet{}
+	c, err := dialAndSelect(src, scope.CollectedLabel)
+	if err != nil {
+		// The label will not exist before the first run. That is not an error:
+		// nothing has been collected yet.
+		return out, nil //nolint:nilerr // absent label means an empty set
+	}
+	defer func() { _ = c.Close() }()
+
+	search, err := c.UIDSearch(&imap.SearchCriteria{}, nil).Wait()
+	if err != nil {
+		return out, nil //nolint:nilerr // an unreadable marker must not block collection
+	}
+	uids := search.AllUIDs()
+	if len(uids) == 0 {
+		return out, nil
+	}
+	msgs, err := c.Fetch(imap.UIDSetNum(uids...), &imap.FetchOptions{Envelope: true}).Collect()
+	if err != nil {
+		return out, nil //nolint:nilerr
+	}
+	for _, m := range msgs {
+		if m.Envelope != nil && strings.TrimSpace(m.Envelope.MessageID) != "" {
+			out[strings.TrimSpace(m.Envelope.MessageID)] = true
+		}
+	}
+	return out, nil
 }
 
 // parseMessage converts a fetched IMAP message into our Mail type.

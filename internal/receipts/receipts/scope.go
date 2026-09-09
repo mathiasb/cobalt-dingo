@@ -2,6 +2,7 @@ package receipts
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -10,6 +11,15 @@ import (
 // collector unusable: 41,000 unread messages, full bodies, against Gmail's
 // 2,500 MB/day IMAP ceiling (#79).
 const maxWindow = 400 * 24 * time.Hour
+
+const (
+	// defaultFolder is All Mail, not INBOX. Read and archived receipts are
+	// still unrouted receipts.
+	defaultFolder = "[Gmail]/All Mail"
+
+	// defaultCollectedLabel keeps processed-ness out of the user's read state.
+	defaultCollectedLabel = "cobalt-dingo/collected"
+)
 
 // ScopeConfig bounds a collection run.
 type ScopeConfig struct {
@@ -22,6 +32,18 @@ type ScopeConfig struct {
 	// exceeding it is an error.
 	Max int
 
+	// Folder to search. Defaults to All Mail rather than INBOX: a receipt that
+	// has been read or archived is still an unrouted receipt, and searching
+	// INBOX meant the collector could only see mail nobody had touched (#81).
+	Folder string
+
+	// CollectedLabel marks mail this tool has already handled. Defaults to a
+	// label of its own rather than the \Seen flag — \Seen is the user's read
+	// state, and overloading it fused two meanings: marking a receipt processed
+	// also marked it read, and skipping read mail meant never revisiting
+	// anything.
+	CollectedLabel string
+
 	// FetchBodies pulls full message bodies during the search. Off by default:
 	// routing needs only sender and subject, and bodies are fetched afterwards
 	// for the handful that matched.
@@ -30,9 +52,11 @@ type ScopeConfig struct {
 
 // Scope is a validated collection bound.
 type Scope struct {
-	Since       time.Time
-	Max         int
-	FetchBodies bool
+	Since          time.Time
+	Max            int
+	Folder         string
+	CollectedLabel string
+	FetchBodies    bool
 }
 
 // NewScope validates a bound, refusing rather than defaulting.
@@ -51,7 +75,19 @@ func NewScope(cfg ScopeConfig) (*Scope, error) {
 	if cfg.Max <= 0 {
 		return nil, fmt.Errorf("scope has no message cap: a first run over a long window would forward hundreds unattended")
 	}
-	return &Scope{Since: cfg.Since, Max: cfg.Max, FetchBodies: cfg.FetchBodies}, nil
+	folder := cfg.Folder
+	if folder == "" {
+		folder = defaultFolder
+	}
+	label := cfg.CollectedLabel
+	if label == "" {
+		label = defaultCollectedLabel
+	}
+	return &Scope{
+		Since: cfg.Since, Max: cfg.Max,
+		Folder: folder, CollectedLabel: label,
+		FetchBodies: cfg.FetchBodies,
+	}, nil
 }
 
 // Check reports whether a candidate count is safe to process.
@@ -65,4 +101,22 @@ func (s *Scope) Check(candidates int) error {
 			candidates, s.Max)
 	}
 	return nil
+}
+
+// CollectedSet is the set of Message-IDs this tool has already handled.
+//
+// Keyed by Message-ID rather than UID: UIDs are per-folder and change when a
+// message moves, so a UID-keyed record silently stops matching the moment Gmail
+// re-labels something.
+type CollectedSet map[string]bool
+
+// Has reports whether a message has already been collected. An empty id is
+// never collected — a message without one must be reconsidered rather than
+// silently skipped.
+func (c CollectedSet) Has(messageID string) bool {
+	id := strings.TrimSpace(messageID)
+	if id == "" {
+		return false
+	}
+	return c[id]
 }

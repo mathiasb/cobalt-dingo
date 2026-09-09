@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,7 +25,8 @@ func newTestCollector(dryRun bool, mails []Mail, failUID uint32) (*Collector, *[
 	c := &Collector{
 		router: router,
 		dryRun: dryRun,
-		fetch:  func(_ *Source, _ *Scope) ([]Mail, error) { return mails, nil },
+		fetch:  func(_ *Source, _ *Scope, _ CollectedSet) ([]Mail, error) { return mails, nil },
+		scope:  testScope(),
 		deliverFn: func(m Mail, _ *Destination) error {
 			delivered = append(delivered, m.UID)
 			if m.UID == failUID {
@@ -32,7 +34,7 @@ func newTestCollector(dryRun bool, mails []Mail, failUID uint32) (*Collector, *[
 			}
 			return nil
 		},
-		markSeen: func(_ *Source, uids []uint32) error {
+		markSeen: func(_ *Source, _ *Scope, uids []uint32) error {
 			marked = append(marked, uids...)
 			return nil
 		},
@@ -71,4 +73,13 @@ func TestProcessAccount_dryRun_marksAndSendsNothing(t *testing.T) {
 	assert.Empty(t, *delivered, "dry run forwards nothing")
 	assert.Empty(t, *marked, "dry run marks nothing \\Seen")
 	assert.Equal(t, 2, res.Routed, "dry run still counts what would route")
+}
+
+// testScope is the minimum valid bound; Run refuses without one.
+func testScope() *Scope {
+	s, err := NewScope(ScopeConfig{Since: time.Now().AddDate(0, -1, 0), Max: 100})
+	if err != nil {
+		panic(err)
+	}
+	return s
 }

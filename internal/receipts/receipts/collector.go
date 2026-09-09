@@ -66,9 +66,9 @@ type Collector struct {
 	smtp    SMTPConfig
 
 	// Seams — overridable in tests. Default to the real IMAP/SMTP impls.
-	fetch     func(src *Source, scope *Scope) ([]Mail, error)
+	fetch     func(src *Source, scope *Scope, collected CollectedSet) ([]Mail, error)
 	deliverFn func(m Mail, dest *Destination) error
-	markSeen  func(src *Source, uids []uint32) error
+	markSeen  func(src *Source, scope *Scope, uids []uint32) error
 }
 
 // NewCollector constructs a Collector. When dryRun is true no mail is
@@ -78,7 +78,7 @@ func NewCollector(sources []*Source, router *Router, dryRun bool, smtp SMTPConfi
 	c := &Collector{sources: sources, router: router, dryRun: dryRun, smtp: smtp}
 	c.fetch = fetchMails
 	c.deliverFn = c.deliver
-	c.markSeen = markSeen
+	c.markSeen = markCollected
 	return c
 }
 
@@ -98,7 +98,18 @@ func (c *Collector) Run(ctx context.Context) ([]CollectorResult, error) {
 func (c *Collector) processAccount(_ context.Context, src *Source) (CollectorResult, error) {
 	result := CollectorResult{Account: src.Name}
 
-	mails, err := c.fetch(src, c.scope)
+	if c.scope == nil {
+		// Fail closed. An unbounded collector against a real backlog searches
+		// tens of thousands of messages (#79); panicking on a nil scope, or
+		// worse silently defaulting to everything, is not an option.
+		return result, fmt.Errorf("collector has no scope: call WithScope before Run")
+	}
+
+	collected, err := loadCollected(src, c.scope)
+	if err != nil {
+		return result, err
+	}
+	mails, err := c.fetch(src, c.scope, collected)
 	if err != nil {
 		return result, err
 	}
@@ -127,7 +138,7 @@ func (c *Collector) processAccount(_ context.Context, src *Source) (CollectorRes
 	}
 
 	if !c.dryRun && len(forwarded) > 0 {
-		if err := c.markSeen(src, forwarded); err != nil {
+		if err := c.markSeen(src, c.scope, forwarded); err != nil {
 			result.Errors = append(result.Errors, fmt.Errorf("markera \\Seen: %w", err))
 		}
 	}
