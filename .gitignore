@@ -6,6 +6,8 @@ bin/
 /probe-sandbox
 /e2e-seed
 /e2e-teardown
+/receipts-check
+/receipts-collector
 
 # Reference data (not source-of-truth, available via vendor docs)
 fortnox-openapi.json
@@ -30,6 +32,12 @@ secrets/
 config/receipt-sources.yml
 config/receipts/receipt-sources.yml
 !config/receipts/receipt-sources.example.yml
+
+# op run env-files. These hold op:// REFERENCES rather than secret values, but
+# they are per-operator and name real vault items. NOTE: the `.env.*` rule above
+# does NOT cover this name — it matches `.env.<something>`, not `.op-*.env`.
+.op-*.env
+!.op-*.example.env
 
 # IDE
 .idea/

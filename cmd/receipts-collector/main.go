@@ -10,47 +10,7 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/mathiasb/cobalt-dingo/internal/receipts/receipts"
-	"gopkg.in/yaml.v3"
 )
-
-const (
-	configPath = "config/receipt-sources.yml"
-
-	// exampleConfigPath is the template users copy. It is asserted to load into
-	// the structs below by TestExampleConfigLoadsIntoTheStructsThisBinaryUses —
-	// yaml.v3 ignores unknown fields, so a drifted example produces an empty
-	// config and a collector that silently does nothing.
-	exampleConfigPath = "../../config/receipts/receipt-sources.example.yml"
-)
-
-type configFile struct {
-	Sources      []sourceConfig      `yaml:"sources"`
-	Destinations []destinationConfig `yaml:"destinations"`
-	Rules        []ruleConfig        `yaml:"rules"`
-}
-
-type sourceConfig struct {
-	Name        string `yaml:"name"`
-	Host        string `yaml:"host"`
-	Port        int    `yaml:"port"`
-	Username    string `yaml:"username"`
-	PasswordEnv string `yaml:"password_env"`
-	Folder      string `yaml:"folder"`
-	TLS         bool   `yaml:"tls"`
-}
-
-type destinationConfig struct {
-	Name    string `yaml:"name"`
-	Type    string `yaml:"type"`
-	Address string `yaml:"address"`
-}
-
-type ruleConfig struct {
-	Name         string   `yaml:"name"`
-	MatchFrom    []string `yaml:"match_from"`
-	MatchSubject []string `yaml:"match_subject"`
-	Destination  string   `yaml:"destination"`
-}
 
 func main() {
 	_ = godotenv.Load()
@@ -62,46 +22,17 @@ func main() {
 		}
 	}
 
-	cfg, err := loadConfig(configPath)
+	cfg, err := receipts.LoadConfig(receipts.DefaultConfigPath)
 	if err != nil {
-		log.Fatalf("fel vid läsning av %s: %v", configPath, err)
+		log.Fatalf("config: %v", err)
 	}
 
-	sources := make([]*receipts.Source, 0, len(cfg.Sources))
-	for _, s := range cfg.Sources {
-		password := os.Getenv(s.PasswordEnv)
-		if password == "" {
-			log.Fatalf("miljövariabel %s är inte satt (source: %s)", s.PasswordEnv, s.Name) //nolint:misspell
-		}
-		sources = append(sources, &receipts.Source{
-			Name:     s.Name,
-			Host:     s.Host,
-			Port:     s.Port,
-			Username: s.Username,
-			Password: password,
-			Folder:   s.Folder,
-			TLS:      s.TLS,
-		})
+	sources, err := cfg.SourceList()
+	if err != nil {
+		log.Fatalf("credentials: %v", err)
 	}
-
-	dests := make([]*receipts.Destination, 0, len(cfg.Destinations))
-	for _, d := range cfg.Destinations {
-		dests = append(dests, &receipts.Destination{
-			Name:    d.Name,
-			Type:    d.Type,
-			Address: d.Address,
-		})
-	}
-
-	rules := make([]receipts.Rule, 0, len(cfg.Rules))
-	for _, r := range cfg.Rules {
-		rules = append(rules, receipts.Rule{
-			Name:         r.Name,
-			MatchFrom:    r.MatchFrom,
-			MatchSubject: r.MatchSubject,
-			Destination:  r.Destination,
-		})
-	}
+	dests := cfg.DestinationList()
+	rules := cfg.RuleList()
 
 	smtpCfg := receipts.SMTPConfig{
 		Host:     os.Getenv("SMTP_HOST"),
@@ -149,18 +80,4 @@ func atoiDefault(s string, def int) int {
 		return n
 	}
 	return def
-}
-
-func loadConfig(path string) (*configFile, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, fmt.Errorf("öppna %s: %w", path, err)
-	}
-	defer func() { _ = f.Close() }()
-
-	var cfg configFile
-	if err := yaml.NewDecoder(f).Decode(&cfg); err != nil {
-		return nil, fmt.Errorf("tolka yaml: %w", err)
-	}
-	return &cfg, nil
 }
