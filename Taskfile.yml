@@ -180,6 +180,23 @@ tasks:
     cmds:
       - source .env && FORTNOX_MODE=production go run ./cmd/fortnox-check
 
+  # ── Receipt collector ───────────────────────────────────────────────────────
+
+  receipts:check:
+    desc: >-
+      Verify every configured mail account authenticates. Read-only: opens each
+      folder with EXAMINE, so it cannot change \Seen. Reads secrets via op run;
+      passwords never reach argv or stdout.
+    cmds:
+      - op run --env-file=.op-receipts.env -- go run ./cmd/receipts-check
+
+  receipts:dry-run:
+    desc: >-
+      Classify mail without forwarding anything and without marking anything
+      read. Always check receipts:check first.
+    cmds:
+      - op run --env-file=.op-receipts.env -- env DRY_RUN=true go run ./cmd/receipts-collector
+
   # ── Database ────────────────────────────────────────────────────────────────
 
   db:migrate:

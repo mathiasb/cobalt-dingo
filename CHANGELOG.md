@@ -14,6 +14,81 @@ the domain model or port interfaces will be called out explicitly.
 
 ---
 
+## [0.24.0] — 2026-09-08
+
+### Fixed
+
+- **Routing rules ANDed their criteria, not ORed** (#56, #48). `ruleMatches`
+  returned true if *either* the sender or the subject matched, so a rule naming
+  both — which is how every rule in the routing config is written — fired on the
+  subject alone. Any mail from anyone with "Invoice" in the subject would have
+  routed to Fortnox as a supplier invoice, and the sender constraint was
+  decorative. Nothing caught it because every rule in the existing tests named
+  only one criterion. Criteria are now ANDed, alternatives within a criterion
+  ORed, and an omitted criterion is not a constraint, so single-criterion rules
+  are unchanged.
+
+- **The example routing config did not load into the binary that reads it.** It
+  used `accounts:` with nested `imap:` blocks, rules with nested `match:` maps
+  and a destinations *map*; `cmd/receipts-collector` expects `sources:`,
+  flat `match_from` / `match_subject` lists and a destinations *list*. It failed
+  to parse outright — and had it parsed, `yaml.v3` ignores unknown fields, so
+  following the documented steps would have produced zero sources, zero rules
+  and a collector that ran, forwarded nothing and reported success. Rewritten to
+  the real schema, with every vendor from #56 preserved.
+
+- **The example lived at a path nothing reads.** `config/receipts/receipt-sources.example.yml`,
+  while the loader opens `config/receipt-sources.yml`. Both paths are now
+  gitignored for the real file and the example names the right destination.
+
+- **`.gitignore` did not cover `.op-*.env`.** The existing `.env.*` rule matches
+  `.env.<something>`, not `.op-receipts.env` — a distinction easy to assert and
+  easy to get wrong. Caught by checking `git check-ignore` rather than by reading
+  the pattern.
+
+- **`.gitignore` did not exclude the real routing config**, which carries IMAP
+  usernames and the Mynt and Fortnox inbox addresses. #56 asserted it was
+  ignored; it was not. Added, with a negative rule keeping the example tracked.
+
+- The drop rule for Apple price-change notices sat *after* the Apple receipt
+  rule, so first-match-wins meant it could never fire. Moved to the top, and it
+  now matches the Swedish subject as well as the English one.
+
+### Added
+
+- **`cmd/receipts-check` and `task receipts:check`** — proves every configured
+  mail account authenticates before the collector is pointed at real mail. It
+  opens each folder with **EXAMINE, not SELECT**, so it is read-only at the
+  protocol level and cannot set `\Seen` even if something below it is wrong.
+  Passwords resolve inside an `op run` subprocess and never reach argv or stdout.
+  Verified against three live Gmail accounts.
+
+- `.op-receipts.example.env` — the `op run` env-file template. Holds `op://`
+  references, not values. Records why these items live in the **HomeLab** vault
+  rather than AgentSecrets: a Gmail App Password is minted by a human inside a
+  Google account, so its creation is operator-governed, and AgentSecrets is for
+  keys the agent generates. Also records that all references must resolve from
+  one vault, because a mixed-vault env-file fails wholesale.
+
+- Config loading moved to `internal/receipts/receipts/config.go` with a
+  `Validate` that rejects a file which parses but does nothing — no sources, no
+  rules, an inline password instead of `password_env`, a rule matching nothing,
+  or a rule pointing at a destination that does not exist. Previously the schema
+  lived privately inside `cmd/receipts-collector`, which is how it drifted out of
+  agreement with the example in the first place.
+
+- `TestExampleConfigLoads` — asserts the committed
+  example parses into `cmd/receipts-collector`'s own structs and yields non-empty
+  sources, destinations and rules, that no source inlines a password, and that
+  every rule points at a destination that exists. This is the assertion whose
+  absence let the example drift out of usability unnoticed.
+
+- `TestRuleWithBothCriteriaRequiresBoth` and `TestSingleCriterionRulesStillMatch`.
+  Both fixes mutation-verified: restoring the OR, and drifting the example's
+  `sources:` key back to `accounts:`, each turn the suite red.
+
+---
+
 ## [0.23.0] — 2026-09-08
 
 ### Decided

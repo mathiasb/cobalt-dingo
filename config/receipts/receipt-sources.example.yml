@@ -1,170 +1,253 @@
-# Receipt Collector – konfigurationsschema
+# Receipt collector — konfiguration
 #
-# Kopiera till config/receipt-sources.yml och fyll i dina värden.
-# Lägg ALDRIG in lösenord här – använd miljövariabler eller secrets-store.
-# Se .env.example för tillgängliga env-variabler.
+# Kopiera till  config/receipt-sources.yml  (sökvägen cmd/receipts-collector
+# faktiskt läser) och fyll i dina värden. Filen är gitignorerad.
+#
+# Lägg ALDRIG ett lösenord i den här filen. Konton anger `password_env`, alltså
+# NAMNET på en miljövariabel; värdet hämtas från miljön vid start.
+#
+# Schemat här är asserterat mot binärens egna structs av
+# TestExampleConfigLoadsIntoTheStructsThisBinaryUses. yaml.v3 ignorerar okända
+# fält, så en exempelfil som glidit isär från koden ger en tom konfiguration och
+# en collector som tyst gör ingenting — därför testas det istället för att läsas.
 
 # ---------------------------------------------------------------------------
 # Mailkonton (IMAP)
+#
+# Hämtas alltid med PEEK, så inga \Seen-flaggor ändras vid läsning. Ett mail
+# markeras som läst först när det vidarebefordrats (se Collector.markSeen).
 # ---------------------------------------------------------------------------
-accounts:
-  - id: personal-gmail           # Unikt ID, används i routing-regler
-    label: "Privat Gmail"
-    imap:
-      host: imap.gmail.com
-      port: 993
-      tls: true
-      username: "${GMAIL_USER}"         # env-variabel
-      password: "${GMAIL_APP_PASSWORD}" # App-lösenord, inte vanligt lösenord
-    search_folder: INBOX
-    processed_label: coo-agent/processed  # Gmail-label som sätts efter hantering
+sources:
+  - name: personal-gmail
+    host: imap.gmail.com
+    port: 993
+    tls: true
+    username: din.adress@gmail.com
+    password_env: GMAIL_APP_PASSWORD_PERSONAL # App-lösenord, inte kontolösenord
+    folder: INBOX
 
-  # Exempel: ytterligare konto (Fastmail, Proton, etc.)
-  # - id: work-fastmail
-  #   label: "Jobbmail"
-  #   imap:
-  #     host: imap.fastmail.com
-  #     port: 993
-  #     tls: true
-  #     username: "${FASTMAIL_USER}"
-  #     password: "${FASTMAIL_APP_PASSWORD}"
-  #   search_folder: INBOX
-  #   processed_label: coo-agent/processed
+  # Ytterligare konton får varsin egen env-variabel — dela aldrig en.
+  # - name: work-gmail
+  #   host: imap.gmail.com
+  #   port: 993
+  #   tls: true
+  #   username: jobb.adressen@gmail.com
+  #   password_env: GMAIL_APP_PASSWORD_WORK
+  #   folder: INBOX
 
 # ---------------------------------------------------------------------------
-# Destinations
+# Destinationer
+#
+# type: smtp              — vidarebefordran via SMTP till `address`
+#       fortnox-receipts  — uppladdning till Fortnox kvitto-inbox
+#       fortnox-invoices  — uppladdning till Fortnox leverantörsfaktura-inbox
 # ---------------------------------------------------------------------------
 destinations:
-  mynt:
-    type: email_forward
-    address: "${MYNT_RECEIPT_EMAIL}"   # kvitto+<hash>@mynt.se
+  - name: mynt
+    type: smtp
+    address: kvitto+DITT-HASH@mynt.se
 
-  fortnox_receipt:
-    type: email_forward
-    address: "${FORTNOX_RECEIPT_EMAIL}" # inbox.ver.<ditt-orgnr>@arkivplats.se
+  - name: fortnox-receipts
+    type: smtp
+    address: inbox.ver.DITT-ORGNR@arkivplats.se
 
-  fortnox_invoice:
-    type: email_forward
-    address: "${FORTNOX_INVOICE_EMAIL}" # inbox.lev.<ditt-orgnr>@arkivplats.se
+  - name: fortnox-invoices
+    type: smtp
+    address: inbox.lev.DITT-ORGNR@arkivplats.se
 
 # ---------------------------------------------------------------------------
-# Routing-regler
-# Utvärderas i ordning – första match vinner.
-# Fält: from_domain, from_address, subject_contains, subject_matches (regex)
-# Destination: mynt | fortnox_receipt | fortnox_invoice | null (ignorera)
+# Routingregler — utvärderas i ordning, första träff vinner.
+#
+# match_from     — exakt adress, eller *@domän
+# match_subject  — delsträng, skiftlägesokänslig
+#
+# Kriterier ANDas; alternativ inom ett kriterium ORas. En regel som anger både
+# match_from och match_subject kräver alltså BÅDA. Utelämnat kriterium är inte
+# en begränsning, så en regel med bara match_from matchar oavsett ämnesrad.
+#
+# destination: ""  — släng uttryckligen (regeln matchar, inget vidarebefordras)
 # ---------------------------------------------------------------------------
 rules:
-  # --- Leverantörsfakturor → Fortnox faktura ---
-  - id: hetzner-invoice
-    description: "Hetzner månads-/årsräkning"
-    match:
-      from_domain: hetzner.com
-      subject_contains: "Invoice"
-    destination: fortnox_invoice
+  # --- Släng först: en droppregel efter en bredare regel nås aldrig ---
+  - name: ignore-apple-price-change
+    match_from: ["*@email.apple.com"]
+    match_subject: ["price change", "prisändring"]
+    destination: ""
 
-  - id: bahnhof-invoice
-    description: "Bahnhof bredbandsräkning"
-    match:
-      from_domain: bahnhof.se
-    destination: fortnox_invoice
+  # --- Leverantörsfakturor → Fortnox ---
+  - name: hetzner-invoice
+    match_from: ["*@hetzner.com"]
+    match_subject: ["Invoice", "Faktura"]
+    destination: fortnox-invoices
+
+  - name: bahnhof-invoice
+    match_from: ["*@bahnhof.se"]
+    destination: fortnox-invoices
+
+  - name: telenor-invoice
+    match_from: ["*@telenor.se"]
+    destination: fortnox-invoices
+
+  - name: telia-invoice
+    match_from: ["*@telia.se"]
+    destination: fortnox-invoices
+
+  # BMW Financial Services kommer via Kivra-vidarebefordran, så avsändaren är
+  # Kivra och inte BMW — matcha på ämnesraden också.
+  - name: bmw-financial-services
+    match_from: ["*@kivra.com", "*@kivra.se"]
+    match_subject: ["BMW"]
+    destination: fortnox-invoices
+
+  - name: workforcelogiq-invoice
+    match_from: ["*@workforcelogiq.com"]
+    destination: fortnox-invoices
+
+  - name: soderberg-partners
+    match_from: ["*@soderbergpartners.se"]
+    destination: fortnox-invoices
 
   # --- Korttransaktioner → Mynt ---
-  - id: google-play-receipt
-    description: "Google Play prenumerationskvitto"
-    match:
-      from_domain: google.com
-      subject_contains: "Kvitto på din beställning från Google Play"
+  # Google sends payment receipts from payments-noreply@ under subjects well
+  # outside the two originally listed. Match the payments sender on its own and
+  # keep the subject constraint only for the general google.com address, which
+  # also carries account and product mail.
+  - name: google-payments-receipt
+    match_from: ["payments-noreply@google.com"]
     destination: mynt
 
-  - id: apple-receipt
-    description: "Apple App Store / iCloud-faktura"
-    match:
-      from_domain: email.apple.com
-      subject_contains_any:
-        - "Your invoice from Apple"
-        - "Din faktura från Apple"
+  - name: google-play-receipt
+    match_from: ["*@google.com"]
+    match_subject: ["Kvitto på din beställning", "Google Play order receipt", "payment receipt"]
     destination: mynt
 
-  - id: amazon-receipt
-    description: "Amazon orderbekräftelse"
-    match:
-      from_domain_any:
-        - amazon.se
-        - amazon.com
-      subject_contains_any:
-        - "Your order"
-        - "Din beställning"
-        - "order confirmation"
+  # The subject allowlist was too narrow — three forwarded Apple receipts
+  # matched none of it. "receipt"/"kvitto"/"faktura" covers the variants without
+  # opening the rule to Apple's marketing, which the drop rule above catches.
+  - name: apple-receipt
+    match_from: ["*@email.apple.com"]
+    match_subject: ["invoice", "faktura", "kvitto", "receipt"]
     destination: mynt
 
-  - id: spotify-receipt
-    description: "Spotify månadskvitto"
-    match:
-      from_domain: spotify.com
-      subject_contains: "receipt"
+  - name: amazon-receipt
+    match_from: ["*@amazon.se", "*@amazon.com"]
+    match_subject: ["Your order", "Din beställning", "order confirmation"]
     destination: mynt
 
-  - id: nextory-receipt
-    match:
-      from_domain: nextory.com
+  - name: spotify-receipt
+    match_from: ["*@spotify.com"]
+    match_subject: ["receipt", "kvitto"]
     destination: mynt
 
-  - id: svd-receipt
-    description: "Svenska Dagbladet / Bonnier prenumeration"
-    match:
-      from_domain_any:
-        - bonniernews.se
-        - svd.se
+  - name: easypark-receipt
+    match_from: ["*@easypark.net"]
     destination: mynt
 
-  - id: sats-receipt
-    match:
-      from_domain: sats.com
+  # Parkster is a .se domain. The .com pattern never matched a single message.
+  - name: parkster-receipt
+    match_from: ["*@parkster.se", "*@parkster.com"]
     destination: mynt
 
-  - id: berget-receipt
-    match:
-      from_domain: berget.ai
+  - name: nextory-receipt
+    match_from: ["*@nextory.com"]
     destination: mynt
 
-  - id: easypark-receipt
-    match:
-      from_domain: easypark.net
+  - name: bonnier-svd-receipt
+    match_from: ["*@bonniernews.se", "*@svd.se"]
     destination: mynt
 
-  - id: parkster-receipt
-    match:
-      from_domain: parkster.com
+  - name: sats-receipt
+    match_from: ["*@sats.com"]
     destination: mynt
 
-  - id: anthropic-receipt
-    description: "Claude Pro / Anthropic"
-    match:
-      from_domain: anthropic.com
-      subject_contains: "receipt"
+  - name: berget-receipt
+    match_from: ["*@berget.ai"]
     destination: mynt
 
-  - id: elevenlabs-receipt
-    match:
-      from_domain: elevenlabs.io
+  - name: perplexity-receipt
+    match_from: ["*@perplexity.ai"]
     destination: mynt
 
-  - id: perplexity-receipt
-    match:
-      from_domain: perplexity.ai
+  - name: elevenlabs-receipt
+    match_from: ["*@elevenlabs.io"]
     destination: mynt
 
-  # --- Kvitton utan kortknytning → Fortnox kvitto ---
-  - id: wolt-receipt
-    description: "Wolt matleverans – representationskostnad"
-    match:
-      from_domain: wolt.com
-    destination: fortnox_receipt
+  # Invoices arrive from the mail.anthropic.com SUBDOMAIN. `*@anthropic.com`
+  # matches the apex only, so this rule matched nothing for its whole life.
+  - name: anthropic-receipt
+    match_from: ["*@anthropic.com", "*@mail.anthropic.com"]
+    destination: mynt
 
-  # --- Ignorera (ej kvitton) ---
-  - id: ignore-apple-price-change
-    description: "Prisändringsavisering från Apple – inte ett kvitto"
-    match:
-      from_domain: email.apple.com
-      subject_contains: "price change"
-    destination: null
+  # --- Betalningsförmedlare (köpmannen står i ämnesraden, inte avsändaren) ---
+  # Ground truth: 2026-09-09 audit of 209 receipts forwarded by hand to Mynt.
+  # 39 senders matched no rule at all; these are the ones that recurred.
+  - name: stripe-receipt
+    match_from: ["*@stripe.com"]
+    destination: mynt
+
+  - name: paddle-receipt
+    match_from: ["*@paddle.com"]
+    destination: mynt
+
+  - name: zettle-receipt
+    match_from: ["*@zettle.com"]
+    destination: mynt
+
+  # --- Resor, parkering, vägavgifter ---
+  - name: uber-receipt
+    match_from: ["*@uber.com"]
+    destination: mynt
+
+  - name: sas-receipt
+    match_from: ["*@flysas.com"]
+    destination: mynt
+
+  - name: booking-receipt
+    match_from: ["*@booking.com", "*@property.booking.com"]
+    destination: mynt
+
+  - name: omio-receipt
+    match_from: ["*@omio.com"]
+    destination: mynt
+
+  - name: aimopark-receipt
+    match_from: ["*@aimopark.io"]
+    destination: mynt
+
+  - name: taxistockholm-receipt
+    match_from: ["*@taxistockholm.se"]
+    destination: mynt
+
+  - name: asfinag-receipt
+    match_from: ["*@asfinag.at"]
+    destination: mynt
+
+  # --- SaaS ---
+  - name: onepassword-receipt
+    match_from: ["*@1password.com"]
+    destination: mynt
+
+  # Mistral sends from two different subdomains — a merchant list reliably
+  # misses the second one.
+  - name: mistral-receipt
+    match_from: ["*@mistral.ai", "*@emails.mistral.ai"]
+    destination: mynt
+
+  - name: github-receipt
+    match_from: ["*@github.com"]
+    match_subject: ["receipt", "payment", "invoice"]
+    destination: mynt
+
+  - name: audible-receipt
+    match_from: ["*@audible.com"]
+    match_subject: ["receipt", "kvitto", "order"]
+    destination: mynt
+
+  - name: evernote-receipt
+    match_from: ["*@mg.evernote.com"]
+    destination: mynt
+
+  # --- Kvitton utan kortknytning → Fortnox ---
+  - name: wolt-receipt
+    match_from: ["*@wolt.com"]
+    destination: fortnox-receipts

@@ -6,6 +6,8 @@ bin/
 /probe-sandbox
 /e2e-seed
 /e2e-teardown
+/receipts-check
+/receipts-collector
 
 # Reference data (not source-of-truth, available via vendor docs)
 fortnox-openapi.json
@@ -24,6 +26,18 @@ vendor/
 secrets/
 .fortnox-tokens*.json
 .task/
+
+# Real receipt-collector config. Carries IMAP usernames and the Mynt/Fortnox
+# inbox addresses; the example beside it is the committed template.
+config/receipt-sources.yml
+config/receipts/receipt-sources.yml
+!config/receipts/receipt-sources.example.yml
+
+# op run env-files. These hold op:// REFERENCES rather than secret values, but
+# they are per-operator and name real vault items. NOTE: the `.env.*` rule above
+# does NOT cover this name — it matches `.env.<something>`, not `.op-*.env`.
+.op-*.env
+!.op-*.example.env
 
 # IDE
 .idea/
