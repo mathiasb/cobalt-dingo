@@ -108,14 +108,25 @@ rules:
     destination: fortnox-invoices
 
   # --- Korttransaktioner → Mynt ---
-  - name: google-play-receipt
-    match_from: ["*@google.com"]
-    match_subject: ["Kvitto på din beställning", "Your Google Play order receipt"]
+  # Google sends payment receipts from payments-noreply@ under subjects well
+  # outside the two originally listed. Match the payments sender on its own and
+  # keep the subject constraint only for the general google.com address, which
+  # also carries account and product mail.
+  - name: google-payments-receipt
+    match_from: ["payments-noreply@google.com"]
     destination: mynt
 
+  - name: google-play-receipt
+    match_from: ["*@google.com"]
+    match_subject: ["Kvitto på din beställning", "Google Play order receipt", "payment receipt"]
+    destination: mynt
+
+  # The subject allowlist was too narrow — three forwarded Apple receipts
+  # matched none of it. "receipt"/"kvitto"/"faktura" covers the variants without
+  # opening the rule to Apple's marketing, which the drop rule above catches.
   - name: apple-receipt
     match_from: ["*@email.apple.com"]
-    match_subject: ["Your invoice from Apple", "Din faktura från Apple", "Ditt kvitto från Apple"]
+    match_subject: ["invoice", "faktura", "kvitto", "receipt"]
     destination: mynt
 
   - name: amazon-receipt
@@ -132,8 +143,9 @@ rules:
     match_from: ["*@easypark.net"]
     destination: mynt
 
+  # Parkster is a .se domain. The .com pattern never matched a single message.
   - name: parkster-receipt
-    match_from: ["*@parkster.com"]
+    match_from: ["*@parkster.se", "*@parkster.com"]
     destination: mynt
 
   - name: nextory-receipt
@@ -160,8 +172,79 @@ rules:
     match_from: ["*@elevenlabs.io"]
     destination: mynt
 
+  # Invoices arrive from the mail.anthropic.com SUBDOMAIN. `*@anthropic.com`
+  # matches the apex only, so this rule matched nothing for its whole life.
   - name: anthropic-receipt
-    match_from: ["*@anthropic.com"]
+    match_from: ["*@anthropic.com", "*@mail.anthropic.com"]
+    destination: mynt
+
+  # --- Betalningsförmedlare (köpmannen står i ämnesraden, inte avsändaren) ---
+  # Ground truth: 2026-09-09 audit of 209 receipts forwarded by hand to Mynt.
+  # 39 senders matched no rule at all; these are the ones that recurred.
+  - name: stripe-receipt
+    match_from: ["*@stripe.com"]
+    destination: mynt
+
+  - name: paddle-receipt
+    match_from: ["*@paddle.com"]
+    destination: mynt
+
+  - name: zettle-receipt
+    match_from: ["*@zettle.com"]
+    destination: mynt
+
+  # --- Resor, parkering, vägavgifter ---
+  - name: uber-receipt
+    match_from: ["*@uber.com"]
+    destination: mynt
+
+  - name: sas-receipt
+    match_from: ["*@flysas.com"]
+    destination: mynt
+
+  - name: booking-receipt
+    match_from: ["*@booking.com", "*@property.booking.com"]
+    destination: mynt
+
+  - name: omio-receipt
+    match_from: ["*@omio.com"]
+    destination: mynt
+
+  - name: aimopark-receipt
+    match_from: ["*@aimopark.io"]
+    destination: mynt
+
+  - name: taxistockholm-receipt
+    match_from: ["*@taxistockholm.se"]
+    destination: mynt
+
+  - name: asfinag-receipt
+    match_from: ["*@asfinag.at"]
+    destination: mynt
+
+  # --- SaaS ---
+  - name: onepassword-receipt
+    match_from: ["*@1password.com"]
+    destination: mynt
+
+  # Mistral sends from two different subdomains — a merchant list reliably
+  # misses the second one.
+  - name: mistral-receipt
+    match_from: ["*@mistral.ai", "*@emails.mistral.ai"]
+    destination: mynt
+
+  - name: github-receipt
+    match_from: ["*@github.com"]
+    match_subject: ["receipt", "payment", "invoice"]
+    destination: mynt
+
+  - name: audible-receipt
+    match_from: ["*@audible.com"]
+    match_subject: ["receipt", "kvitto", "order"]
+    destination: mynt
+
+  - name: evernote-receipt
+    match_from: ["*@mg.evernote.com"]
     destination: mynt
 
   # --- Kvitton utan kortknytning → Fortnox ---

@@ -105,3 +105,98 @@ func TestExplicitDropRuleIsValid(t *testing.T) {
 	}
 	assert.NoError(t, c.Validate())
 }
+
+// The routing rules were written by listing merchants. These cases come from
+// ground truth instead: 209 receipts Mathias forwarded to the Mynt inbox by
+// hand, audited 2026-09-09. Each address below is one he decided was worth
+// booking and the rules missed.
+//
+// Four were outright pattern bugs that could never have matched anything.
+func TestRulesMatchTheSendersActuallyForwarded(t *testing.T) {
+	cfg, err := receipts.LoadConfig(repoPath(receipts.ExampleConfigPath))
+	require.NoError(t, err)
+	router := receipts.NewRouter(cfg.RuleList(), cfg.DestinationList())
+
+	cases := []struct {
+		what    string
+		from    string
+		subject string
+	}{
+		// The four bugs.
+		{
+			"Anthropic invoices come from a SUBDOMAIN, so *@anthropic.com never matched",
+			"invoice+statements@mail.anthropic.com", "Your invoice from Anthropic",
+		},
+		{
+			"Anthropic failed-payment notices, same subdomain",
+			"failed-payments@mail.anthropic.com", "Payment failed",
+		},
+		{
+			"Parkster is parkster.SE, not .com — the rule matched nothing",
+			"no-reply-charging@parkster.se", "Kvitto",
+		},
+		{
+			"Google payment receipts use subjects outside the listed set",
+			"payments-noreply@google.com", "Your Google payment receipt",
+		},
+		{
+			"Apple sends receipt subjects beyond the listed ones",
+			"no_reply@email.apple.com", "Your receipt from Apple",
+		},
+
+		// Payment intermediaries — the merchant is in the subject, not the sender.
+		{"Stripe", "invoice+statements+acct_1m07hslmdodimxbs@stripe.com", "Invoice paid"},
+		{"Paddle", "help@paddle.com", "Your receipt"},
+		{"Zettle", "no-reply@zettle.com", "Kvitto"},
+
+		// Travel, parking, tolls — the real long tail.
+		{"Uber", "noreply@uber.com", "Your Wednesday morning trip with Uber"},
+		{"SAS", "no-reply@flysas.com", "Din bokning"},
+		{"AimoPark", "no-reply@aimopark.io", "Kvitto parkering"},
+		{"Booking.com", "noreply-payments@booking.com", "Your payment"},
+		{"Omio", "service@omio.com", "Your booking confirmation"},
+		{"ASFINAG road toll", "shop@asfinag.at", "Ihre Rechnung"},
+		{"Taxi Stockholm", "noreply@taxistockholm.se", "Kvitto"},
+
+		// SaaS.
+		{"1Password", "hello@1password.com", "Your receipt"},
+		{"Mistral", "no-reply@mistral.ai", "Invoice"},
+		{"Mistral, second subdomain", "no-reply@emails.mistral.ai", "Invoice"},
+		{"GitHub", "noreply@github.com", "Payment receipt"},
+		{"Audible", "donotreply@audible.com", "Your receipt"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.from, func(t *testing.T) {
+			dest, ok := router.Route(receipts.Mail{From: tc.from, Subject: tc.subject})
+			require.True(t, ok, "no rule matched — %s", tc.what)
+			assert.NotNil(t, dest)
+		})
+	}
+}
+
+// Widening the rules must not turn them into "route everything". A receipt
+// rule that matches newsletters puts junk in the books, and the survey already
+// showed a flat domain list doing exactly that: `bonniernews.se` alone matched
+// 57 Expressen adverts.
+func TestRulesStillRejectNonReceipts(t *testing.T) {
+	cfg, err := receipts.LoadConfig(repoPath(receipts.ExampleConfigPath))
+	require.NoError(t, err)
+	router := receipts.NewRouter(cfg.RuleList(), cfg.DestinationList())
+
+	nonReceipts := []struct{ from, subject string }{
+		{"noreply-expressen@email.bonniernews.se", "Läs hela sommaren – 99 kr/mån i 3 månader!"},
+		{"svd@utskick.svd.se", "Veckans nyhetsbrev"},
+		{"noreply@notifications.kivra.com", "Kom ihåg att läsa brevet från Skatteverket"},
+		{"newsletters@technologyreview.com", "The Download: today's news"},
+		{"noreply@svenskalag.se", "Kallelse till match"},
+	}
+
+	for _, tc := range nonReceipts {
+		t.Run(tc.from, func(t *testing.T) {
+			if dest, ok := router.Route(receipts.Mail{From: tc.from, Subject: tc.subject}); ok {
+				t.Errorf("routed a non-receipt to %q — this puts junk in the books", dest.Name)
+			}
+		})
+	}
+}
