@@ -14,7 +14,7 @@ the domain model or port interfaces will be called out explicitly.
 
 ---
 
-## [0.24.0] — 2026-09-08
+## [0.24.0] — 2026-09-09
 
 ### Fixed
 
@@ -53,6 +53,33 @@ the domain model or port interfaces will be called out explicitly.
 - The drop rule for Apple price-change notices sat *after* the Apple receipt
   rule, so first-match-wins meant it could never fire. Moved to the top, and it
   now matches the Swedish subject as well as the English one.
+
+- **Routing rules matched 54% of what is actually forwarded; now 93%.**
+  Measured against ground truth — 209 receipts Mathias forwarded to the Mynt
+  inbox by hand — rather than against the merchant list someone wrote from
+  memory. Before: 112 covered from 5 senders, 95 missed across 39. After: 192
+  covered from 28 senders, 15 missed across 14.
+
+  Four misses were pattern bugs that could never have matched anything:
+  `anthropic` matched `*@anthropic.com` while invoices arrive from the
+  `mail.anthropic.com` **subdomain**; `parkster` matched `.com` for a `.se`
+  domain; and the `google` and `apple` subject allowlists were narrower than
+  the subjects those senders actually use.
+
+  These land **with** the AND-semantics fix rather than after it. Those subject
+  conditions are only too *tight* once criteria are correctly ANDed — under the
+  OR behaviour being replaced, `google-play-receipt` matched every message from
+  any `@google.com` address regardless of subject. Fixing one without the other
+  swaps a wrong behaviour for a different wrong behaviour.
+
+  The remaining additions show what the rule set was missing structurally: it
+  covered subscription merchants, while the real spend is travel, parking, road
+  tolls, payment intermediaries and SaaS. 15 one-off merchants still miss;
+  a merchant allowlist cannot cover a long tail (#78).
+
+- `TestRulesStillRejectNonReceipts` guards the opposite failure. Widening rules
+  to catch more receipts is how newsletters end up in the books — the flat
+  domain list this replaces counted 57 Expressen adverts as receipts.
 
 ### Added
 
