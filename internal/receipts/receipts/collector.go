@@ -38,12 +38,23 @@ type Source struct {
 
 // CollectorResult summarises one account's collection run.
 type CollectorResult struct {
-	Account        string
-	Processed      int
-	Routed         int
+	Account   string
+	Processed int
+	Routed    int
+
+	// RoutedMails records what WOULD be, or was, forwarded and where. A dry run
+	// that reports only a count cannot be reviewed: the operator has to see the
+	// sender, the subject and the destination before mail moves.
+	RoutedMails    []RoutedMail
 	UnmatchedCount int
 	UnmatchedMails []Mail
 	Errors         []error
+}
+
+// RoutedMail is one routing decision, for review.
+type RoutedMail struct {
+	Mail        Mail
+	Destination string
 }
 
 // Collector polls IMAP sources and routes mail via a Router.
@@ -51,10 +62,11 @@ type Collector struct {
 	sources []*Source
 	router  *Router
 	dryRun  bool
+	scope   *Scope
 	smtp    SMTPConfig
 
 	// Seams — overridable in tests. Default to the real IMAP/SMTP impls.
-	fetch     func(src *Source) ([]Mail, error)
+	fetch     func(src *Source, scope *Scope) ([]Mail, error)
 	deliverFn func(m Mail, dest *Destination) error
 	markSeen  func(src *Source, uids []uint32) error
 }
@@ -86,7 +98,7 @@ func (c *Collector) Run(ctx context.Context) ([]CollectorResult, error) {
 func (c *Collector) processAccount(_ context.Context, src *Source) (CollectorResult, error) {
 	result := CollectorResult{Account: src.Name}
 
-	mails, err := c.fetch(src)
+	mails, err := c.fetch(src, c.scope)
 	if err != nil {
 		return result, err
 	}
@@ -111,6 +123,7 @@ func (c *Collector) processAccount(_ context.Context, src *Source) (CollectorRes
 			forwarded = append(forwarded, m.UID)
 		}
 		result.Routed++
+		result.RoutedMails = append(result.RoutedMails, RoutedMail{Mail: m, Destination: dest.Name})
 	}
 
 	if !c.dryRun && len(forwarded) > 0 {
@@ -119,4 +132,12 @@ func (c *Collector) processAccount(_ context.Context, src *Source) (CollectorRes
 		}
 	}
 	return result, nil
+}
+
+// WithScope bounds what a run may process. Required before Run: an unbounded
+// collector against a real backlog searches tens of thousands of messages and
+// fetches every body (#79).
+func (c *Collector) WithScope(s *Scope) *Collector {
+	c.scope = s
+	return c
 }

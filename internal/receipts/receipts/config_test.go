@@ -128,10 +128,6 @@ func TestRulesMatchTheSendersActuallyForwarded(t *testing.T) {
 			"invoice+statements@mail.anthropic.com", "Your invoice from Anthropic",
 		},
 		{
-			"Anthropic failed-payment notices, same subdomain",
-			"failed-payments@mail.anthropic.com", "Payment failed",
-		},
-		{
 			"Parkster is parkster.SE, not .com — the rule matched nothing",
 			"no-reply-charging@parkster.se", "Kvitto",
 		},
@@ -196,6 +192,96 @@ func TestRulesStillRejectNonReceipts(t *testing.T) {
 		t.Run(tc.from, func(t *testing.T) {
 			if dest, ok := router.Route(receipts.Mail{From: tc.from, Subject: tc.subject}); ok {
 				t.Errorf("routed a non-receipt to %q — this puts junk in the books", dest.Name)
+			}
+		})
+	}
+}
+
+// Widening the rules by SENDER in #76 fixed a 46% miss rate and introduced a
+// false-positive rate: Anthropic, 1Password and Berget all send security
+// alerts and product mail from the same addresses as their invoices.
+//
+// Every case below was routed to bookkeeping in a live dry run on 2026-09-09.
+// None is a receipt.
+//
+// The earlier negative test only covered newsletters, because the positive
+// cases were drawn from the forwarded set — ground truth told us what to
+// catch and nothing told us what to avoid.
+func TestSecurityAlertsAndNoticesAreNotRouted(t *testing.T) {
+	cfg, err := receipts.LoadConfig(repoPath(receipts.ExampleConfigPath))
+	require.NoError(t, err)
+	router := receipts.NewRouter(cfg.RuleList(), cfg.DestinationList())
+
+	notReceipts := []struct{ what, from, subject string }{
+		{"1Password sign-in alert", "hello@1password.com", "New 1Password sign-in alert"},
+		{
+			"Claude device alert", "no-reply-i-8WdaVL4WaAnqoEP5iHig@mail.anthropic.com",
+			"Security alert: new trusted device added to your Claude account",
+		},
+		{
+			"Claude passkey alert", "no-reply-jhTwecdb9AxMhkbIec4erw@mail.anthropic.com",
+			"Security alert: new passkey added to your Claude account",
+		},
+		{
+			"Berget product announcement", "andreas@berget.ai",
+			"Early access: Kimi K3 is available for evaluation on Berget",
+		},
+		{
+			"a cancellation is not a purchase", "noreply@booking.com",
+			"Booking cancelled for Hotel Sonnenheim",
+		},
+		{
+			"a notice that no invoice was raised", "billing@hetzner.com",
+			"Minimum invoice amount not reached (K0499337726)",
+		},
+
+		// A failed payment means the charge did NOT succeed, so there is no
+		// expense to book — routing it would record a purchase that never
+		// happened. An earlier test here asserted the opposite; that was my
+		// error. This belongs to forfall, which watches unmet obligations.
+		{
+			"a failed payment is not an expense",
+			"failed-payments@mail.anthropic.com", "Payment failed",
+		},
+
+		// A pre-notification of a charge that has not happened yet. Same
+		// category as a failed payment: booking it records an expense that
+		// does not exist. The real receipt follows once the card is charged.
+		{
+			"an upcoming charge is not yet an expense",
+			"no-reply-charging@parkster.se", "Kommande kortbetalning",
+		},
+	}
+
+	for _, tc := range notReceipts {
+		t.Run(tc.what, func(t *testing.T) {
+			if dest, ok := router.Route(receipts.Mail{From: tc.from, Subject: tc.subject}); ok {
+				t.Errorf("routed to %q — %s is not a receipt and this puts junk in the books",
+					dest.Name, tc.what)
+			}
+		})
+	}
+}
+
+// Tightening must not undo #76. The real receipts from those same senders have
+// to keep routing, or the fix trades one failure for the other.
+func TestRealReceiptsFromTheSameSendersStillRoute(t *testing.T) {
+	cfg, err := receipts.LoadConfig(repoPath(receipts.ExampleConfigPath))
+	require.NoError(t, err)
+	router := receipts.NewRouter(cfg.RuleList(), cfg.DestinationList())
+
+	receiptsFromMixedSenders := []struct{ from, subject string }{
+		{"invoice+statements@mail.anthropic.com", "Your receipt from Anthropic, PBC #2879-8484-5252"},
+		{"hello@1password.com", "Your receipt from 1Password"},
+		{"info@berget.ai", "Faktura 12345"},
+		{"noreply@booking.com", "Thanks! Your booking is confirmed at Hotel Sonnenheim"},
+		{"billing@hetzner.com", "Your Hetzner invoice 12345"},
+	}
+
+	for _, tc := range receiptsFromMixedSenders {
+		t.Run(tc.subject, func(t *testing.T) {
+			if _, ok := router.Route(receipts.Mail{From: tc.from, Subject: tc.subject}); !ok {
+				t.Errorf("a real receipt stopped routing — the tightening went too far")
 			}
 		})
 	}

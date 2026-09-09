@@ -69,6 +69,35 @@ destinations:
 # ---------------------------------------------------------------------------
 rules:
   # --- Släng först: en droppregel efter en bredare regel nås aldrig ---
+  # --- Släng först: en droppregel efter en bredare regel nås aldrig ---
+  #
+  # Dessa avsändare skickar BÅDE kvitton och säkerhetslarm/produktmail från
+  # samma adress. Sender-only-reglerna nedan skulle annars boka larmen.
+  # Hittade i en skarp dry run 2026-09-09.
+  - name: ignore-security-alerts
+    match_subject: ["security alert", "sign-in alert", "säkerhetsavisering", "new passkey", "new trusted device"]
+    destination: ""
+
+  - name: ignore-cancellations
+    match_subject: ["cancelled", "canceled", "avbokad", "avbokning", "makulerad"]
+    destination: ""
+
+  - name: ignore-no-invoice-raised
+    match_subject: ["minimum invoice amount not reached"]
+    destination: ""
+
+  # En misslyckad betalning är ingen kostnad att bokföra — den skulle registrera
+  # ett köp som aldrig skedde. Hör hemma i forfall, inte i bokföringen.
+  - name: ignore-failed-payments
+    match_subject: ["payment failed", "betalning misslyckades", "payment declined"]
+    destination: ""
+
+  # Förhandsavisering om ett kommande kortköp. Kostnaden finns inte ännu —
+  # det riktiga kvittot kommer när kortet faktiskt dras.
+  - name: ignore-upcoming-charges
+    match_subject: ["kommande kortbetalning", "upcoming payment", "upcoming charge", "kommande betalning"]
+    destination: ""
+
   - name: ignore-apple-price-change
     match_from: ["*@email.apple.com"]
     match_subject: ["price change", "prisändring"]
@@ -162,6 +191,7 @@ rules:
 
   - name: berget-receipt
     match_from: ["*@berget.ai"]
+    match_subject: ["receipt", "invoice", "faktura", "kvitto"]
     destination: mynt
 
   - name: perplexity-receipt
@@ -176,6 +206,7 @@ rules:
   # matches the apex only, so this rule matched nothing for its whole life.
   - name: anthropic-receipt
     match_from: ["*@anthropic.com", "*@mail.anthropic.com"]
+    match_subject: ["receipt", "invoice", "faktura", "kvitto"]
     destination: mynt
 
   # --- Betalningsförmedlare (köpmannen står i ämnesraden, inte avsändaren) ---
@@ -225,6 +256,7 @@ rules:
   # --- SaaS ---
   - name: onepassword-receipt
     match_from: ["*@1password.com"]
+    match_subject: ["receipt", "invoice", "faktura", "kvitto"]
     destination: mynt
 
   # Mistral sends from two different subdomains — a merchant list reliably

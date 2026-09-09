@@ -51,16 +51,19 @@ func dialAndSelect(src *Source) (*imapclient.Client, error) {
 // configured folder. It always fetches with PEEK so no \Seen flags change —
 // marking a message processed is the caller's job, only after a successful
 // forward (see Collector.markSeen).
-func fetchMails(src *Source) ([]Mail, error) {
+func fetchMails(src *Source, scope *Scope) ([]Mail, error) {
 	c, err := dialAndSelect(src)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = c.Close() }()
 
-	// Unseen = messages without the \Seen flag.
+	// Unseen AND recent. UNSEEN alone is the wrong queue signal when unread is
+	// the natural resting state of tens of thousands of messages — searching it
+	// unbounded is what made this tool unusable against a real mailbox (#79).
 	searchData, err := c.UIDSearch(&imap.SearchCriteria{
 		NotFlag: []imap.Flag{imap.FlagSeen},
+		Since:   scope.Since,
 	}, nil).Wait()
 	if err != nil {
 		return nil, fmt.Errorf("imap search: %w", err)
@@ -69,11 +72,19 @@ func fetchMails(src *Source) ([]Mail, error) {
 	if len(uids) == 0 {
 		return nil, nil
 	}
+	if err := scope.Check(len(uids)); err != nil {
+		return nil, err
+	}
 
+	// Envelopes only. Routing needs the sender and the subject; bodies are
+	// fetched afterwards for the handful that actually matched, which turns
+	// tens of thousands of body fetches into a few.
 	fetchOptions := &imap.FetchOptions{
-		UID:         true,
-		Envelope:    true,
-		BodySection: []*imap.FetchItemBodySection{{Peek: true}}, // never alter \Seen
+		UID:      true,
+		Envelope: true,
+	}
+	if scope.FetchBodies {
+		fetchOptions.BodySection = []*imap.FetchItemBodySection{{Peek: true}} // never alter \Seen
 	}
 	msgs, err := c.Fetch(imap.UIDSetNum(uids...), fetchOptions).Collect()
 	if err != nil {

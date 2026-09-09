@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/mathiasb/cobalt-dingo/internal/receipts/receipts"
@@ -45,8 +46,29 @@ func main() {
 		log.Fatal("SMTP_HOST måste sättas när DRY_RUN=false")
 	}
 
+	// Bound the run. Unbounded UNSEEN against a real backlog searches tens of
+	// thousands of messages and fetches every body (#79), so both the window and
+	// the cap are required rather than defaulted to "everything".
+	since := time.Now().AddDate(0, -2, 0)
+	if v := os.Getenv("RECEIPTS_SINCE"); v != "" {
+		t, perr := time.Parse("2006-01-02", v)
+		if perr != nil {
+			log.Fatalf("RECEIPTS_SINCE: %v", perr)
+		}
+		since = t
+	}
+	scope, serr := receipts.NewScope(receipts.ScopeConfig{
+		Since: since,
+		Max:   atoiDefault(os.Getenv("RECEIPTS_MAX"), 50),
+	})
+	if serr != nil {
+		log.Fatalf("scope: %v", serr)
+	}
+	fmt.Printf("scope: sedan %s, hogst %d meddelanden per korning\n",
+		scope.Since.Format("2006-01-02"), scope.Max)
+
 	router := receipts.NewRouter(rules, dests)
-	collector := receipts.NewCollector(sources, router, dryRun, smtpCfg)
+	collector := receipts.NewCollector(sources, router, dryRun, smtpCfg).WithScope(scope)
 
 	if dryRun {
 		fmt.Println("=== DRY RUN – inga mail vidarebefordras ===")
@@ -63,6 +85,13 @@ func main() {
 		fmt.Printf("  Hämtade:   %d\n", r.Processed)
 		fmt.Printf("  Routade:   %d\n", r.Routed)
 		fmt.Printf("  Omatchade: %d\n", r.UnmatchedCount)
+		for _, rm := range r.RoutedMails {
+			subj := rm.Mail.Subject
+			if len(subj) > 58 {
+				subj = subj[:58] + "..."
+			}
+			fmt.Printf("    -> %-18s %-34s %s\n", rm.Destination, rm.Mail.From, subj)
+		}
 		if len(r.Errors) > 0 {
 			exitCode = 1
 			fmt.Printf("  Fel:       %d\n", len(r.Errors))
