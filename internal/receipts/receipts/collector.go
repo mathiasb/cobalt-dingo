@@ -48,7 +48,15 @@ type CollectorResult struct {
 	RoutedMails    []RoutedMail
 	UnmatchedCount int
 	UnmatchedMails []Mail
-	Errors         []error
+
+	// DuplicateCount and DuplicateMails record mail that matched a rule but was
+	// already forwarded to the same destination by hand. Reported rather than
+	// dropped silently: a growing duplicate count is how a stale hand-forwarding
+	// habit becomes visible.
+	DuplicateCount int
+	DuplicateMails []Mail
+
+	Errors []error
 }
 
 // RoutedMail is one routing decision, for review.
@@ -66,9 +74,10 @@ type Collector struct {
 	smtp    SMTPConfig
 
 	// Seams — overridable in tests. Default to the real IMAP/SMTP impls.
-	fetch     func(src *Source, scope *Scope, collected CollectedSet) ([]Mail, error)
-	deliverFn func(m Mail, dest *Destination) error
-	markSeen  func(src *Source, scope *Scope, uids []uint32) error
+	fetch         func(src *Source, scope *Scope, collected CollectedSet) ([]Mail, error)
+	deliverFn     func(m Mail, dest *Destination) error
+	markSeen      func(src *Source, scope *Scope, uids []uint32) error
+	loadForwarded func(src *Source, scope *Scope) (ForwardedIndex, error)
 }
 
 // NewCollector constructs a Collector. When dryRun is true no mail is
@@ -79,6 +88,7 @@ func NewCollector(sources []*Source, router *Router, dryRun bool, smtp SMTPConfi
 	c.fetch = fetchMails
 	c.deliverFn = c.deliver
 	c.markSeen = markCollected
+	c.loadForwarded = c.loadForwardedByHand
 	return c
 }
 
@@ -109,6 +119,19 @@ func (c *Collector) processAccount(_ context.Context, src *Source) (CollectorRes
 	if err != nil {
 		return result, err
 	}
+	if c.loadForwarded == nil {
+		// Fail closed rather than dereferencing nil. A missing duplicate guard is
+		// the exact defect this guard exists to prevent: the collector and
+		// Mathias reach the same inboxes.
+		return result, fmt.Errorf("collector has no duplicate guard: refusing to run, since it would re-forward every receipt already sent by hand")
+	}
+
+	// Fail closed. An unreadable index is indistinguishable from an empty one,
+	// and an empty one means every receipt forwarded by hand goes again.
+	forwardedByHand, err := c.loadForwarded(src, c.scope)
+	if err != nil {
+		return result, err
+	}
 	mails, err := c.fetch(src, c.scope, collected)
 	if err != nil {
 		return result, err
@@ -124,6 +147,11 @@ func (c *Collector) processAccount(_ context.Context, src *Source) (CollectorRes
 		if !ok {
 			result.UnmatchedCount++
 			result.UnmatchedMails = append(result.UnmatchedMails, m)
+			continue
+		}
+		if forwardedByHand.Has(m.Subject) {
+			result.DuplicateCount++
+			result.DuplicateMails = append(result.DuplicateMails, m)
 			continue
 		}
 		if !c.dryRun {

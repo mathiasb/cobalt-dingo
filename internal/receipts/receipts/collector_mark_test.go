@@ -26,7 +26,10 @@ func newTestCollector(dryRun bool, mails []Mail, failUID uint32) (*Collector, *[
 		router: router,
 		dryRun: dryRun,
 		fetch:  func(_ *Source, _ *Scope, _ CollectedSet) ([]Mail, error) { return mails, nil },
-		scope:  testScope(),
+		loadForwarded: func(_ *Source, _ *Scope) (ForwardedIndex, error) {
+			return ForwardedIndex{}, nil
+		},
+		scope: testScope(),
 		deliverFn: func(m Mail, _ *Destination) error {
 			delivered = append(delivered, m.UID)
 			if m.UID == failUID {

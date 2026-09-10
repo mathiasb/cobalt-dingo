@@ -19,6 +19,12 @@ const (
 
 	// defaultCollectedLabel keeps processed-ness out of the user's read state.
 	defaultCollectedLabel = "cobalt-dingo/collected"
+
+	// defaultSentFolder is where the duplicate guard looks for receipts already
+	// forwarded by hand. Gmail localises this name — these accounts are Swedish,
+	// hence "Skickat". A wrong value is not silent: loadForwardedByHand fails the
+	// run rather than returning an empty index.
+	defaultSentFolder = "[Gmail]/Skickat"
 )
 
 // ScopeConfig bounds a collection run.
@@ -48,6 +54,11 @@ type ScopeConfig struct {
 	// routing needs only sender and subject, and bodies are fetched afterwards
 	// for the handful that matched.
 	FetchBodies bool
+
+	// SentFolder is searched for receipts already forwarded by hand, so the
+	// collector does not send them a second time. Defaults to Gmail's Swedish
+	// Sent folder.
+	SentFolder string
 }
 
 // Scope is a validated collection bound.
@@ -57,6 +68,7 @@ type Scope struct {
 	Folder         string
 	CollectedLabel string
 	FetchBodies    bool
+	SentFolder     string
 }
 
 // NewScope validates a bound, refusing rather than defaulting.
@@ -83,10 +95,15 @@ func NewScope(cfg ScopeConfig) (*Scope, error) {
 	if label == "" {
 		label = defaultCollectedLabel
 	}
+	sent := cfg.SentFolder
+	if sent == "" {
+		sent = defaultSentFolder
+	}
 	return &Scope{
 		Since: cfg.Since, Max: cfg.Max,
 		Folder: folder, CollectedLabel: label,
 		FetchBodies: cfg.FetchBodies,
+		SentFolder:  sent,
 	}, nil
 }
 

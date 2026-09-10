@@ -14,6 +14,34 @@ the domain model or port interfaces will be called out explicitly.
 
 ---
 
+## [0.26.0] — 2026-09-10
+
+### Added
+
+- **Duplicate-forward guard, wired into the collector and failing closed.** The
+  collector and Mathias reach the same Mynt and Fortnox inboxes, and he has
+  forwarded 209 receipts by hand. Before this, the first live run would have
+  re-sent every one of them still inside the scope window. `ForwardedIndex`
+  reads the account's Sent folder for mail addressed to a configured
+  destination, normalises the subjects (stripping `Fwd:`/`VB:`/`Re:`/`SV:`) and
+  skips matches, reporting them as `DuplicateCount`/`DuplicateMails` rather than
+  dropping them silently.
+
+  It fails closed in three ways, because an empty index is indistinguishable
+  from a working one that found nothing: an unreadable Sent folder aborts the
+  run, a router with no destination addresses aborts the run, and a `Collector`
+  with no guard wired at all aborts the run instead of dereferencing nil. The
+  guard was mutation-verified — disabling the skip fails two tests.
+
+- `ScopeConfig.SentFolder`, defaulting to `[Gmail]/Skickat`, overridable with
+  `RECEIPTS_SENT_FOLDER`. Gmail localises the name; a wrong value now fails the
+  run rather than yielding an empty guard.
+
+- `Router.DestinationAddresses()` — what "already forwarded to bookkeeping"
+  means, in one place.
+
+---
+
 ## [0.25.0] — 2026-09-10
 
 ### Fixed

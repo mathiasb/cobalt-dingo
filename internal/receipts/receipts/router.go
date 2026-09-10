@@ -1,6 +1,9 @@
 package receipts
 
-import "strings"
+import (
+	"sort"
+	"strings"
+)
 
 // Destination describes where matched mail should be forwarded.
 // Type is one of: "smtp", "fortnox-receipts", "fortnox-invoices".
@@ -31,6 +34,20 @@ func NewRouter(rules []Rule, destinations []*Destination) *Router {
 		dm[d.Name] = d
 	}
 	return &Router{rules: rules, destinations: dm}
+}
+
+// DestinationAddresses returns every configured destination address. The
+// duplicate guard searches Sent for these: they are what "already forwarded to
+// bookkeeping" means.
+func (r *Router) DestinationAddresses() []string {
+	out := make([]string, 0, len(r.destinations))
+	for _, d := range r.destinations {
+		if addr := strings.TrimSpace(d.Address); addr != "" {
+			out = append(out, addr)
+		}
+	}
+	sort.Strings(out) // map order is random; a stable order keeps runs comparable
+	return out
 }
 
 // Route returns the destination for m, or (nil, false) if no rule matches.

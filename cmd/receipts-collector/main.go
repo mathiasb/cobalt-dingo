@@ -60,12 +60,16 @@ func main() {
 	scope, serr := receipts.NewScope(receipts.ScopeConfig{
 		Since: since,
 		Max:   atoiDefault(os.Getenv("RECEIPTS_MAX"), 50),
+		// Gmail localises the Sent folder name. Overridable so a non-Swedish
+		// account does not need a rebuild — the duplicate guard fails the run
+		// if it cannot select this folder, so a wrong value is loud.
+		SentFolder: os.Getenv("RECEIPTS_SENT_FOLDER"),
 	})
 	if serr != nil {
 		log.Fatalf("scope: %v", serr)
 	}
-	fmt.Printf("scope: sedan %s, hogst %d meddelanden per korning\n",
-		scope.Since.Format("2006-01-02"), scope.Max)
+	fmt.Printf("scope: sedan %s, hogst %d meddelanden per korning, dubblettskydd mot %s\n",
+		scope.Since.Format("2006-01-02"), scope.Max, scope.SentFolder)
 
 	router := receipts.NewRouter(rules, dests)
 	collector := receipts.NewCollector(sources, router, dryRun, smtpCfg).WithScope(scope)
@@ -85,6 +89,14 @@ func main() {
 		fmt.Printf("  Hämtade:   %d\n", r.Processed)
 		fmt.Printf("  Routade:   %d\n", r.Routed)
 		fmt.Printf("  Omatchade: %d\n", r.UnmatchedCount)
+		fmt.Printf("  Dubbletter (redan vidarebefordrade för hand): %d\n", r.DuplicateCount)
+		for _, dm := range r.DuplicateMails {
+			subj := dm.Subject
+			if len(subj) > 58 {
+				subj = subj[:58] + "..."
+			}
+			fmt.Printf("    skip %-34s %s\n", dm.From, subj)
+		}
 		for _, rm := range r.RoutedMails {
 			subj := rm.Mail.Subject
 			if len(subj) > 58 {
