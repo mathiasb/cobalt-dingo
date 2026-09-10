@@ -14,6 +14,57 @@ the domain model or port interfaces will be called out explicitly.
 
 ---
 
+## [0.25.0] — 2026-09-10
+
+### Fixed
+
+- **The receipt collector could only see mail nobody had touched** (#81). It
+  searched `UNSEEN` in `INBOX`, so anything read or archived was invisible.
+  Three real Hetzner invoices were reported as non-existent because of it — one
+  was on screen while the agent asserted it was not there. Now searches All Mail
+  with no `\Seen` filter.
+
+  The substantive change is separating two fused meanings: `\Seen` is the
+  *user's read state*, and using it as the collector's work queue meant marking
+  a receipt handled also marked it read, and refusing to look at read mail meant
+  never revisiting anything. Processed-ness now lives in its own label
+  (`cobalt-dingo/collected`), keyed by Message-ID because UIDs change when Gmail
+  re-labels.
+
+- **The collector could not run against a real backlog** (#79). Unbounded
+  `UNSEEN` plus full body fetches meant 41,000 messages and gigabytes against
+  Gmail's 2,500 MB/day IMAP ceiling; the first dry run was killed after ten
+  minutes. Now bounded by `SINCE` with a per-run cap that **refuses rather than
+  truncates**, and envelopes are fetched before bodies — 2,854 body fetches
+  became fourteen.
+
+- **Six non-receipts were being routed into bookkeeping.** Widening rules by
+  sender in 0.24.0 fixed a 46% miss rate and introduced the opposite error:
+  Anthropic, 1Password and Berget send security alerts from the same addresses
+  as their invoices. Drop rules now shield them, plus subject constraints on the
+  three sender-only rules. Failed payments and upcoming charges are also dropped
+  — neither is an expense that exists.
+
+- **A stale Fortnox inbox address had received ten supplier invoices** (#80).
+  Mail to a dead `arkivplats.se` address does not bounce; the invoices simply
+  never appeared in Fortnox.
+
+- **`validateDate` rejected same-day vouchers for two hours every night.** It
+  compared a voucher *date* against `time.Now()` as an *instant*, so a date-only
+  value read as the future while UTC was still on the previous day. Latent for
+  an unknown period; found only because the gate ran after local midnight.
+
+### Added
+
+- `internal/receipts.Scope` — a validated collection bound that refuses an
+  absent date, an over-long window, or a missing cap rather than defaulting to
+  everything. Defaulting is what produced #79.
+- Dry runs now report *what* would be routed, not just how many. The six false
+  positives were only visible because the list was reviewed rather than the
+  count.
+
+---
+
 ## [0.24.0] — 2026-09-09
 
 ### Fixed
