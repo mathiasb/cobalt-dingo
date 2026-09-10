@@ -54,6 +54,13 @@ the domain model or port interfaces will be called out explicitly.
   value read as the future while UTC was still on the previous day. Latent for
   an unknown period; found only because the gate ran after local midnight.
 
+  The first fix normalised both sides to a UTC calendar day, which passed
+  locally (UTC+2) and failed in CI (UTC) — the regression test caught it. A
+  voucher date carries no timezone, so one day of tolerance is unavoidable:
+  "today" in Auckland is tomorrow in UTC. **This deliberately loosens the check**
+  — a voucher mis-dated one day ahead is no longer rejected here, and is instead
+  caught by reconciliation against the bank. Two days ahead is still refused.
+
 ### Added
 
 - `internal/receipts.Scope` — a validated collection bound that refuses an

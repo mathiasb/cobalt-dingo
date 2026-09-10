@@ -72,7 +72,14 @@ func TestValidator_RejectsUnknownAccount(t *testing.T) {
 func TestValidator_RejectsFutureDate(t *testing.T) {
 	v := validatorWithAccounts(t, knownAccounts)
 
-	future := time.Now().AddDate(0, 0, 1).Format("2006-01-02")
+	// Two days, not one. A voucher date carries no timezone and the validator
+	// does not know the operator's, so one day of slack is unavoidable: "today"
+	// in Auckland is tomorrow in UTC. One day out is caught by reconciliation
+	// against the bank; two days ahead is a genuine mistake.
+	//
+	// This is a deliberate loosening of the check, made when the previous
+	// version rejected same-day vouchers for every operator east of UTC.
+	future := time.Now().AddDate(0, 0, 2).Format("2006-01-02")
 	voucher := validator.Voucher{
 		Description: "Test",
 		VoucherDate: future,
@@ -229,6 +236,23 @@ func validatorWithAccounts(t *testing.T, accounts []validator.Account) *validato
 // in summer time.
 //
 // Found 2026-09-10 at 00:0x, when an unrelated gate run went red.
+// Tomorrow must be ACCEPTED, and this is the cost of the tolerance above: a
+// voucher genuinely mis-dated one day ahead is not caught here. It is caught by
+// reconciliation, which compares the voucher against the bank transaction.
+func TestTomorrowIsAcceptedBecauseTimezonesExist(t *testing.T) {
+	v := validatorWithAccounts(t, knownAccounts)
+
+	voucher := validator.Voucher{
+		Description: "tomorrow in UTC is today in Auckland",
+		VoucherDate: time.Now().AddDate(0, 0, 1).Format("2006-01-02"),
+		Rows: []validator.VoucherRow{
+			{Account: 6212, Debit: 100.00},
+			{Account: 2893, Credit: 100.00},
+		},
+	}
+	assert.NoError(t, v.ValidateVoucher(context.Background(), voucher))
+}
+
 func TestTodayIsNeverInTheFuture(t *testing.T) {
 	v := validatorWithAccounts(t, knownAccounts)
 

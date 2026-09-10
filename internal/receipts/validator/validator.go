@@ -100,7 +100,17 @@ func validateDate(date time.Time) []error {
 	date = day(date)
 	now := day(time.Now())
 
-	if date.After(now) {
+	// One day of tolerance, because a voucher date carries no timezone and the
+	// validator does not know the operator's. "Today" in Stockholm is already
+	// tomorrow in UTC for two hours each night, and "today" in Auckland is
+	// tomorrow in UTC for twelve. A timezone offset never exceeds one calendar
+	// day, so a date more than one day ahead is genuinely wrong while a date
+	// one day ahead is plausibly today somewhere.
+	//
+	// This was found by a test that ran green locally (UTC+2) and red in CI
+	// (UTC) — the first version of this fix normalised both sides to a UTC day
+	// and still failed for any operator east of UTC.
+	if date.After(now.AddDate(0, 0, 1)) {
 		errs = append(errs, fmt.Errorf("datum %s är i framtiden", date.Format("2006-01-02")))
 	}
 	if date.Before(now.AddDate(-1, 0, 0).Add(-24*time.Hour + time.Second)) {
