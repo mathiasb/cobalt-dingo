@@ -128,6 +128,10 @@ func TestExampleRules_stillRouteTheReceiptsHeForwardedByHand(t *testing.T) {
 		{"sas refund confirmation", "no-reply@flysas.com", "Cancellation and refund confirmation", "mynt"},
 		{"mistral payment receipt", "no-reply@mistral.ai", "Ditt betalningskvitto från Mistral AI SAS #MSTRL-API-728586", "mynt"},
 		{"berget invoice", "andreas@berget.ai", "Faktura och kortbetalning", "mynt"},
+		// Confirmed as company expenses by Mathias on 2026-09-10, when the
+		// measurement surfaced them as judgment calls rather than errors.
+		{"neko health via stripe", "receipts+acct_1MEbglINImBQHjHQ@stripe.com", "Ditt kvitto från Neko Health [1623-4394]", "mynt"},
+		{"workspace invoice for another domain", "payments-noreply@google.com", "Google Workspace: Your invoice is available for another-domain.se", "mynt"},
 	}
 
 	for _, tc := range cases {

@@ -14,6 +14,19 @@ the domain model or port interfaces will be called out explicitly.
 
 ---
 
+## [0.27.1] — 2026-09-10
+
+### Added
+
+- `docs/receipt-review-2026-09-10.md` — the 24 candidates from the measured dry
+  run, as a sign-off list. The gate is review, then production Fortnox OAuth
+  (#50), then a live run.
+- Two routed receipts confirmed as company expenses rather than false positives
+  (Neko Health via Stripe, a Workspace invoice for another domain) and pinned in
+  the ground-truth test, so a future tightening cannot silently drop them.
+
+---
+
 ## [0.27.0] — 2026-09-10
 
 Measured against 11 months of real mail (16,558 messages across three
