@@ -78,11 +78,19 @@ func (c *Collector) loadForwardedByHand(src *Source, scope *Scope) (ForwardedInd
 		return nil, fmt.Errorf("duplicate guard has no destination addresses to look for: refusing to run, since an empty guard silently re-sends every receipt forwarded by hand")
 	}
 
-	client, err := dialAndSelect(src, scope.SentFolder)
+	client, err := dialAndLogin(src)
 	if err != nil {
 		return nil, fmt.Errorf("duplicate guard: %w", err)
 	}
 	defer func() { _ = client.Close() }()
+
+	sent, err := resolveSpecialFolder(client, scope.SentFolder, imap.MailboxAttrSent)
+	if err != nil {
+		return nil, fmt.Errorf("duplicate guard: %w", err)
+	}
+	if _, err := client.Select(sent, nil).Wait(); err != nil {
+		return nil, fmt.Errorf("duplicate guard: select %s: %w", sent, err)
+	}
 
 	// One search per destination. IMAP ANDs the criteria in a single struct, so
 	// a combined "To: any of these" has to be several searches.

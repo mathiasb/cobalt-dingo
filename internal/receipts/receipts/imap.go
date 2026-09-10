@@ -23,6 +23,21 @@ func dialAndSelect(src *Source, folder string) (*imapclient.Client, error) {
 		folder = "INBOX"
 	}
 
+	c, err := dialAndLogin(src)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := c.Select(folder, nil).Wait(); err != nil {
+		_ = c.Close()
+		return nil, fmt.Errorf("imap select %s: %w", folder, err)
+	}
+	return c, nil
+}
+
+// dialAndLogin connects and authenticates without selecting a mailbox, so the
+// caller can LIST first — which is how the Sent folder is found, since Gmail
+// localises its name.
+func dialAndLogin(src *Source) (*imapclient.Client, error) {
 	addr := fmt.Sprintf("%s:%d", src.Host, src.Port)
 	var (
 		c   *imapclient.Client
@@ -43,10 +58,6 @@ func dialAndSelect(src *Source, folder string) (*imapclient.Client, error) {
 		_ = c.Close()
 		return nil, fmt.Errorf("imap login %s: %w", src.Username, err)
 	}
-	if _, err := c.Select(folder, nil).Wait(); err != nil {
-		_ = c.Close()
-		return nil, fmt.Errorf("imap select %s: %w", folder, err)
-	}
 	return c, nil
 }
 
@@ -55,7 +66,7 @@ func dialAndSelect(src *Source, folder string) (*imapclient.Client, error) {
 // marking a message processed is the caller's job, only after a successful
 // forward (see Collector.markSeen, which now applies a label rather than \Seen).
 func fetchMails(src *Source, scope *Scope, collected CollectedSet) ([]Mail, error) {
-	c, err := dialAndSelect(src, scope.Folder)
+	c, err := dialAndSelectSpecial(src, scope.Folder, imap.MailboxAttrAll)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +137,7 @@ func markCollected(src *Source, scope *Scope, uids []uint32) error {
 	if len(uids) == 0 {
 		return nil
 	}
-	c, err := dialAndSelect(src, scope.Folder)
+	c, err := dialAndSelectSpecial(src, scope.Folder, imap.MailboxAttrAll)
 	if err != nil {
 		return err
 	}
@@ -249,4 +260,64 @@ func extractAttachments(raw []byte) ([]Attachment, error) {
 	}
 
 	return attachments, nil
+}
+
+// resolveSpecialFolder returns the mailbox to use for a special-use role.
+//
+// An explicit configured name wins — an operator overriding this knows more
+// than the server does. Otherwise the mailbox is found by its RFC 6154
+// special-use attribute rather than by name.
+//
+// Naming these folders in code was wrong twice on the same day: the collector
+// guessed "[Gmail]/Skickat" and the duplicate guard failed on the account that
+// says "Sent Mail", then it guessed "[Gmail]/All Mail" and the search failed on
+// the next account. Gmail localises both, and three accounts on one tailnet do
+// not agree.
+func resolveSpecialFolder(c *imapclient.Client, configured string, attr imap.MailboxAttr) (string, error) {
+	if strings.TrimSpace(configured) != "" {
+		return configured, nil
+	}
+	boxes, err := c.List("", "*", nil).Collect()
+	if err != nil {
+		return "", fmt.Errorf("list mailboxes: %w", err)
+	}
+	return pickSpecialFolder(boxes, attr)
+}
+
+// pickSpecialFolder finds the mailbox carrying attr.
+//
+// It refuses rather than falling back to a plausible name. A guessed folder
+// either does not exist — which at least fails loudly — or exists and is the
+// wrong one, which does not.
+func pickSpecialFolder(boxes []*imap.ListData, attr imap.MailboxAttr) (string, error) {
+	for _, b := range boxes {
+		if b == nil {
+			continue
+		}
+		for _, a := range b.Attrs {
+			if a == attr {
+				return b.Mailbox, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("no mailbox on this account carries the %s attribute: name the folder explicitly in config", attr)
+}
+
+// dialAndSelectSpecial connects and selects a special-use mailbox, discovering
+// its localised name when one is not configured.
+func dialAndSelectSpecial(src *Source, configured string, attr imap.MailboxAttr) (*imapclient.Client, error) {
+	c, err := dialAndLogin(src)
+	if err != nil {
+		return nil, err
+	}
+	folder, err := resolveSpecialFolder(c, configured, attr)
+	if err != nil {
+		_ = c.Close()
+		return nil, err
+	}
+	if _, err := c.Select(folder, nil).Wait(); err != nil {
+		_ = c.Close()
+		return nil, fmt.Errorf("imap select %s: %w", folder, err)
+	}
+	return c, nil
 }

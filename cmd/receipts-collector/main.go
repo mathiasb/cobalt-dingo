@@ -60,16 +60,19 @@ func main() {
 	scope, serr := receipts.NewScope(receipts.ScopeConfig{
 		Since: since,
 		Max:   atoiDefault(os.Getenv("RECEIPTS_MAX"), 50),
-		// Gmail localises the Sent folder name. Overridable so a non-Swedish
-		// account does not need a rebuild — the duplicate guard fails the run
-		// if it cannot select this folder, so a wrong value is loud.
+		// Empty means the duplicate guard discovers each account's Sent folder by
+		// its \Sent attribute. Set only to override that.
 		SentFolder: os.Getenv("RECEIPTS_SENT_FOLDER"),
 	})
 	if serr != nil {
 		log.Fatalf("scope: %v", serr)
 	}
+	sentDesc := scope.SentFolder
+	if sentDesc == "" {
+		sentDesc = "Skickat-mappen (upptacks per konto)"
+	}
 	fmt.Printf("scope: sedan %s, hogst %d meddelanden per korning, dubblettskydd mot %s\n",
-		scope.Since.Format("2006-01-02"), scope.Max, scope.SentFolder)
+		scope.Since.Format("2006-01-02"), scope.Max, sentDesc)
 
 	router := receipts.NewRouter(rules, dests)
 	collector := receipts.NewCollector(sources, router, dryRun, smtpCfg).WithScope(scope)
@@ -89,7 +92,17 @@ func main() {
 		fmt.Printf("  Hämtade:   %d\n", r.Processed)
 		fmt.Printf("  Routade:   %d\n", r.Routed)
 		fmt.Printf("  Omatchade: %d\n", r.UnmatchedCount)
-		fmt.Printf("  Dubbletter (redan vidarebefordrade för hand): %d\n", r.DuplicateCount)
+		fmt.Printf("  Dubbletter (redan skickade för hand): %d (%d unika ämnen i Skickat)\n",
+			r.DuplicateCount, r.ForwardedSubjects)
+		fmt.Printf("  Egna utskick (hoppade over): %d\n", r.SelfSentSkipped)
+		fmt.Printf("  MISSADE (vidarebefordrade för hand, ingen regel matchade): %d\n", r.MissedCount)
+		for _, mm := range r.MissedMails {
+			subj := mm.Subject
+			if len(subj) > 58 {
+				subj = subj[:58] + "..."
+			}
+			fmt.Printf("    MISS %-34s %s\n", mm.From, subj)
+		}
 		for _, dm := range r.DuplicateMails {
 			subj := dm.Subject
 			if len(subj) > 58 {

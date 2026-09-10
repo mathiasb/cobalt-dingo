@@ -4,6 +4,7 @@ package receipts
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -55,6 +56,23 @@ type CollectorResult struct {
 	// habit becomes visible.
 	DuplicateCount int
 	DuplicateMails []Mail
+
+	// ForwardedSubjects is how many DISTINCT normalised subjects the duplicate
+	// guard found in Sent. It is not a denominator for DuplicateCount: thirty
+	// Apple invoices share one subject, so the counts measure different things.
+	ForwardedSubjects int
+
+	// MissedCount and MissedMails are the honest coverage gap — mail Mathias
+	// forwarded by hand that NO rule matched. Each one is a receipt this tool
+	// would have left behind, and a rule waiting to be written.
+	MissedCount int
+	MissedMails []Mail
+
+	// SelfSentSkipped counts mail the account sent itself. All Mail includes
+	// Sent, so every hand-forward comes back as a candidate with the account as
+	// sender. Routing one would forward a forward; counting one as a miss made
+	// the coverage gap look twenty times larger than it is.
+	SelfSentSkipped int
 
 	Errors []error
 }
@@ -132,6 +150,8 @@ func (c *Collector) processAccount(_ context.Context, src *Source) (CollectorRes
 	if err != nil {
 		return result, err
 	}
+	result.ForwardedSubjects = len(forwardedByHand)
+
 	mails, err := c.fetch(src, c.scope, collected)
 	if err != nil {
 		return result, err
@@ -143,10 +163,20 @@ func (c *Collector) processAccount(_ context.Context, src *Source) (CollectorRes
 
 	for _, m := range mails {
 		result.Processed++
+		if strings.EqualFold(strings.TrimSpace(m.From), strings.TrimSpace(src.Username)) {
+			result.SelfSentSkipped++
+			continue
+		}
 		dest, ok := c.router.Route(m)
 		if !ok {
 			result.UnmatchedCount++
 			result.UnmatchedMails = append(result.UnmatchedMails, m)
+			// He forwarded this one himself and no rule caught it. That is the
+			// coverage gap, measurable only because the guard knows what he sent.
+			if forwardedByHand.Has(m.Subject) {
+				result.MissedCount++
+				result.MissedMails = append(result.MissedMails, m)
+			}
 			continue
 		}
 		if forwardedByHand.Has(m.Subject) {

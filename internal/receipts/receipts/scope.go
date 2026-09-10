@@ -13,18 +13,8 @@ import (
 const maxWindow = 400 * 24 * time.Hour
 
 const (
-	// defaultFolder is All Mail, not INBOX. Read and archived receipts are
-	// still unrouted receipts.
-	defaultFolder = "[Gmail]/All Mail"
-
 	// defaultCollectedLabel keeps processed-ness out of the user's read state.
 	defaultCollectedLabel = "cobalt-dingo/collected"
-
-	// defaultSentFolder is where the duplicate guard looks for receipts already
-	// forwarded by hand. Gmail localises this name — these accounts are Swedish,
-	// hence "Skickat". A wrong value is not silent: loadForwardedByHand fails the
-	// run rather than returning an empty index.
-	defaultSentFolder = "[Gmail]/Skickat"
 )
 
 // ScopeConfig bounds a collection run.
@@ -56,8 +46,12 @@ type ScopeConfig struct {
 	FetchBodies bool
 
 	// SentFolder is searched for receipts already forwarded by hand, so the
-	// collector does not send them a second time. Defaults to Gmail's Swedish
-	// Sent folder.
+	// collector does not send them a second time.
+	//
+	// Left empty it is DISCOVERED per account, by the RFC 6154 \Sent attribute.
+	// It is deliberately not defaulted to a name: Gmail localises the Sent
+	// folder, these accounts disagree on it, and a name that does not exist gave
+	// a guard that failed the whole run.
 	SentFolder string
 }
 
@@ -87,23 +81,15 @@ func NewScope(cfg ScopeConfig) (*Scope, error) {
 	if cfg.Max <= 0 {
 		return nil, fmt.Errorf("scope has no message cap: a first run over a long window would forward hundreds unattended")
 	}
-	folder := cfg.Folder
-	if folder == "" {
-		folder = defaultFolder
-	}
 	label := cfg.CollectedLabel
 	if label == "" {
 		label = defaultCollectedLabel
 	}
-	sent := cfg.SentFolder
-	if sent == "" {
-		sent = defaultSentFolder
-	}
 	return &Scope{
 		Since: cfg.Since, Max: cfg.Max,
-		Folder: folder, CollectedLabel: label,
+		Folder: cfg.Folder, CollectedLabel: label, // empty Folder means discover \All
 		FetchBodies: cfg.FetchBodies,
-		SentFolder:  sent,
+		SentFolder:  cfg.SentFolder, // empty means discover it per account
 	}, nil
 }
 

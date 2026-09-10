@@ -75,7 +75,8 @@ rules:
   # samma adress. Sender-only-reglerna nedan skulle annars boka larmen.
   # Hittade i en skarp dry run 2026-09-09.
   - name: ignore-security-alerts
-    match_subject: ["security alert", "sign-in alert", "säkerhetsavisering", "new passkey", "new trusted device"]
+    match_subject: ["security alert", "sign-in alert", "säkerhetsavisering", "new passkey", "new trusted device",
+                    "new device sign-in", "inloggning på ny enhet", "privacy notice"]
     destination: ""
 
   - name: ignore-cancellations
@@ -95,12 +96,39 @@ rules:
   # Förhandsavisering om ett kommande kortköp. Kostnaden finns inte ännu —
   # det riktiga kvittot kommer när kortet faktiskt dras.
   - name: ignore-upcoming-charges
-    match_subject: ["kommande kortbetalning", "upcoming payment", "upcoming charge", "kommande betalning"]
+    match_subject: ["kommande kortbetalning", "upcoming payment", "upcoming charge", "kommande betalning",
+                    "your upcoming", "din kommande", "please pay for your booking", "charging your card soon"]
     destination: ""
 
   - name: ignore-apple-price-change
     match_from: ["*@email.apple.com"]
     match_subject: ["price change", "prisändring"]
+    destination: ""
+
+  # Mätt 2026-09-10 mot 11 månader riktig post: 16 558 meddelanden, 143 kvitton
+  # som Mathias vidarebefordrat för hand, 156 som reglerna skulle skicka — varav
+  # ~68 inte var kvitton. Dessa droppregler och ämnesvillkoren nedan är svaret.
+  # Regressionsskyddet ligger i TestExampleRules_doNotRouteTheseMeasuredFalsePositives.
+  - name: ignore-review-requests
+    match_subject: ["waiting for your review", "väntar på din recension", "rate ", "betygsätt", "hjälp oss att bli bättre"]
+    destination: ""
+
+  - name: ignore-inbox-messages
+    match_subject: ["you have a message from", "du har ett meddelande från"]
+    destination: ""
+
+  # En bokad resa eller order är inte en kostnad. Kvittot kommer när den utförs.
+  - name: ignore-reservations-and-orders
+    match_subject: ["reservation confirmed", "orderbekräftelse", "tack för din beställning"]
+    destination: ""
+
+  - name: ignore-verification-codes
+    match_subject: ["verifieringskod", "verification code", "your code is"]
+    destination: ""
+
+  # ERP-flödesmail. Att bli ombedd att ANGE ett fakturanummer är inte en faktura.
+  - name: ignore-erp-workflow-prompts
+    match_subject: ["please enter your supplier invoice numbers", "requisition"]
     destination: ""
 
   # --- Leverantörsfakturor → Fortnox ---
@@ -109,16 +137,22 @@ rules:
     match_subject: ["Invoice", "Faktura"]
     destination: fortnox-invoices
 
+  # Sender-only routade orderbekräftelser och supportärenden hit.
   - name: bahnhof-invoice
     match_from: ["*@bahnhof.se"]
+    match_subject: ["faktura", "invoice"]
     destination: fortnox-invoices
 
   - name: telenor-invoice
     match_from: ["*@telenor.se"]
+    match_subject: ["faktura", "invoice"]
     destination: fortnox-invoices
 
+  # 12 av 12 telia-mail på 11 månader var marknadsföring eller
+  # orderbekräftelser, noll fakturor — de kommer via Kivra.
   - name: telia-invoice
     match_from: ["*@telia.se"]
+    match_subject: ["faktura", "invoice"]
     destination: fortnox-invoices
 
   # BMW Financial Services kommer via Kivra-vidarebefordran, så avsändaren är
@@ -128,12 +162,19 @@ rules:
     match_subject: ["BMW"]
     destination: fortnox-invoices
 
+  # Sender-only här är säkert först efter droppregeln ignore-erp-workflow-prompts:
+  # samma avsändare skickar både fakturor och arbetsflödespåminnelser.
   - name: workforcelogiq-invoice
     match_from: ["*@workforcelogiq.com"]
+    match_subject: ["invoice", "faktura"]
     destination: fortnox-invoices
 
+  # Sender-only routade vanlig mänsklig mail om en PRIVAT pension in i bolagets
+  # leverantörsfakturainkorg — 16 meddelanden på 11 månader, noll fakturor.
+  # Rådgivare mailar från namngivna adresser på samma domän.
   - name: soderberg-partners
     match_from: ["*@soderbergpartners.se"]
+    match_subject: ["faktura", "invoice"]
     destination: fortnox-invoices
 
   # --- Korttransaktioner → Mynt ---
@@ -143,6 +184,7 @@ rules:
   # also carries account and product mail.
   - name: google-payments-receipt
     match_from: ["payments-noreply@google.com"]
+    match_subject: ["faktura", "invoice", "kvitto", "receipt", "betalning", "payment"]
     destination: mynt
 
   - name: google-play-receipt
@@ -168,13 +210,17 @@ rules:
     match_subject: ["receipt", "kvitto"]
     destination: mynt
 
+  # support@easypark.net är kundtjänstärenden, inte kvitton.
   - name: easypark-receipt
-    match_from: ["*@easypark.net"]
+    match_from: ["no-reply@easypark.net", "noreply@easypark.net"]
+    match_subject: ["receipt", "kvitto"]
     destination: mynt
 
   # Parkster is a .se domain. The .com pattern never matched a single message.
+  # "Uppskjuten debitering" är ett besked om en kommande dragning.
   - name: parkster-receipt
     match_from: ["*@parkster.se", "*@parkster.com"]
+    match_subject: ["kvitto", "receipt", "faktura"]
     destination: mynt
 
   - name: nextory-receipt
@@ -225,16 +271,37 @@ rules:
     destination: mynt
 
   # --- Resor, parkering, vägavgifter ---
+  # uber@ och ubereats@ är ren marknadsföring; no-reply@ skickar
+  # bokningsbekräftelser. Kvittona kommer alltid från noreply@ med resan i
+  # ämnesraden — 11 av 11 vidarebefordrade för hand ser ut så.
   - name: uber-receipt
-    match_from: ["*@uber.com"]
+    match_from: ["noreply@uber.com"]
+    match_subject: ["trip with uber", "resa med uber", "kvitto", "receipt"]
     destination: mynt
 
   - name: sas-receipt
     match_from: ["*@flysas.com"]
     destination: mynt
 
-  - name: booking-receipt
-    match_from: ["*@booking.com", "*@property.booking.com"]
+  # Booking.com skickar kvitton från HOTELLETS adress under
+  # property.booking.com. Apexdomänen (noreply@, noreply-iam@,
+  # noreply-payments@, customer.service@) skickar recensionsförfrågningar,
+  # verifieringskoder, marknadsföring och bokningsbekräftelser — 45 av dem på 11
+  # månader och inte ett enda kvitto som vidarebefordrats för hand. En
+  # bokningsbekräftelse är inte heller ett kvitto: kostnaden uppstår vid
+  # betalning, och betalningen kommer i ett eget mail.
+  # noreply-payments@ fanns i handvidarebefordringsrevisionen (209 kvitton, längre
+  # historik än mätfönstret 2025-10→2026-09). Behåll den — men på ämnesrad, inte
+  # på avsändare: samma adress skickar "Please pay for your booking now", som
+  # droppregeln ignore-upcoming-charges fångar först.
+  - name: booking-payment-receipt
+    match_from: ["noreply-payments@booking.com"]
+    match_subject: ["payment", "betalning", "kvitto", "receipt", "faktura", "invoice"]
+    destination: mynt
+
+  - name: booking-property-receipt
+    match_from: ["*@property.booking.com"]
+    match_subject: ["bill ", "kvitto", "receipt", "betalningsbekräftelse", "faktura", "invoice"]
     destination: mynt
 
   - name: omio-receipt
@@ -261,8 +328,10 @@ rules:
 
   # Mistral sends from two different subdomains — a merchant list reliably
   # misses the second one.
+  # mistral-news@ ligger på samma domän som fakturorna.
   - name: mistral-receipt
     match_from: ["*@mistral.ai", "*@emails.mistral.ai"]
+    match_subject: ["faktura", "invoice", "kvitto", "receipt"]
     destination: mynt
 
   - name: github-receipt
@@ -275,8 +344,21 @@ rules:
     match_subject: ["receipt", "kvitto", "order"]
     destination: mynt
 
+  # Kvittona kommer från BÅDE apexdomänen och mg-subdomänen.
   - name: evernote-receipt
-    match_from: ["*@mg.evernote.com"]
+    match_from: ["*@evernote.com", "*@mg.evernote.com"]
+    destination: mynt
+
+  # Långa svansen, funnen i mätningen 2026-09-10 som handvidarebefordringar utan
+  # matchande regel.
+  - name: power-receipt
+    match_from: ["*@power.se"]
+    match_subject: ["kvitto", "faktura", "receipt", "invoice"]
+    destination: mynt
+
+  - name: purspot-receipt
+    match_from: ["*@purspot.com"]
+    match_subject: ["payment", "betalning", "kvitto", "receipt"]
     destination: mynt
 
   # --- Kvitton utan kortknytning → Fortnox ---

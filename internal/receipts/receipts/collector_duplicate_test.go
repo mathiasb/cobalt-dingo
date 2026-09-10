@@ -114,3 +114,48 @@ func TestProcessAccount_refusesWithNoDuplicateGuardAtAll(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no duplicate guard")
 }
+
+// Coverage is only honest if the denominator is reported. A guard that knows
+// about 200 hand-forwarded subjects and matches 30 of them means the rules miss
+// 170 receipts Mathias still forwards himself — and the run would otherwise
+// look like a success.
+func TestProcessAccount_reportsHandForwardedMailNoRuleMatched(t *testing.T) {
+	mails := []Mail{
+		{UID: 1, From: "billing@berget.ai", Subject: "Receipt from Berget AB"},    // rule matches, already sent
+		{UID: 2, From: "unknown@newsupplier.se", Subject: "Kvitto för din order"}, // he sent it, no rule matches
+		{UID: 3, From: "noise@other.com", Subject: "Nyhetsbrev"},                  // no rule, never sent — just noise
+	}
+	idx := ForwardedIndex{"receipt from berget ab": true, "kvitto för din order": true}
+
+	c, _, _ := newDuplicateTestCollector(true, mails, idx, nil)
+	res, err := c.processAccount(context.Background(), &Source{Name: "acc"})
+	require.NoError(t, err)
+
+	assert.Equal(t, 2, res.ForwardedSubjects)
+	assert.Equal(t, 1, res.DuplicateCount, "the hand-forward a rule DOES match")
+	assert.Equal(t, 1, res.MissedCount, "the hand-forward no rule matches — the coverage gap")
+	require.Len(t, res.MissedMails, 1)
+	assert.Equal(t, uint32(2), res.MissedMails[0].UID)
+	assert.Equal(t, 2, res.UnmatchedCount, "a miss is still an unmatched mail")
+}
+
+// All Mail includes Sent, so the account's own forwards come back as
+// candidates: same subject, sender the account itself. They are not receipts to
+// route and not coverage gaps either — they are the evidence the guard reads.
+// Before this they made up 143 of 150 apparent "misses".
+func TestProcessAccount_ignoresMailTheAccountSentItself(t *testing.T) {
+	mails := []Mail{
+		{UID: 1, From: "MTHBQV@gmail.com", Subject: "Fwd: Receipt from Berget AB"},
+		{UID: 2, From: "billing@berget.ai", Subject: "Receipt from Berget AB #2"},
+	}
+	idx := ForwardedIndex{"receipt from berget ab": true}
+
+	c, delivered, _ := newDuplicateTestCollector(false, mails, idx, nil)
+	res, err := c.processAccount(context.Background(), &Source{Name: "acc", Username: "mthbqv@gmail.com"})
+	require.NoError(t, err)
+
+	assert.Equal(t, []uint32{2}, *delivered)
+	assert.Equal(t, 1, res.SelfSentSkipped, "the account's own forward is skipped, case-insensitively")
+	assert.Equal(t, 0, res.MissedCount, "one's own forward is not a coverage gap")
+	assert.Equal(t, 0, res.UnmatchedCount)
+}

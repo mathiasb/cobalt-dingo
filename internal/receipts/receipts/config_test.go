@@ -274,7 +274,12 @@ func TestRealReceiptsFromTheSameSendersStillRoute(t *testing.T) {
 		{"invoice+statements@mail.anthropic.com", "Your receipt from Anthropic, PBC #2879-8484-5252"},
 		{"hello@1password.com", "Your receipt from 1Password"},
 		{"info@berget.ai", "Faktura 12345"},
-		{"noreply@booking.com", "Thanks! Your booking is confirmed at Hotel Sonnenheim"},
+		// REMOVED 2026-09-10. This case asserted a booking confirmation is a
+		// receipt. Measured over 11 months: three such mails arrived, Mathias
+		// forwarded none of them, and the property sends a separate payment
+		// confirmation and bill which do route. A confirmation is the promise of
+		// a cost, not the cost. See
+		// TestExampleRules_doNotRouteTheseMeasuredFalsePositives.
 		{"billing@hetzner.com", "Your Hetzner invoice 12345"},
 	}
 

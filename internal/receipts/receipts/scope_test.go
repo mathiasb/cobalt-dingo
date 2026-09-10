@@ -72,14 +72,19 @@ func TestScopeDefaultsToEnvelopeOnly(t *testing.T) {
 // cares about. Three real Hetzner invoices were invisible to every scan in the
 // session because he had read them and Gmail had labelled them out of the inbox
 // (#81).
-func TestScopeDefaultsToAllMailNotInbox(t *testing.T) {
+//
+// The folder is no longer named here. Naming it was the second half of the same
+// bug: "[Gmail]/All Mail" does not exist on every one of these accounts, since
+// Gmail localises it. An empty Folder now means "discover the mailbox flagged
+// \All", which is INBOX on no account anywhere.
+func TestScopeLeavesTheSearchFolderToDiscovery(t *testing.T) {
 	s, err := receipts.NewScope(receipts.ScopeConfig{
 		Since: time.Now().AddDate(0, -2, 0),
 		Max:   50,
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "[Gmail]/All Mail", s.Folder,
-		"a receipt that has been read or archived is still an unrouted receipt")
+	assert.Empty(t, s.Folder,
+		"an unset folder must mean discover \\All, not fall back to a localised name or INBOX")
 }
 
 func TestScopeFolderIsConfigurable(t *testing.T) {

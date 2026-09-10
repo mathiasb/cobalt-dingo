@@ -14,6 +14,58 @@ the domain model or port interfaces will be called out explicitly.
 
 ---
 
+## [0.27.0] — 2026-09-10
+
+Measured against 11 months of real mail (16,558 messages across three
+accounts), using the 154 receipts Mathias forwarded by hand as ground truth.
+
+### Fixed
+
+- **Routing precision: 156 would-be forwards down to 24, with coverage
+  unchanged.** Around 68 of the original 156 were not receipts. Sender-only
+  rules were the cause in every case: a merchant that sends receipts also sends
+  review requests, verification codes, marketing and booking confirmations.
+  Worst of them routed ordinary human mail about a *private pension* into the
+  company's supplier-invoice inbox — 16 messages, zero invoices, from
+  `*@soderbergpartners.se`.
+
+  Rules now constrained by subject: Uber (marketing and reservations excluded,
+  receipts come from one address), Telia, Bahnhof, Telenor, EasyPark (support
+  tickets excluded), Parkster, Google payments, Mistral (newsletter excluded),
+  WorkforceLogiq and Söderberg. Booking.com apex is no longer sender-only —
+  receipts come from the property under `property.booking.com`, and the
+  payments address keeps a subject constraint.
+
+  New drop rules: review and rating requests, "you have a message from",
+  verification codes, ERP workflow prompts, reservations and order
+  confirmations, and upcoming-charge notices.
+
+- **Self-sent mail is skipped.** All Mail includes Sent, so every hand-forward
+  came back as a candidate with the account as sender. That made the coverage
+  gap look twenty times larger than it is (150 apparent misses, 8 real) and
+  would eventually have forwarded a forward.
+
+- **Special-use folders are discovered, not named.** `[Gmail]/Skickat` and
+  `[Gmail]/All Mail` were both hardcoded, and Gmail localises both — the first
+  live run failed on one account for the Sent folder and the next for All Mail.
+  Both are now found by their RFC 6154 `\Sent` / `\All` attribute, refusing
+  rather than guessing when no mailbox carries one.
+
+### Added
+
+- **The coverage gap is now a number.** `MissedCount` / `MissedMails` are mail
+  Mathias forwarded by hand that no rule matched — measurable only because the
+  duplicate guard knows what he sent. Currently **8 of 154**, all one-off
+  merchants, which is cobalt-dingo#78's long tail with a size attached.
+
+- Long-tail rules from that measurement: Evernote's apex domain (the existing
+  rule only covered `mg.evernote.com`), Power and Purspot.
+
+- `TestExampleRules_*` — the measurement as a regression test. 41 real subjects:
+  25 false positives that must not route, 28 hand-forwarded receipts that must.
+
+---
+
 ## [0.26.0] — 2026-09-10
 
 ### Added
