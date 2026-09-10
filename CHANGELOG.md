@@ -14,6 +14,33 @@ the domain model or port interfaces will be called out explicitly.
 
 ---
 
+## [0.28.0] — 2026-09-10
+
+### Added
+
+- **The Fortnox archive identifier is declared and checked (#80).** Config now
+  carries `fortnox_id`, and every `*@arkivplats.se` destination must bear it.
+  A mismatch, a malformed address, or an archive destination with no declared
+  identifier fails `Validate()` — at load, before anything sends.
+
+  This closes a defect with no symptom. Mail to the wrong
+  `inbox.ver.<id>@arkivplats.se` does not bounce back into the workflow: the
+  forward succeeds, the document never appears in Fortnox, and nothing
+  distinguishes that from success. Ten supplier invoices went to a retired
+  database after a Fortnox migration in spring 2024.
+
+  The identifier is never echoed into an error message — errors reach logs and
+  transcripts, and a Fortnox database id belongs in neither. Both branches of
+  the guard are mutation-verified; the first version of the no-identifier test
+  passed with its own check deleted, because both errors mentioned
+  `fortnox_id`.
+
+- The example config's org-number placeholders are numeric (`0000000`) rather
+  than `DITT-ORGNR`. A letter placeholder violates the new guard, which would
+  make the example unloadable — and a test asserts that it loads.
+
+---
+
 ## [0.27.1] — 2026-09-10
 
 ### Added

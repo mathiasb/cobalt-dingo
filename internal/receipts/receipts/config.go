@@ -3,6 +3,8 @@ package receipts
 import (
 	"fmt"
 	"os"
+	"regexp"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -23,6 +25,13 @@ const ExampleConfigPath = "config/receipts/receipt-sources.example.yml"
 // connectivity check cannot disagree about the schema. They already did once —
 // the example file described a shape no binary could read.
 type Config struct {
+	// FortnoxID is the Fortnox database identifier that archive addresses must
+	// carry. Declared once so a typo'd or stale `inbox.ver.<id>@arkivplats.se`
+	// fails the config rather than the invoice (#80): mail to the wrong archive
+	// address does not bounce back into the workflow — the forward succeeds and
+	// the document never appears.
+	FortnoxID string `yaml:"fortnox_id"`
+
 	Sources      []SourceConfig      `yaml:"sources"`
 	Destinations []DestinationConfig `yaml:"destinations"`
 	Rules        []RuleConfig        `yaml:"rules"`
@@ -101,6 +110,9 @@ func (c *Config) Validate() error {
 		if d.Name == "" {
 			return fmt.Errorf("a destination has no name")
 		}
+		if err := c.checkArchiveAddress(d); err != nil {
+			return err
+		}
 		known[d.Name] = true
 	}
 
@@ -163,4 +175,44 @@ func (c *Config) RuleList() []Rule {
 		out = append(out, Rule(r))
 	}
 	return out
+}
+
+// archiveAddress matches Fortnox's document-archive addresses.
+//
+// `inbox.ver.<id>` is verifikat (receipts) and `inbox.lev.<id>` is supplier
+// invoices. The identifier is the Fortnox database, and it changes when the
+// database does — which is what happened in spring 2024, leaving a config
+// pointing at the previous one (#80).
+var archiveAddress = regexp.MustCompile(`^inbox\.(ver|lev)\.([0-9]+)@arkivplats\.se$`)
+
+// arkivplatsSuffix identifies an archive destination even when its address is
+// malformed, so a broken one is reported rather than silently ignored.
+const arkivplatsSuffix = "@arkivplats.se"
+
+// checkArchiveAddress refuses a Fortnox archive destination that does not carry
+// the declared identifier.
+//
+// Deliberately at config-validation time, not at send time. A wrong archive
+// address produces no error and no result: the forward succeeds, the document
+// never appears in Fortnox, and nothing distinguishes that from success. The
+// only place it can be caught is before anything sends.
+//
+// The identifier is never echoed into the error. Errors reach logs and
+// transcripts, and a Fortnox database id does not belong in either.
+func (c *Config) checkArchiveAddress(d DestinationConfig) error {
+	addr := strings.ToLower(strings.TrimSpace(d.Address))
+	if !strings.HasSuffix(addr, arkivplatsSuffix) {
+		return nil
+	}
+	if strings.TrimSpace(c.FortnoxID) == "" {
+		return fmt.Errorf("destination %q is a Fortnox archive address but no `fortnox_id` is configured: without the expected identifier every address looks equally plausible, which is how ten supplier invoices went to a retired database", d.Name)
+	}
+	m := archiveAddress.FindStringSubmatch(addr)
+	if m == nil {
+		return fmt.Errorf("destination %q is not a valid Fortnox archive address: expected inbox.ver.<fortnox_id>@arkivplats.se or inbox.lev.<fortnox_id>@arkivplats.se", d.Name)
+	}
+	if m[2] != strings.TrimSpace(c.FortnoxID) {
+		return fmt.Errorf("destination %q carries a Fortnox identifier that is not the configured `fortnox_id`: mail to the wrong archive does not bounce, it simply never arrives — check whether the Fortnox database changed", d.Name)
+	}
+	return nil
 }

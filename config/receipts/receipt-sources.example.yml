@@ -12,6 +12,20 @@
 # en collector som tyst gör ingenting — därför testas det istället för att läsas.
 
 # ---------------------------------------------------------------------------
+# Fortnox-databasens identifierare.
+#
+# Arkivadresserna nedan MÅSTE bära det här numret. Validate() vägrar annars
+# ladda konfigurationen — ett fel i en arkivadress ger varken felmeddelande
+# eller resultat: vidarebefordran lyckas och dokumentet dyker aldrig upp i
+# Fortnox. Tio leverantörsfakturor gick till en pensionerad databas efter en
+# Fortnox-migrering våren 2024 (#80).
+# ---------------------------------------------------------------------------
+# Sifferplatshållare, inte "DITT-ORGNR": exempelfilen måste kunna laddas, och
+# TestExampleConfigLoads asserterar det. En bokstavsplatshållare bryter mot
+# guarden nedan och gör exemplet ovaliderbart.
+fortnox_id: "0000000"
+
+# ---------------------------------------------------------------------------
 # Mailkonton (IMAP)
 #
 # Hämtas alltid med PEEK, så inga \Seen-flaggor ändras vid läsning. Ett mail
@@ -49,11 +63,11 @@ destinations:
 
   - name: fortnox-receipts
     type: smtp
-    address: inbox.ver.DITT-ORGNR@arkivplats.se
+    address: inbox.ver.0000000@arkivplats.se
 
   - name: fortnox-invoices
     type: smtp
-    address: inbox.lev.DITT-ORGNR@arkivplats.se
+    address: inbox.lev.0000000@arkivplats.se
 
 # ---------------------------------------------------------------------------
 # Routingregler — utvärderas i ordning, första träff vinner.
