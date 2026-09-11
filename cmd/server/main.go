@@ -15,6 +15,7 @@ import (
 	"github.com/mathiasb/cobalt-dingo/internal/adapter/postgres"
 	"github.com/mathiasb/cobalt-dingo/internal/auth"
 	"github.com/mathiasb/cobalt-dingo/internal/config"
+	"github.com/mathiasb/cobalt-dingo/internal/crypto"
 	"github.com/mathiasb/cobalt-dingo/internal/domain"
 	"github.com/mathiasb/cobalt-dingo/internal/ui"
 )
@@ -147,7 +148,31 @@ func main() {
 			// appear and a user wondering why.
 			log.Warn("fortnox mode not offered", "reason", reason)
 		}
-		connector := ui.NewFortnoxConnector(modes, tokenStore, tenantRepo, sessions, log)
+		// Per-owner Fortnox integrations (ADR-0005). Both nil unless the
+		// encryption key is configured: without it a stored tenant secret
+		// cannot be decrypted, and the resolver refuses rather than falling
+		// back to these application-level credentials.
+		var (
+			integrationStore domain.IntegrationStore
+			integrationKey   *crypto.Cipher
+		)
+		if raw := os.Getenv("FORTNOX_INTEGRATION_KEY"); raw != "" {
+			k, err := crypto.NewCipher(raw)
+			if err != nil {
+				// Refuse to start: a key that is present but unusable means
+				// every per-tenant integration silently stops working, and the
+				// symptom would appear at a tenant's first connect attempt.
+				log.Error("FORTNOX_INTEGRATION_KEY is set but unusable", "err", err)
+				os.Exit(1)
+			}
+			integrationKey = k
+			integrationStore = postgres.NewIntegrationRepo(pgStore)
+			log.Info("per-owner fortnox integrations enabled")
+		} else {
+			log.Info("per-owner fortnox integrations disabled (no FORTNOX_INTEGRATION_KEY) — using application-level credentials")
+		}
+
+		connector := ui.NewFortnoxConnector(modes, tokenStore, tenantRepo, sessions, integrationStore, integrationKey, log)
 		connector.RegisterRoutes(mux)
 		log.Info("fortnox connect routes registered")
 	}

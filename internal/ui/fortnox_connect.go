@@ -14,7 +14,9 @@ import (
 	"github.com/mathiasb/cobalt-dingo/internal/config"
 	"github.com/mathiasb/cobalt-dingo/internal/domain"
 
+	"github.com/mathiasb/cobalt-dingo/internal/crypto"
 	rawfortnox "github.com/mathiasb/cobalt-dingo/internal/fortnox"
+	"github.com/mathiasb/cobalt-dingo/internal/integration"
 )
 
 // ModeStatus holds the connection state for one Fortnox mode.
@@ -43,6 +45,11 @@ type FortnoxConnector struct {
 	// Without it a selection could not outlive the request that made it.
 	sessions *auth.SessionManager
 
+	// integrations and cipher resolve per-owner Fortnox credentials (ADR-0005).
+	// Both nil means single-tenant: the application-level credentials are used.
+	integrations domain.IntegrationStore
+	cipher       *crypto.Cipher
+
 	log *slog.Logger
 }
 
@@ -53,15 +60,34 @@ func NewFortnoxConnector(
 	tokenStore domain.TokenStore,
 	tenantRepo domain.TenantRepository,
 	sessions *auth.SessionManager,
+	integrations domain.IntegrationStore,
+	cipher *crypto.Cipher,
 	log *slog.Logger,
 ) *FortnoxConnector {
 	return &FortnoxConnector{
-		configs:    configs,
-		tokenStore: tokenStore,
-		tenantRepo: tenantRepo,
-		sessions:   sessions,
-		log:        log,
+		configs:      configs,
+		tokenStore:   tokenStore,
+		tenantRepo:   tenantRepo,
+		sessions:     sessions,
+		integrations: integrations,
+		cipher:       cipher,
+		log:          log,
 	}
+}
+
+// resolveFor returns the Fortnox credentials this owner should use: their own
+// registered integration if they have one, otherwise the application-level
+// credentials for that mode (ADR-0005).
+//
+// Every place that builds an authorize URL or exchanges a code must go through
+// here. Authorizing with the owner's client id and exchanging with ours fails
+// at Fortnox with an error naming neither.
+func (c *FortnoxConnector) resolveFor(r *http.Request, sess *auth.Session, mode config.Mode) (config.Fortnox, error) {
+	appLevel, ok := c.configs[mode]
+	if !ok {
+		return config.Fortnox{}, fmt.Errorf("no Fortnox config for mode %s", mode)
+	}
+	return integration.Resolve(r.Context(), c.integrations, c.cipher, sess.Sub, appLevel)
 }
 
 // RegisterRoutes wires the connect/callback/status endpoints onto mux.
@@ -145,9 +171,13 @@ func (c *FortnoxConnector) connectHandler(w http.ResponseWriter, r *http.Request
 	if m := config.Mode(r.URL.Query().Get("mode")); m.IsValid() {
 		mode = m
 	}
-	cfg, ok := c.configs[mode]
-	if !ok {
-		http.Error(w, fmt.Sprintf("no Fortnox config for mode %s", mode), http.StatusBadRequest)
+	cfg, err := c.resolveFor(r, sess, mode)
+	if err != nil {
+		// Fail closed. Falling back to the application-level credentials here
+		// would send the owner to authorize the OPERATOR's integration, which
+		// looks like it worked.
+		c.log.Error("resolve fortnox integration", "owner", sess.Sub, "mode", mode, "err", err)
+		http.Error(w, "could not determine which Fortnox integration to use", http.StatusInternalServerError)
 		return
 	}
 
@@ -182,9 +212,10 @@ func (c *FortnoxConnector) callbackHandler(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "invalid state/mode", http.StatusBadRequest)
 		return
 	}
-	cfg, ok := c.configs[mode]
-	if !ok {
-		http.Error(w, fmt.Sprintf("no config for mode %s", mode), http.StatusBadRequest)
+	cfg, err := c.resolveFor(r, sess, mode)
+	if err != nil {
+		c.log.Error("resolve fortnox integration", "owner", sess.Sub, "mode", mode, "err", err)
+		http.Error(w, "could not determine which Fortnox integration to use", http.StatusInternalServerError)
 		return
 	}
 

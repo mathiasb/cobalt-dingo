@@ -58,7 +58,7 @@ func newTestConnector(store domain.TokenStore) *FortnoxConnector {
 			config.ModeSandbox:    {ClientID: "s"},
 			config.ModeProduction: {ClientID: "p"},
 		},
-		store, nil, auth.NewSessionManager("test-secret-that-is-long-enough"), slog.Default(),
+		store, nil, auth.NewSessionManager("test-secret-that-is-long-enough"), nil, nil, slog.Default(),
 	)
 }
 

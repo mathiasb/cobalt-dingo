@@ -15,6 +15,17 @@ import (
 	"github.com/mathiasb/cobalt-dingo/internal/domain"
 )
 
+// stubDiscoveryOnly replaces just the company lookup, for tests that need to
+// observe what the token exchange was called with.
+func stubDiscoveryOnly(t *testing.T, company domain.Company) {
+	t.Helper()
+	orig := discoverCompanyFunc
+	discoverCompanyFunc = func(_ context.Context, _ config.Fortnox, _ string) (domain.Company, error) {
+		return company, nil
+	}
+	t.Cleanup(func() { discoverCompanyFunc = orig })
+}
+
 // stubbedExchangeAndDiscovery replaces both network calls in the callback and
 // restores them afterwards.
 func stubbedExchangeAndDiscovery(t *testing.T, company domain.Company, discoverErr error) {
