@@ -80,6 +80,14 @@ func TestExampleRules_doNotRouteTheseMeasuredFalsePositives(t *testing.T) {
 		{"parkster deferred charge is not a receipt", "no-reply-charging@parkster.se", "Uppskjuten debitering"},
 		{"google auto-topup notice", "payments-noreply@google.com", "Google Cloud Platform & APIs: Automatisk påfyllning är avstängd"},
 		{"charge that has not happened yet", "hello@1password.com", "Your upcoming 1Password invoice (Mathias Bergqvist’s Family)."},
+
+		// PayPal (#77). Measured 2026-09-11 over 82 messages from service@paypal.se:
+		// 79 receipts (2022–2024) and these three, all from 2026 — the only PayPal
+		// mail in the last two years, and exactly what a sender-only rule would
+		// have booked.
+		{"paypal card maintenance", "service@paypal.se", "Update your expired debit or credit card information for PayPal"},
+		{"paypal card maintenance reminder", "service@paypal.se", "Reminder: Update your expired debit or credit card information for PayPal"},
+		{"paypal card update", "service@paypal.se", "Update your debit or credit card information for PayPal"},
 	}
 
 	for _, tc := range cases {
@@ -132,6 +140,13 @@ func TestExampleRules_stillRouteTheReceiptsHeForwardedByHand(t *testing.T) {
 		// measurement surfaced them as judgment calls rather than errors.
 		{"neko health via stripe", "receipts+acct_1MEbglINImBQHjHQ@stripe.com", "Ditt kvitto från Neko Health [1623-4394]", "mynt"},
 		{"workspace invoice for another domain", "payments-noreply@google.com", "Google Workspace: Your invoice is available for another-domain.se", "mynt"},
+
+		// PayPal is an intermediary: the merchant is in the subject, the sender is
+		// PayPal. Destination is fortnox-receipts — neither a Mynt card
+		// transaction nor a supplier invoice (#77).
+		{"paypal receipt", "service@paypal.se", "Receipt for Your Payment to A Medium Corporation", "fortnox-receipts"},
+		{"paypal receipt spotify", "service@paypal.se", "Receipt for Your Payment to Spotify AB", "fortnox-receipts"},
+		{"paypal payment processed", "service@paypal.se", "Your payment to Uber Payments BV has been processed", "fortnox-receipts"},
 	}
 
 	for _, tc := range cases {

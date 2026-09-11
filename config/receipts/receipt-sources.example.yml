@@ -376,6 +376,19 @@ rules:
     destination: mynt
 
   # --- Kvitton utan kortknytning → Fortnox ---
+  # PayPal är en förmedlare: köpmannen står i ämnesraden, avsändaren är PayPal.
+  # Varken en Mynt-korttransaktion eller en leverantörsfaktura — därför
+  # fortnox-receipts (#77).
+  #
+  # Ämnesvillkoret är inte valfritt. Mätt 2026-09-11 över 82 meddelanden från
+  # service@paypal.se: 79 kvitton (2022–2024) och tre kortunderhållsmail, alla
+  # från 2026 — den enda PayPal-posten på två år är alltså precis det som en
+  # sender-only-regel hade bokfört.
+  - name: paypal-receipt
+    match_from: ["*@paypal.se", "*@paypal.com"]
+    match_subject: ["receipt for your payment", "has been processed", "kvitto"]
+    destination: fortnox-receipts
+
   - name: wolt-receipt
     match_from: ["*@wolt.com"]
     destination: fortnox-receipts

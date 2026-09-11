@@ -14,6 +14,26 @@ the domain model or port interfaces will be called out explicitly.
 
 ---
 
+## [0.28.1] — 2026-09-11
+
+### Added
+
+- **PayPal routed as an intermediary (#77)** — sender is PayPal, merchant is in
+  the subject, so the destination is `fortnox-receipts`: neither a Mynt card
+  transaction nor a supplier invoice.
+
+  The subject constraint is the point. Measured over 82 messages from
+  `service@paypal.se`: **79 receipts, all between 2022 and 2024**, and three
+  card-maintenance notices — which are the *only* PayPal mail from the last two
+  years. A sender-only rule would have booked exactly the three that are not
+  receipts and none that are.
+
+  Consequence for the issue's premise: those 79 receipts fall outside the
+  agreed scope of "the last couple of months", so the rule is worth having for
+  the future rather than for the backlog it was filed about.
+
+---
+
 ## [0.28.0] — 2026-09-10
 
 ### Added
