@@ -33,6 +33,15 @@ type DebtorAccount struct {
 	CreatedAt  time.Time
 }
 
+type FortnoxIntegration struct {
+	OwnerID            string
+	Mode               string
+	ClientID           string
+	ClientSecretSealed string
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+}
+
 type FortnoxToken struct {
 	TenantID     string
 	AccessToken  string

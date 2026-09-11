@@ -31,3 +31,19 @@ DO UPDATE SET
     iban        = EXCLUDED.iban,
     bic         = EXCLUDED.bic,
     pisp_handle = EXCLUDED.pisp_handle;
+
+-- name: GetIntegration :one
+SELECT owner_id, mode, client_id, client_secret_sealed
+FROM fortnox_integrations
+WHERE owner_id = $1 AND mode = $2;
+
+-- name: UpsertIntegration :exec
+INSERT INTO fortnox_integrations (owner_id, mode, client_id, client_secret_sealed)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (owner_id, mode) DO UPDATE SET
+    client_id            = EXCLUDED.client_id,
+    client_secret_sealed = EXCLUDED.client_secret_sealed,
+    updated_at           = NOW();
+
+-- name: DeleteIntegration :exec
+DELETE FROM fortnox_integrations WHERE owner_id = $1 AND mode = $2;

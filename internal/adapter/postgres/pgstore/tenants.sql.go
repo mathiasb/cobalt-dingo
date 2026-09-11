@@ -10,6 +10,20 @@ import (
 	"database/sql"
 )
 
+const deleteIntegration = `-- name: DeleteIntegration :exec
+DELETE FROM fortnox_integrations WHERE owner_id = $1 AND mode = $2
+`
+
+type DeleteIntegrationParams struct {
+	OwnerID string
+	Mode    string
+}
+
+func (q *Queries) DeleteIntegration(ctx context.Context, arg DeleteIntegrationParams) error {
+	_, err := q.db.ExecContext(ctx, deleteIntegration, arg.OwnerID, arg.Mode)
+	return err
+}
+
 const getDefaultDebtorAccount = `-- name: GetDefaultDebtorAccount :one
 SELECT id, tenant_id, name, iban, bic, pisp_handle, is_default, created_at
 FROM debtor_accounts
@@ -28,6 +42,36 @@ func (q *Queries) GetDefaultDebtorAccount(ctx context.Context, tenantID string) 
 		&i.PispHandle,
 		&i.IsDefault,
 		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getIntegration = `-- name: GetIntegration :one
+SELECT owner_id, mode, client_id, client_secret_sealed
+FROM fortnox_integrations
+WHERE owner_id = $1 AND mode = $2
+`
+
+type GetIntegrationParams struct {
+	OwnerID string
+	Mode    string
+}
+
+type GetIntegrationRow struct {
+	OwnerID            string
+	Mode               string
+	ClientID           string
+	ClientSecretSealed string
+}
+
+func (q *Queries) GetIntegration(ctx context.Context, arg GetIntegrationParams) (GetIntegrationRow, error) {
+	row := q.db.QueryRowContext(ctx, getIntegration, arg.OwnerID, arg.Mode)
+	var i GetIntegrationRow
+	err := row.Scan(
+		&i.OwnerID,
+		&i.Mode,
+		&i.ClientID,
+		&i.ClientSecretSealed,
 	)
 	return i, err
 }
@@ -106,6 +150,32 @@ func (q *Queries) UpsertDebtorAccount(ctx context.Context, arg UpsertDebtorAccou
 		arg.Bic,
 		arg.PispHandle,
 		arg.IsDefault,
+	)
+	return err
+}
+
+const upsertIntegration = `-- name: UpsertIntegration :exec
+INSERT INTO fortnox_integrations (owner_id, mode, client_id, client_secret_sealed)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (owner_id, mode) DO UPDATE SET
+    client_id            = EXCLUDED.client_id,
+    client_secret_sealed = EXCLUDED.client_secret_sealed,
+    updated_at           = NOW()
+`
+
+type UpsertIntegrationParams struct {
+	OwnerID            string
+	Mode               string
+	ClientID           string
+	ClientSecretSealed string
+}
+
+func (q *Queries) UpsertIntegration(ctx context.Context, arg UpsertIntegrationParams) error {
+	_, err := q.db.ExecContext(ctx, upsertIntegration,
+		arg.OwnerID,
+		arg.Mode,
+		arg.ClientID,
+		arg.ClientSecretSealed,
 	)
 	return err
 }
