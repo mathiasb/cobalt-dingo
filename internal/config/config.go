@@ -4,6 +4,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 )
 
 // Mode determines which Fortnox environment + capability this process targets.
@@ -201,13 +202,37 @@ func LoadLLM() LLM {
 	}
 }
 
-// LoadAllModes returns a config for each mode whose CLIENT_ID env var is set.
-// Used by FortnoxConnector to support multiple modes simultaneously.
-func LoadAllModes() map[Mode]Fortnox {
+// LoadAllModes returns a config for each FULLY configured mode, plus a
+// human-readable reason for each mode that is configured but unusable.
+//
+// A mode is only offered if it has a client id, a client secret and a redirect
+// URI. Half a credential used to be offered in the connect UI and then failed
+// at token exchange with an opaque "token exchange failed" — the error arrived
+// three steps away from the missing value.
+//
+// Absent is not the same as broken: a mode with no client id at all is simply
+// not configured (the normal state for production before the credentials
+// exist) and is reported as neither available nor incomplete.
+//
+// The reasons never contain credential values — they are logged at startup.
+func LoadAllModes() (map[Mode]Fortnox, []string) {
 	modes := map[Mode]Fortnox{}
+	var incomplete []string
 	for _, m := range []Mode{ModeSandbox, ModeProduction} {
 		p := m.EnvPrefix()
 		if id := os.Getenv(p + "CLIENT_ID"); id != "" {
+			var missing []string
+			if os.Getenv(p+"CLIENT_SECRET") == "" {
+				missing = append(missing, p+"CLIENT_SECRET")
+			}
+			if os.Getenv(p+"REDIRECT_URI") == "" {
+				missing = append(missing, p+"REDIRECT_URI")
+			}
+			if len(missing) > 0 {
+				incomplete = append(incomplete,
+					fmt.Sprintf("mode %s has %sCLIENT_ID but is missing %s — not offered", m, p, strings.Join(missing, " and ")))
+				continue
+			}
 			f := Fortnox{
 				Mode:         m,
 				ClientID:     id,
@@ -225,7 +250,7 @@ func LoadAllModes() map[Mode]Fortnox {
 			modes[m] = f
 		}
 	}
-	return modes
+	return modes, incomplete
 }
 
 // Load reads Fortnox configuration based on FORTNOX_MODE. It returns an

@@ -141,7 +141,13 @@ func main() {
 	// and sessions is passed so switching the active company can re-issue the
 	// session cookie.
 	if pgStore != nil {
-		connector := ui.NewFortnoxConnector(config.LoadAllModes(), tokenStore, tenantRepo, sessions, log)
+		modes, incomplete := config.LoadAllModes()
+		for _, reason := range incomplete {
+			// Loud, because the alternative is a mode that quietly does not
+			// appear and a user wondering why.
+			log.Warn("fortnox mode not offered", "reason", reason)
+		}
+		connector := ui.NewFortnoxConnector(modes, tokenStore, tenantRepo, sessions, log)
 		connector.RegisterRoutes(mux)
 		log.Info("fortnox connect routes registered")
 	}
