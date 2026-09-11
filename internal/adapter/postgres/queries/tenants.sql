@@ -8,6 +8,15 @@ SELECT id, tenant_id, name, iban, bic, pisp_handle, is_default, created_at
 FROM debtor_accounts
 WHERE tenant_id = $1 AND is_default = TRUE;
 
+-- name: ListTenantsByPrefix :many
+-- Tenant ids are "<sub>:<mode>:<company>", so a prefix of "<sub>:<mode>:"
+-- lists every company one user has connected in one mode. The prefix is
+-- matched literally: LIKE metacharacters in it are escaped by the caller.
+SELECT id, name, created_at
+FROM tenants
+WHERE id LIKE $1
+ORDER BY name;
+
 -- name: UpsertTenant :exec
 INSERT INTO tenants (id, name)
 VALUES ($1, $2)

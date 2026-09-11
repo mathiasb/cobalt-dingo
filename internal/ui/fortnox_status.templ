@@ -1,6 +1,6 @@
 package ui
 
-templ FortnoxStatusPage(statuses []ModeStatus, flash string, nav *UserNav) {
+templ FortnoxStatusPage(statuses []ModeStatus, companies []CompanyChoice, flash string, nav *UserNav) {
 	@Layout("Fortnox Connections", nav) {
 		if flash != "" {
 			<div class="mb-6 rounded-lg border border-green-300 bg-green-50 px-4 py-3">
@@ -8,6 +8,7 @@ templ FortnoxStatusPage(statuses []ModeStatus, flash string, nav *UserNav) {
 			</div>
 		}
 		<h1 class="text-2xl font-semibold text-gray-900 mb-6">Fortnox Connections</h1>
+		@companyPicker(companies)
 		<div class="space-y-4 max-w-xl">
 			for _, s := range statuses {
 				if s.Mode.IsSandbox() {
@@ -72,6 +73,42 @@ templ productionCard(connected bool) {
 				href="/fortnox/connect?mode=production"
 				class="inline-block rounded bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 opacity-50 pointer-events-none"
 			>Connect Production</a>
+		}
+	</div>
+}
+
+// CompanyChoice is one connected company, for the switcher.
+// Active marks the one the session is currently working with.
+templ companyPicker(companies []CompanyChoice) {
+	<div class="mb-8 max-w-xl rounded-lg border border-gray-300 bg-white p-6">
+		<h2 class="text-lg font-medium text-gray-900 mb-1">Working with</h2>
+		if len(companies) == 0 {
+			<p class="text-sm text-gray-500">
+				No company connected in this mode yet. Connect one below — cobalt-dingo
+				reads which company it is from Fortnox, so there is nothing to type.
+			</p>
+		} else {
+			<p class="text-sm text-gray-500 mb-4">
+				Every page shows the active company&#39;s data. Switching changes nothing in Fortnox.
+			</p>
+			<ul class="space-y-2">
+				for _, c := range companies {
+					<li class="flex items-center justify-between rounded border border-gray-200 px-3 py-2">
+						<span class="text-sm text-gray-900">
+							{ c.Name }
+							<span class="ml-2 text-xs text-gray-500">{ c.OrgNumber }</span>
+						</span>
+						if c.Active {
+							<span class="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700">Active</span>
+						} else {
+							<form method="POST" action="/fortnox/company">
+								<input type="hidden" name="company" value={ c.OrgNumber }/>
+								<button type="submit" class="text-sm text-blue-600 hover:text-blue-800 hover:underline">Work with this</button>
+							</form>
+						}
+					</li>
+				}
+			</ul>
 		}
 	</div>
 }

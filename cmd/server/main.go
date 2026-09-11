@@ -136,10 +136,12 @@ func main() {
 		mux.HandleFunc("GET /auth/logout", oidcHandler.LogoutHandler)
 	}
 
-	// Fortnox web-based OAuth connect (per user, per mode).
-	// Loaded from all configured modes so users can connect sandbox + production.
+	// Fortnox web-based OAuth connect (per user, per mode, per company).
+	// Loaded from all configured modes so users can connect sandbox + production,
+	// and sessions is passed so switching the active company can re-issue the
+	// session cookie.
 	if pgStore != nil {
-		connector := ui.NewFortnoxConnector(config.LoadAllModes(), tokenStore, tenantRepo, log)
+		connector := ui.NewFortnoxConnector(config.LoadAllModes(), tokenStore, tenantRepo, sessions, log)
 		connector.RegisterRoutes(mux)
 		log.Info("fortnox connect routes registered")
 	}
