@@ -16,34 +16,59 @@ package crypto
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/hkdf"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"fmt"
 )
 
-// keyLen is 32 bytes — AES-256. Fixed rather than inferred from the key's
-// length, so a short key is an error instead of a silent downgrade to AES-128.
+// keyLen is 32 bytes — AES-256.
 const keyLen = 32
 
-// Cipher seals and opens secrets with one master key.
+// minSecretLen is the floor on the CONFIGURED secret, not on the derived key.
+//
+// HKDF cannot manufacture entropy the input does not have, and it is a fast
+// KDF by design — so a guessable secret is brute-forceable offline against a
+// stolen database. 32 characters is comfortably above what 1Password's
+// `letters,digits,symbols,64` recipe produces, which is how these are
+// provisioned (infra scripts/new-agent-secret.sh).
+const minSecretLen = 32
+
+// hkdfInfo domain-separates this key from any other use of the same secret, so
+// a future second purpose cannot accidentally derive the same bytes.
+const hkdfInfo = "cobalt-dingo/fortnox-integration-client-secret/v1"
+
+// Cipher seals and opens secrets with one derived key.
 type Cipher struct{ aead cipher.AEAD }
 
-// NewCipher builds a Cipher from a base64-encoded 32-byte key.
+// NewCipher derives an AES-256 key from the configured secret via HKDF-SHA256.
 //
-// It refuses an unusable key here, at configuration time, rather than letting
-// the failure surface when a tenant first tries to connect. Errors never quote
-// the key: they reach logs.
-func NewCipher(base64Key string) (*Cipher, error) {
-	if base64Key == "" {
-		return nil, errors.New("no encryption key configured: refusing to store tenant secrets unencrypted")
+// The secret's FORMAT is deliberately free — any sufficiently long string works
+// — so the estate's existing secret-provisioning path can be used unchanged
+// rather than requiring a base64-encoded 32-byte blob. Its LENGTH is not free:
+// see minSecretLen.
+//
+// A salt is deliberately absent. HKDF's salt is optional and its value here
+// would have to be stored alongside the ciphertext or fixed in code; with a
+// high-entropy input the extract step needs no salt to be sound, and a fixed
+// salt in code provides nothing a fixed info string does not.
+//
+// It refuses an unusable secret here, at configuration time, rather than
+// letting the failure surface when a tenant first connects. Errors never quote
+// the secret: they reach logs.
+func NewCipher(secret string) (*Cipher, error) {
+	if secret == "" {
+		return nil, errors.New("no encryption secret configured: refusing to store tenant secrets unencrypted")
 	}
-	key, err := base64.StdEncoding.DecodeString(base64Key)
+	if len(secret) < minSecretLen {
+		return nil, fmt.Errorf("encryption secret must be at least %d characters (got %d): HKDF cannot add entropy the input lacks", minSecretLen, len(secret))
+	}
+
+	key, err := hkdf.Key(sha256.New, []byte(secret), nil, hkdfInfo, keyLen)
 	if err != nil {
-		return nil, errors.New("encryption key is not valid base64")
-	}
-	if len(key) != keyLen {
-		return nil, fmt.Errorf("encryption key must be %d bytes (got %d): generate one with `openssl rand -base64 32`", keyLen, len(key))
+		return nil, fmt.Errorf("derive key: %w", err)
 	}
 	block, err := aes.NewCipher(key)
 	if err != nil {

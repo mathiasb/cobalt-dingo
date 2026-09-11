@@ -10,10 +10,11 @@ import (
 	"github.com/mathiasb/cobalt-dingo/internal/crypto"
 )
 
-// A 32-byte key, base64. Test-only; generated, not a real secret.
+// Test-only high-entropy secrets, shaped like 1Password's
+// `letters,digits,symbols,64` recipe. Not real secrets.
 const (
-	testKey  = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="
-	otherKey = "f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f38="
+	testKey  = "Kq7#vP2mZx9!tR4wLs8@nB6yHj3^dF5gCe1%uA0oXi7*qW2zTv4rMk9$bN6pJ8hY"
+	otherKey = "Zb3!mK8wQr2@yT5nHd7^pL4gXs9%vC6jFe1oUa0#iR7*zN2tBk9$qM6wJ8hYpD4"
 )
 
 func TestSeal_roundTripsThroughOpen(t *testing.T) {
@@ -100,19 +101,15 @@ func TestOpen_rejectsGarbage(t *testing.T) {
 // is configured, not discovered later when a tenant tries to connect.
 func TestNewCipher_refusesAnUnusableKey(t *testing.T) {
 	cases := map[string]string{
-		"empty":          "",
-		"not base64":     "%%%not-base64%%%",
-		"too short":      "c2hvcnQ=",
-		"one byte short": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHg==",
-
-		// These two are the only cases the explicit length check actually
-		// catches, and they are the reason it is not redundant: aes.NewCipher
-		// accepts 16- and 24-byte keys as AES-128 and AES-192. Without the
-		// check, configuring a short-but-valid key silently downgrades the
-		// cipher instead of failing — found by mutating the check out and
-		// watching every other case still pass.
-		"valid AES-128 key": "AAECAwQFBgcICQoLDA0ODw==",
-		"valid AES-192 key": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYX",
+		"empty": "",
+		// The key is DERIVED from this secret with HKDF, so its format is free
+		// — but its entropy is not. A short secret is refused at configuration
+		// time, because HKDF cannot manufacture entropy the input lacks, and a
+		// fast KDF over a guessable input is brute-forceable offline against a
+		// stolen database.
+		"one character":    "x",
+		"short passphrase": "hunter2",
+		"31 characters":    "0123456789012345678901234567890",
 	}
 	for name, key := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -122,10 +119,32 @@ func TestNewCipher_refusesAnUnusableKey(t *testing.T) {
 	}
 }
 
+// 32 characters is the documented floor and must be accepted, or the boundary
+// is untested in the direction provisioning actually depends on.
+func TestNewCipher_acceptsTheMinimumLength(t *testing.T) {
+	_, err := crypto.NewCipher("01234567890123456789012345678901")
+
+	require.NoError(t, err)
+}
+
+// The derivation must actually depend on its input.
+func TestNewCipher_derivesADistinctKeyPerSecret(t *testing.T) {
+	a, err := crypto.NewCipher(testKey)
+	require.NoError(t, err)
+	b, err := crypto.NewCipher(otherKey)
+	require.NoError(t, err)
+
+	sealedByA, err := a.Seal("secret")
+	require.NoError(t, err)
+
+	_, err = b.Open(sealedByA)
+	require.Error(t, err, "a different configured secret must not open A's ciphertext")
+}
+
 // The error must never quote the key or the plaintext — these reach logs.
 func TestNewCipher_errorDoesNotEchoTheKey(t *testing.T) {
-	_, err := crypto.NewCipher("c2hvcnQ=")
+	_, err := crypto.NewCipher("hunter2")
 
 	require.Error(t, err)
-	assert.NotContains(t, err.Error(), "c2hvcnQ")
+	assert.NotContains(t, err.Error(), "hunter2")
 }
