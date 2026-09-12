@@ -12,30 +12,36 @@ import (
 
 const atomicRefreshToken = `-- name: AtomicRefreshToken :one
 UPDATE fortnox_tokens
-SET access_token  = $3,
-    refresh_token = $4,
-    expires_at    = $5,
-    updated_at    = NOW()
-WHERE tenant_id = $1 AND refresh_token = $2
+SET access_token_sealed  = $3,
+    refresh_token_sealed = $4,
+    refresh_token_fp     = $5,
+    expires_at           = $6,
+    updated_at           = NOW()
+WHERE tenant_id = $1 AND refresh_token_fp = $2
 RETURNING tenant_id
 `
 
 type AtomicRefreshTokenParams struct {
-	TenantID       string
-	RefreshToken   string
-	AccessToken    string
-	RefreshToken_2 string
-	ExpiresAt      time.Time
+	TenantID           string
+	RefreshTokenFp     string
+	AccessTokenSealed  string
+	RefreshTokenSealed string
+	RefreshTokenFp_2   string
+	ExpiresAt          time.Time
 }
 
-// Replaces the token only when the stored refresh_token still matches old_refresh_token.
+// Replaces the token only when the stored refresh token still matches the one
+// the caller read. Matched on the FINGERPRINT, not the ciphertext: GCM is
+// randomised, so comparing sealed values would never match and the race
+// detection would silently stop working.
 // Returns the tenant_id row when successful; zero rows means ErrTokenConflict.
 func (q *Queries) AtomicRefreshToken(ctx context.Context, arg AtomicRefreshTokenParams) (string, error) {
 	row := q.db.QueryRowContext(ctx, atomicRefreshToken,
 		arg.TenantID,
-		arg.RefreshToken,
-		arg.AccessToken,
-		arg.RefreshToken_2,
+		arg.RefreshTokenFp,
+		arg.AccessTokenSealed,
+		arg.RefreshTokenSealed,
+		arg.RefreshTokenFp_2,
 		arg.ExpiresAt,
 	)
 	var tenant_id string
@@ -53,46 +59,49 @@ func (q *Queries) DeleteToken(ctx context.Context, tenantID string) error {
 }
 
 const getToken = `-- name: GetToken :one
-SELECT access_token, refresh_token, expires_at
+SELECT access_token_sealed, refresh_token_sealed, expires_at
 FROM fortnox_tokens
 WHERE tenant_id = $1
 `
 
 type GetTokenRow struct {
-	AccessToken  string
-	RefreshToken string
-	ExpiresAt    time.Time
+	AccessTokenSealed  string
+	RefreshTokenSealed string
+	ExpiresAt          time.Time
 }
 
 func (q *Queries) GetToken(ctx context.Context, tenantID string) (GetTokenRow, error) {
 	row := q.db.QueryRowContext(ctx, getToken, tenantID)
 	var i GetTokenRow
-	err := row.Scan(&i.AccessToken, &i.RefreshToken, &i.ExpiresAt)
+	err := row.Scan(&i.AccessTokenSealed, &i.RefreshTokenSealed, &i.ExpiresAt)
 	return i, err
 }
 
 const upsertToken = `-- name: UpsertToken :exec
-INSERT INTO fortnox_tokens (tenant_id, access_token, refresh_token, expires_at, updated_at)
-VALUES ($1, $2, $3, $4, NOW())
+INSERT INTO fortnox_tokens (tenant_id, access_token_sealed, refresh_token_sealed, refresh_token_fp, expires_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, NOW())
 ON CONFLICT (tenant_id) DO UPDATE SET
-    access_token  = EXCLUDED.access_token,
-    refresh_token = EXCLUDED.refresh_token,
-    expires_at    = EXCLUDED.expires_at,
-    updated_at    = NOW()
+    access_token_sealed  = EXCLUDED.access_token_sealed,
+    refresh_token_sealed = EXCLUDED.refresh_token_sealed,
+    refresh_token_fp     = EXCLUDED.refresh_token_fp,
+    expires_at           = EXCLUDED.expires_at,
+    updated_at           = NOW()
 `
 
 type UpsertTokenParams struct {
-	TenantID     string
-	AccessToken  string
-	RefreshToken string
-	ExpiresAt    time.Time
+	TenantID           string
+	AccessTokenSealed  string
+	RefreshTokenSealed string
+	RefreshTokenFp     string
+	ExpiresAt          time.Time
 }
 
 func (q *Queries) UpsertToken(ctx context.Context, arg UpsertTokenParams) error {
 	_, err := q.db.ExecContext(ctx, upsertToken,
 		arg.TenantID,
-		arg.AccessToken,
-		arg.RefreshToken,
+		arg.AccessTokenSealed,
+		arg.RefreshTokenSealed,
+		arg.RefreshTokenFp,
 		arg.ExpiresAt,
 	)
 	return err

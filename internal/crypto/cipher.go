@@ -17,11 +17,14 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/hkdf"
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // keyLen is 32 bytes — AES-256.
@@ -40,8 +43,14 @@ const minSecretLen = 32
 // a future second purpose cannot accidentally derive the same bytes.
 const hkdfInfo = "cobalt-dingo/fortnox-integration-client-secret/v1"
 
-// Cipher seals and opens secrets with one derived key.
-type Cipher struct{ aead cipher.AEAD }
+// Cipher seals and opens secrets, and fingerprints them for comparison.
+type Cipher struct {
+	aead cipher.AEAD
+
+	// fpKey is derived from the same secret under a different info string, so
+	// encryption and fingerprinting do not share a key.
+	fpKey []byte
+}
 
 // NewCipher derives an AES-256 key from the configured secret via HKDF-SHA256.
 //
@@ -78,7 +87,12 @@ func NewCipher(secret string) (*Cipher, error) {
 	if err != nil {
 		return nil, fmt.Errorf("build GCM: %w", err)
 	}
-	return &Cipher{aead: aead}, nil
+	fpKey, err := hkdf.Key(sha256.New, []byte(secret), nil, fingerprintInfo, keyLen)
+	if err != nil {
+		return nil, fmt.Errorf("derive fingerprint key: %w", err)
+	}
+
+	return &Cipher{aead: aead, fpKey: fpKey}, nil
 }
 
 // Seal encrypts plaintext and returns base64(nonce || ciphertext).
@@ -117,4 +131,34 @@ func (c *Cipher) Open(sealed string) (string, error) {
 		return "", errors.New("stored secret failed authentication: wrong key, or the row was modified")
 	}
 	return string(plaintext), nil
+}
+
+// fingerprintInfo derives a SEPARATE key for fingerprinting.
+//
+// Domain separation is not decorative here: using the encryption key as an HMAC
+// key means one secret serving two cryptographic purposes, and a weakness in
+// either use would reach the other.
+const fingerprintInfo = "cobalt-dingo/refresh-token-fingerprint/v1"
+
+// Fingerprint returns a deterministic, keyed fingerprint of plaintext.
+//
+// It exists because encrypted columns cannot be compared. The rolling-refresh
+// race is detected by `UPDATE ... WHERE refresh_token_fp = <old>`, and GCM
+// ciphertext is randomised — the same token seals differently every time, so
+// matching on the ciphertext would never succeed and the race detection would
+// silently stop working. That is worse than the plaintext it replaces: two
+// processes would both believe they won.
+//
+// HMAC rather than a bare hash: a database dump must not let someone confirm a
+// guessed token by hashing it.
+//
+// An empty input has no fingerprint. Returning a real one would let a row with
+// no refresh token take part in a compare-and-swap.
+func (c *Cipher) Fingerprint(plaintext string) string {
+	if strings.TrimSpace(plaintext) == "" {
+		return ""
+	}
+	mac := hmac.New(sha256.New, c.fpKey)
+	mac.Write([]byte(plaintext))
+	return hex.EncodeToString(mac.Sum(nil))
 }
