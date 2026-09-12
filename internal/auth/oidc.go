@@ -143,6 +143,7 @@ func NewOIDCHandler(ctx context.Context, cfg config.OIDC, sessions *SessionManag
 		verifier:    verifier,
 		sessions:    sessions,
 		defaultMode: defaultMode,
+		directory:   directory,
 		log:         log,
 	}, nil
 }
