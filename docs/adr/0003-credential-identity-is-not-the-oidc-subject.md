@@ -121,6 +121,49 @@ to the money path.
   current scheme is correct and deliberately unchanged — sandbox and production
   credentials must never resolve to each other.
 
+## Amendment, 2026-09-12: the email claim is operator-asserted, not IdP-verified
+
+This ADR rests on the email claim being **verified**, and named the failure of
+that premise as grounds to supersede rather than work around. Implementing it
+(#67) turned up the relevant fact, and it changes what the premise means here.
+
+**authentik 2025.10 changed the default: `email_verified` is now `false`.**
+Before that release the email scope always asserted `true`. Their stated
+reason is that authentik *"does not have a single authoritative source for
+determining whether a user's email address is verified"*, so asserting it could
+have security implications — which is this ADR's own argument, made by the
+vendor.
+
+This estate runs 2026.5.2, so the claim arrives present and `false`, and the
+implementation correctly refused every login. Mathias was locked out of
+`books.d-ma.be` until it was addressed.
+
+**Resolution: select authentik's built-in mapping that returns
+`"email_verified": True`.** That restores login and keeps the key derivation as
+decided.
+
+**What it does NOT do is make the claim independently verified**, and that has
+to be recorded or a future reader will believe otherwise. The mapping asserts
+`true` unconditionally, so after this change:
+
+- the claim is **operator-asserted** — true in fact, because the operator owns
+  the domain and the mailbox, but not machine-checked by anything
+- the security property is "the operator vouches for this address", not "the
+  identity provider verified it"
+
+That is acceptable for a single-operator deployment on an IdP the operator
+runs. **It is not acceptable once there is a second user**, because the
+assertion would then cover addresses the operator has not verified — and
+ADR-0005 puts paying tenants on the roadmap, which makes this a dated
+exception rather than a standing one.
+
+**Resolution trigger, observable by someone who is not the author:** the moment
+a second human can log in, `email_verified` must come from a real verification
+— authentik's documented approach is to verify the address and store the result
+as a user attribute, then map that attribute dynamically. Until then this
+amendment is the record that the premise is weaker than the Decision section
+implies.
+
 ## Validation
 
 `verify: scripts/assert-credential-key-stability.sh`, which asserts the end
