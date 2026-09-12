@@ -14,6 +14,48 @@ the domain model or port interfaces will be called out explicitly.
 
 ---
 
+## [0.30.0] — 2026-09-12
+
+Credentials stop depending on the identity provider, and nothing is stored in
+plaintext any more.
+
+### Added
+
+- **Credentials keyed by an internal user ID** (ADR-0003, #67). Minted at first
+  login, resolved from the **verified** email — `email_verified` is now
+  required and a login without it is refused, because keying on an unverified
+  email is worse than keying on the subject. The OIDC subject is kept for audit
+  and is never a lookup key. `scripts/assert-credential-key-stability.sh` is
+  green on both conditions for the first time.
+- **CSRF protection on the Fortnox OAuth callback** (#83). `state` was the mode
+  alone; it is now `<nonce>:<mode>`, single-use, ten-minute TTL, `hmac.Equal`.
+- **Fortnox tokens encrypted at rest** (#85), closing the TODO from the initial
+  schema. The rolling-refresh compare-and-swap matches on a deterministic keyed
+  fingerprint, because GCM ciphertext cannot be compared — a naive port would
+  have silently disabled the race detection.
+- `/migrate` ships in the image, so migrations run as an in-cluster Job instead
+  of an operator decrypting the production DSN onto a workstation.
+
+### Fixed
+
+- **Three regressions from v0.29.0.** The credential key was rebuilt by hand in
+  nine places and three still produced the pre-company two-part form, so the
+  mode status cards always read "Not connected", `/fortnox/status` always
+  returned false, and **Disconnect deleted nothing while reporting success**.
+  `auth.TenantKey` is now the single derivation. A fourth instance lived in an
+  SQL `LIKE` pattern in `cmd/e2e-token`.
+
+  The tests missed all of it because they hand-wrote the keys they asserted, so
+  test and implementation agreed — both written together, both wrong.
+
+### Migration
+
+`FORTNOX_INTEGRATION_KEY` is **required** whenever `DATABASE_URL` is set;
+the server refuses to start without it. Migration 005 deletes existing tokens —
+SQL cannot encrypt — so **every Fortnox connection must be re-made once**.
+
+---
+
 ## [0.29.0] — 2026-09-12
 
 Multi-company working, and the first half of multi-tenancy. **ADR-0005
