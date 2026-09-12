@@ -86,6 +86,23 @@ type Fortnox struct {
 	InvoiceInbox string // Arkivplats email for incoming supplier invoices
 	AllowsWrites bool
 
+	// AccountType is Fortnox's `account_type` authorize parameter.
+	//
+	// Empty means an ordinary user authorization: the token binds to the human
+	// who approved it. "service" creates a SERVICE ACCOUNT — a purpose-made
+	// user with service-to-service permissions — which removes the dependency
+	// on one person's account remaining intact. Correct for an unattended
+	// integration holding a 45-day rotating refresh token.
+	//
+	// Requires "Only administrator" enabled for the app in the Fortnox
+	// Developer Portal, and only a system administrator of the customer can
+	// authorize it. One service account per client id per customer.
+	//
+	// Per-mode on purpose: the sandbox is already connected as a user, and
+	// switching it would invalidate that connection on its next
+	// re-authorization for no benefit.
+	AccountType string
+
 	// BaseURLOverride redirects API calls away from the live Fortnox host.
 	// It is a test-only seam (see adapter/fortnox connector integration
 	// tests) and is deliberately never populated from the environment by
@@ -221,6 +238,19 @@ func LoadAllModes() (map[Mode]Fortnox, []string) {
 	for _, m := range []Mode{ModeSandbox, ModeProduction} {
 		p := m.EnvPrefix()
 		if id := os.Getenv(p + "CLIENT_ID"); id != "" {
+			// "service" is the only value Fortnox documents. A typo would
+			// otherwise travel to the authorize endpoint and either be
+			// rejected there or ignored — the second producing a user-bound
+			// token while the operator believed they had a service account,
+			// a difference that is invisible afterwards and costs a
+			// re-authorization to correct.
+			accountType := os.Getenv(p + "ACCOUNT_TYPE")
+			if accountType != "" && accountType != "service" {
+				incomplete = append(incomplete,
+					fmt.Sprintf("mode %s has an invalid %sACCOUNT_TYPE (only \"service\" is valid) — not offered", m, p))
+				continue
+			}
+
 			var missing []string
 			if os.Getenv(p+"CLIENT_SECRET") == "" {
 				missing = append(missing, p+"CLIENT_SECRET")
@@ -240,6 +270,7 @@ func LoadAllModes() (map[Mode]Fortnox, []string) {
 				RedirectURI:  os.Getenv(p + "REDIRECT_URI"),
 				Scopes:       os.Getenv(p + "SCOPES"),
 				InvoiceInbox: os.Getenv(p + "INVOICE_INBOX"),
+				AccountType:  accountType,
 			}
 			switch m {
 			case ModeSandbox:

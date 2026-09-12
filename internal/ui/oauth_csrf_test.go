@@ -136,3 +136,43 @@ func TestCallback_acceptsTheMatchingNonceAndConsumesIt(t *testing.T) {
 	assert.Equal(t, "5566778899", stored.Company,
 		"connecting a company is also what starts working with it")
 }
+
+// Fortnox service accounts (docs: developer/blog/service-accounts) bind the
+// token to a purpose-made user rather than to the human who approved it, which
+// is the right model for an unattended integration holding a 45-day rotating
+// refresh token. It is requested with `account_type=service` on the authorize
+// redirect.
+func TestConnect_sendsAccountTypeWhenConfigured(t *testing.T) {
+	c := csrfConnector(t)
+	c.configs[config.ModeProduction] = config.Fortnox{
+		Mode: config.ModeProduction, ClientID: "p", ClientSecret: "s",
+		RedirectURI: "https://books.d-ma.be/fortnox/callback",
+		Scopes:      "bookkeeping", AccountType: "service",
+	}
+
+	w := httptest.NewRecorder()
+	c.connectHandler(w, requestAs("GET", "/fortnox/connect?mode=production",
+		ownerSession("owner-1", config.ModeProduction, "")))
+
+	require.Equal(t, http.StatusFound, w.Code, "body: %s", w.Body.String())
+	loc, err := url.Parse(w.Header().Get("Location"))
+	require.NoError(t, err)
+	assert.Equal(t, "service", loc.Query().Get("account_type"))
+}
+
+// Absent, not empty. An empty `account_type=` is a value Fortnox does not
+// document, and sending one risks it being rejected or — worse — ignored,
+// which would produce a user-bound token while looking like a service one.
+func TestConnect_omitsAccountTypeEntirelyWhenNotConfigured(t *testing.T) {
+	c := csrfConnector(t)
+
+	w := httptest.NewRecorder()
+	c.connectHandler(w, requestAs("GET", "/fortnox/connect?mode=sandbox",
+		ownerSession("owner-1", config.ModeSandbox, "")))
+
+	require.Equal(t, http.StatusFound, w.Code)
+	loc, err := url.Parse(w.Header().Get("Location"))
+	require.NoError(t, err)
+	_, present := loc.Query()["account_type"]
+	assert.False(t, present, "the parameter must be absent, not empty")
+}

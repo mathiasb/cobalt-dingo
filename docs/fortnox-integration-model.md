@@ -127,6 +127,67 @@ The 25-per-5-seconds shape is the number that matters for any batch read — SIE
 export plus per-supplier invoice fetches will hit it long before 300/min looks
 close.
 
+## Service accounts — the thing this document originally missed
+
+Re-read 2026-09-12 at Mathias's insistence that the guidance here was wrong on
+important points. It was. Source:
+<https://www.fortnox.se/developer/blog/service-accounts>.
+
+**Fortnox supports service accounts, and an unattended integration should use
+one.** Quoting the vendor: activation with the service-account option connects
+the access token to *"a custom-created user with a set of permissions suitable
+for service-to-service integrations, thereby removing the dependency to a
+specific person within the company."*
+
+That is precisely cobalt-dingo's situation — a scheduled collector plus a
+server, holding a refresh token that rotates and expires after 45 days. An
+ordinary authorization binds the live books to whichever human approved it.
+
+| | |
+|---|---|
+| Enable | Developer Portal, select **"Only administrator"** for the app |
+| Request | `account_type=service` on the authorize redirect (the only valid value) |
+| Who may authorize | **only a system administrator** of the customer |
+| Limit | **one service account per client id per customer** |
+
+Implemented as per-mode config (`FORTNOX_<MODE>_ACCOUNT_TYPE`), absent by
+default. Absent rather than empty: an empty `account_type=` is undocumented,
+and being ignored rather than rejected would yield a user-bound token that
+looks like a service one — a difference invisible afterwards and costing a
+re-authorization to correct. The sandbox stays a user authorization, because it
+is already connected and switching it would buy nothing.
+
+## Three corrections to what this document said before
+
+1. **The licence is a step, not a possible prompt.** This file called it an
+   open question and said to treat a licence prompt as "expected rather than a
+   fault". The FAQ is direct: *"The customer must log in to Fortnox and order
+   an integration licence"*, via **Tilläggsbeställning** / Manage users. And
+   for a hidden integration, *"customers can use your Client ID to find it in
+   Fortnox"*. So the real order is: find by Client ID → order the licence →
+   authorize.
+
+2. **One redirect URI, not several.** The docs say `redirect_uri` *"Must match
+   the Redirect URI for the app set in the Developer Portal. If omitted, it
+   will default to the registered Redirect URI"* — singular throughout. Advice
+   given earlier to register both a localhost callback and the production one
+   was wrong.
+
+3. **`state` is a required parameter**, not optional decoration. Worth noting
+   because this repo shipped `state` carrying only the mode, with no CSRF value
+   in it at all (#83, fixed).
+
+## Verified unchanged
+
+- 27 scopes, no read-only variant, and all six in the recommended grant exist.
+- Token lifetimes: authorization code 10 minutes, access token 1 hour, refresh
+  token 45 days, rotating on use.
+- Token endpoint: `POST https://apps.fortnox.se/oauth-v1/token`, **HTTP Basic**
+  with base64 `client_id:client_secret`, `application/x-www-form-urlencoded`
+  body of `grant_type`, `code`, `redirect_uri`. The implementation matches.
+- Authorize endpoint and parameters as implemented.
+- Scopes are URL-encoded, space-delimited, case-sensitive.
+
 ## What this changes
 
 - **#50** is not gated on Fortnox approval. Create a private integration, pick

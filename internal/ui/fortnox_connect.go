@@ -220,6 +220,19 @@ func (c *FortnoxConnector) connectHandler(w http.ResponseWriter, r *http.Request
 		"state":         {auth.OAuthState(nonce, string(mode))},
 		"access_type":   {"offline"},
 	}
+
+	// Service accounts bind the token to a purpose-made user instead of the
+	// human who approved it, which is what an unattended integration wants —
+	// otherwise the live books depend on one person's account staying intact.
+	//
+	// Added only when configured, and ABSENT rather than empty when not: an
+	// empty `account_type=` is undocumented, and being ignored rather than
+	// rejected would produce a user-bound token that looks like a service one.
+	// That difference cannot be seen after the fact and costs a
+	// re-authorization to correct.
+	if cfg.AccountType != "" {
+		params.Set("account_type", cfg.AccountType)
+	}
 	authURL := "https://apps.fortnox.se/oauth-v1/auth?" + params.Encode()
 	http.Redirect(w, r, authURL, http.StatusFound)
 }
