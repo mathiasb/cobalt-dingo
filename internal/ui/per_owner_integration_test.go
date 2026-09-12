@@ -111,7 +111,7 @@ func TestCallback_exchangesWithTheOwnersCredentials(t *testing.T) {
 	c.cipher = cipher
 
 	c.callbackHandler(httptest.NewRecorder(),
-		requestWithSession("GET", "/fortnox/callback?code=abc&state=production", "user-1"))
+		requestWithSession("GET", "/fortnox/callback?code=abc&state=test-oauth-nonce:production", "user-1"))
 
 	assert.Equal(t, "tenant-client-id", usedClientID)
 	assert.Equal(t, "tenant-secret", usedSecret)

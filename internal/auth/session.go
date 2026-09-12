@@ -49,6 +49,17 @@ type Session struct {
 	// error at TenantID() rather than a default.
 	Company string `json:"company,omitempty"`
 
+	// FortnoxNonce binds a Fortnox authorization to the session that started
+	// it, and FortnoxNonceAt bounds how long that binding is good for.
+	//
+	// Before these, `state` was just the mode — so the callback had no CSRF
+	// protection: anyone who could get a logged-in browser to issue the
+	// callback could bind a Fortnox authorization of their choosing (#83).
+	//
+	// Single-use: cleared on a successful callback, so a replay fails.
+	FortnoxNonce   string    `json:"fortnox_nonce,omitempty"`
+	FortnoxNonceAt time.Time `json:"fortnox_nonce_at,omitempty"`
+
 	ExpiresAt time.Time `json:"exp"`
 }
 

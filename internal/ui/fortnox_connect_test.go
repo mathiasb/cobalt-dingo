@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mathiasb/cobalt-dingo/internal/auth"
 	"github.com/mathiasb/cobalt-dingo/internal/config"
@@ -62,9 +63,17 @@ func newTestConnector(store domain.TokenStore) *FortnoxConnector {
 	)
 }
 
+// testOAuthNonce is the nonce the shared helper pre-loads into the session, so
+// callback tests carry a state that passes the CSRF check (#83) and fail for
+// the reason they are actually about.
+const testOAuthNonce = "test-oauth-nonce"
+
 func requestWithSession(method, target string, sub string) *http.Request {
 	r := httptest.NewRequest(method, target, nil)
-	sess := &auth.Session{Owner: sub, Sub: "sub-" + sub, Email: sub + "@example.com", Mode: config.ModeSandbox}
+	sess := &auth.Session{
+		Owner: sub, Sub: "sub-" + sub, Email: sub + "@example.com", Mode: config.ModeSandbox,
+		FortnoxNonce: testOAuthNonce, FortnoxNonceAt: time.Now(),
+	}
 	return r.WithContext(auth.WithSession(r.Context(), sess))
 }
 
@@ -151,7 +160,7 @@ func TestCallbackHandler_ExchangesCodeAndRedirects(t *testing.T) {
 	store := newConnectorTokenStore()
 	c := newTestConnector(store)
 
-	r := requestWithSession("GET", "/fortnox/callback?code=abc123&state=sandbox", "user1")
+	r := requestWithSession("GET", "/fortnox/callback?code=abc123&state=test-oauth-nonce:sandbox", "user1")
 	w := httptest.NewRecorder()
 
 	c.callbackHandler(w, r)

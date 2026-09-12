@@ -189,13 +189,35 @@ func (c *FortnoxConnector) connectHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// Bind this authorization to this session. `state` used to be the mode
+	// alone, which meant it carried routing information and provided no CSRF
+	// protection at all (#83).
+	nonce, err := auth.NewOAuthNonce()
+	if err != nil {
+		c.log.Error("generate oauth nonce", "err", err)
+		http.Error(w, "could not start authorization", http.StatusInternalServerError)
+		return
+	}
+	if c.sessions == nil {
+		http.Error(w, "session manager unavailable", http.StatusInternalServerError)
+		return
+	}
+	pending := *sess
+	pending.FortnoxNonce = nonce
+	pending.FortnoxNonceAt = time.Now()
+	if err := c.sessions.Set(w, pending); err != nil {
+		c.log.Error("persist oauth nonce", "err", err)
+		http.Error(w, "session error", http.StatusInternalServerError)
+		return
+	}
+
 	// Fortnox OAuth2 authorization endpoint.
 	params := url.Values{
 		"client_id":     {cfg.ClientID},
 		"redirect_uri":  {cfg.RedirectURI},
 		"scope":         {cfg.Scopes},
 		"response_type": {"code"},
-		"state":         {string(mode)}, // mode used as state to route callback
+		"state":         {auth.OAuthState(nonce, string(mode))},
 		"access_type":   {"offline"},
 	}
 	authURL := "https://apps.fortnox.se/oauth-v1/auth?" + params.Encode()
@@ -215,9 +237,25 @@ func (c *FortnoxConnector) callbackHandler(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "missing code", http.StatusBadRequest)
 		return
 	}
-	mode := config.Mode(r.URL.Query().Get("state"))
+	presentedNonce, modeFromState, ok := auth.ParseOAuthState(r.URL.Query().Get("state"))
+	if !ok {
+		// Includes the old mode-only format. Accepting that "for
+		// compatibility" would leave the hole open.
+		http.Error(w, "invalid state", http.StatusBadRequest)
+		return
+	}
+	if !sess.OAuthNonceValid(presentedNonce, time.Now()) {
+		// A callback carrying a nonce this session did not issue, or one that
+		// has expired. Refusing is the whole point: otherwise anyone able to
+		// make a logged-in browser issue this request could bind a Fortnox
+		// authorization of their choosing to this session (#83).
+		c.log.Error("fortnox callback refused: state nonce does not match this session", "owner", sess.Owner)
+		http.Error(w, "this authorization did not start here — please try connecting again", http.StatusBadRequest)
+		return
+	}
+	mode := config.Mode(modeFromState)
 	if !mode.IsValid() {
-		http.Error(w, "invalid state/mode", http.StatusBadRequest)
+		http.Error(w, "invalid mode in state", http.StatusBadRequest)
 		return
 	}
 	cfg, err := c.resolveFor(r, sess, mode)
@@ -274,7 +312,20 @@ func (c *FortnoxConnector) callbackHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	c.log.Info("fortnox connected", "tenant", tenantID, "mode", mode)
+	// Consume the nonce so a replayed callback fails, and make the
+	// just-connected company the active one — connecting it is what starting
+	// to work with it means.
+	updated := *sess
+	updated.FortnoxNonce = ""
+	updated.FortnoxNonceAt = time.Time{}
+	updated.Company = companyKey
+	if err := c.sessions.Set(w, updated); err != nil {
+		c.log.Error("persist session after connect", "tenant", tenantID, "err", err)
+		http.Error(w, "session error", http.StatusInternalServerError)
+		return
+	}
+
+	c.log.Info("fortnox connected", "tenant", tenantID, "mode", mode, "company", company.Name)
 	http.Redirect(w, r, "/fortnox/?connected="+string(mode), http.StatusSeeOther)
 }
 
