@@ -5,6 +5,7 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -34,6 +35,7 @@ type verifiedIdentity struct {
 	Nonce             string
 	Sub               string
 	Email             string
+	EmailVerified     bool
 	Name              string
 	PreferredUsername string
 }
@@ -57,6 +59,7 @@ func (g gooidcVerifier) Verify(ctx context.Context, rawIDToken string) (verified
 	var c struct {
 		Sub               string `json:"sub"`
 		Email             string `json:"email"`
+		EmailVerified     bool   `json:"email_verified"`
 		Name              string `json:"name"`
 		PreferredUsername string `json:"preferred_username"`
 	}
@@ -67,6 +70,7 @@ func (g gooidcVerifier) Verify(ctx context.Context, rawIDToken string) (verified
 		Nonce:             tok.Nonce,
 		Sub:               c.Sub,
 		Email:             c.Email,
+		EmailVerified:     c.EmailVerified,
 		Name:              c.Name,
 		PreferredUsername: c.PreferredUsername,
 	}, nil
@@ -78,11 +82,18 @@ type OIDCHandler struct {
 	verifier    idTokenVerifier
 	sessions    *SessionManager
 	defaultMode config.Mode
-	log         *slog.Logger
+
+	// directory resolves the verified email to the internal user ID that
+	// credentials are keyed by (ADR-0003). Required: without it a login would
+	// issue a session with no credential owner, which looks like success and
+	// then fails at every credential lookup.
+	directory OwnerDirectory
+
+	log *slog.Logger
 }
 
 // NewOIDCHandler constructs an OIDCHandler, performing OIDC discovery against issuerURL.
-func NewOIDCHandler(ctx context.Context, cfg config.OIDC, sessions *SessionManager, defaultMode config.Mode, log *slog.Logger) (*OIDCHandler, error) {
+func NewOIDCHandler(ctx context.Context, cfg config.OIDC, sessions *SessionManager, defaultMode config.Mode, directory OwnerDirectory, log *slog.Logger) (*OIDCHandler, error) {
 	provider, err := gooidc.NewProvider(ctx, cfg.IssuerURL)
 	if err != nil {
 		return nil, fmt.Errorf("oidc discovery %s: %w", cfg.IssuerURL, err)
@@ -192,22 +203,32 @@ func (h *OIDCHandler) CallbackHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	name := ident.Name
-	if name == "" {
-		name = ident.PreferredUsername
+	s, err := NewSession(r.Context(), h.directory, ident, h.defaultMode)
+	if errors.Is(err, ErrEmailNotVerified) {
+		// Fail closed on the premise ADR-0003 rests on. Not a 500: this is a
+		// legitimate refusal of an identity, and the operator fixes it in the
+		// identity provider rather than in this application.
+		h.log.Error("login refused: identity provider did not assert a verified email", "sub", ident.Sub)
+		http.Error(w, "your email address is not verified with the identity provider", http.StatusForbidden)
+		return
+	}
+	if err != nil {
+		h.log.Error("resolve credential owner", "sub", ident.Sub, "err", err)
+		http.Error(w, "could not establish who you are", http.StatusInternalServerError)
+		return
+	}
+	if s.Name == "" {
+		s.Name = ident.PreferredUsername
 	}
 
-	s := Session{
-		Sub:   ident.Sub,
-		Email: ident.Email,
-		Name:  name,
-		Mode:  h.defaultMode,
-	}
 	if err := h.sessions.Set(w, s); err != nil {
 		http.Error(w, "session error", http.StatusInternalServerError)
 		return
 	}
-	h.log.Info("user logged in", "sub", s.Sub, "email", s.Email)
+	// Log the owner AND the subject: the owner is what credentials hang off,
+	// the subject is what changes underneath. Both are needed to diagnose an
+	// IdP change after the fact.
+	h.log.Info("user logged in", "owner", s.Owner, "sub", s.Sub, "email", s.Email)
 	http.Redirect(w, r, "/", http.StatusFound)
 }
 

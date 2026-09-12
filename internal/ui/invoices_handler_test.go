@@ -62,7 +62,7 @@ func newFortnoxBackedServer(t *testing.T, fortnoxURL string) *Server {
 // company's books.
 func getInvoices(s *Server) *httptest.ResponseRecorder {
 	return getInvoicesAs(s, &auth.Session{
-		Sub: "test-user", Mode: config.ModeSandbox, Company: "556677-8899",
+		Owner: "test-user", Mode: config.ModeSandbox, Company: "556677-8899",
 	})
 }
 
@@ -90,7 +90,7 @@ func TestInvoicesHandler_redirectsWhenNoCompanySelected(t *testing.T) {
 	defer fortnox.Close()
 
 	w := getInvoicesAs(newFortnoxBackedServer(t, fortnox.URL),
-		&auth.Session{Sub: "test-user", Mode: config.ModeSandbox})
+		&auth.Session{Owner: "test-user", Mode: config.ModeSandbox})
 
 	assert.Equal(t, http.StatusSeeOther, w.Code)
 	assert.Equal(t, "/fortnox/", w.Header().Get("Location"))

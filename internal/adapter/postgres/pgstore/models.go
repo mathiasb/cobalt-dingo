@@ -65,3 +65,17 @@ type Tenant struct {
 	Name      string
 	CreatedAt time.Time
 }
+
+type User struct {
+	ID        string
+	Email     string
+	CreatedAt time.Time
+}
+
+type UserSubject struct {
+	UserID    string
+	Sub       string
+	Issuer    string
+	FirstSeen time.Time
+	LastSeen  time.Time
+}

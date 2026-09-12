@@ -69,6 +69,7 @@ func main() {
 	var pgStore *postgres.Store
 	var batchRepo domain.BatchRepository
 	var tenantRepo domain.TenantRepository
+	var ownerDirectory auth.OwnerDirectory
 	if appCfg.DatabaseURL != "" {
 		var dbErr error
 		pgStore, dbErr = postgres.NewStore(appCfg.DatabaseURL)
@@ -79,6 +80,7 @@ func main() {
 		batchRepo = postgres.NewBatchRepo(pgStore)
 		tenantRepo = postgres.NewTenantRepo(pgStore)
 		tokenStore = postgres.NewTokenStore(pgStore)
+		ownerDirectory = postgres.NewUserDirectory(pgStore, config.LoadOIDC().IssuerURL)
 		log.Info("postgres connected")
 	}
 
@@ -112,8 +114,16 @@ func main() {
 		if fortnoxEnabled {
 			defaultMode = cfg.Mode
 		}
+		if ownerDirectory == nil {
+			// ADR-0003: credentials are keyed by an internal user ID, which
+			// lives in postgres. Serving OIDC login without it would issue
+			// sessions with no credential owner — a login that reports success
+			// and then fails at every credential lookup. Refuse instead.
+			log.Error("OIDC is enabled but there is no database: credentials are keyed by an internal user ID (ADR-0003), which requires DATABASE_URL")
+			os.Exit(1)
+		}
 		var err error
-		oidcHandler, err = auth.NewOIDCHandler(context.Background(), oidcCfg, sessions, defaultMode, log)
+		oidcHandler, err = auth.NewOIDCHandler(context.Background(), oidcCfg, sessions, defaultMode, ownerDirectory, log)
 		if err != nil {
 			// Deliberately NOT a downgrade to unauthenticated serving. See
 			// secureHandler in wiring.go, which turns this nil into a refusal.

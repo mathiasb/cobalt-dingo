@@ -9,12 +9,14 @@ import (
 	"github.com/mathiasb/cobalt-dingo/internal/config"
 )
 
-// Until now the tenant key was "<sub>:<mode>", so one user had exactly one
-// Fortnox connection per mode. Connecting a second company **overwrote the
-// first** — same key, same row. Mathias works with more than one company, so
-// the company is now part of the key.
+// The tenant key is "<owner>:<mode>:<company>".
+//
+// Two separate defects shaped it. It was "<sub>:<mode>", so one user had
+// exactly one connection per mode and a second company overwrote the first;
+// and it derived from the OIDC subject, which orphaned a live token when the
+// subject changed (ADR-0003).
 func TestTenantID_includesTheCompany(t *testing.T) {
-	s := Session{Sub: "user-1", Mode: config.ModeProduction, Company: "5566778899"}
+	s := Session{Owner: "user-1", Mode: config.ModeProduction, Company: "5566778899"}
 
 	tid, err := s.TenantID()
 
@@ -23,8 +25,8 @@ func TestTenantID_includesTheCompany(t *testing.T) {
 }
 
 func TestTenantID_isDifferentPerCompany(t *testing.T) {
-	a := Session{Sub: "user-1", Mode: config.ModeProduction, Company: "5566778899"}
-	b := Session{Sub: "user-1", Mode: config.ModeProduction, Company: "1234567890"}
+	a := Session{Owner: "user-1", Mode: config.ModeProduction, Company: "5566778899"}
+	b := Session{Owner: "user-1", Mode: config.ModeProduction, Company: "1234567890"}
 
 	tidA, errA := a.TenantID()
 	tidB, errB := b.TenantID()
@@ -35,8 +37,8 @@ func TestTenantID_isDifferentPerCompany(t *testing.T) {
 }
 
 func TestTenantID_isDifferentPerMode(t *testing.T) {
-	sandbox := Session{Sub: "user-1", Mode: config.ModeSandbox, Company: "5566778899"}
-	production := Session{Sub: "user-1", Mode: config.ModeProduction, Company: "5566778899"}
+	sandbox := Session{Owner: "user-1", Mode: config.ModeSandbox, Company: "5566778899"}
+	production := Session{Owner: "user-1", Mode: config.ModeProduction, Company: "5566778899"}
 
 	tidS, _ := sandbox.TenantID()
 	tidP, _ := production.TenantID()
@@ -49,7 +51,7 @@ func TestTenantID_isDifferentPerMode(t *testing.T) {
 // happened to be stored there, and the whole point of this key is that the
 // caller cannot be vague about which company's books it is touching.
 func TestTenantID_refusesWithNoCompanySelected(t *testing.T) {
-	s := Session{Sub: "user-1", Mode: config.ModeProduction}
+	s := Session{Owner: "user-1", Mode: config.ModeProduction}
 
 	_, err := s.TenantID()
 
@@ -58,19 +60,24 @@ func TestTenantID_refusesWithNoCompanySelected(t *testing.T) {
 }
 
 func TestTenantID_refusesWithNoMode(t *testing.T) {
-	s := Session{Sub: "user-1", Company: "5566778899"}
+	s := Session{Owner: "user-1", Company: "5566778899"}
 
 	_, err := s.TenantID()
 
 	require.Error(t, err)
 }
 
-func TestTenantID_refusesWithNoSubject(t *testing.T) {
-	s := Session{Mode: config.ModeProduction, Company: "5566778899"}
+// A subject is NOT required to derive the key any more — that is the point of
+// ADR-0003. A session with an owner and no subject is unusual but perfectly
+// keyable, and asserting otherwise would re-couple the key to the subject.
+// The no-owner case is TestTenantID_refusesWithNoOwner.
+func TestTenantID_doesNotNeedTheSubject(t *testing.T) {
+	s := Session{Owner: "user-1", Mode: config.ModeProduction, Company: "5566778899"}
 
-	_, err := s.TenantID()
+	tid, err := s.TenantID()
 
-	require.Error(t, err)
+	require.NoError(t, err)
+	assert.Equal(t, "user-1:production:5566778899", string(tid))
 }
 
 // The company key comes from Fortnox's OrganizationNumber, which is formatted

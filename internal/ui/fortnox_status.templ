@@ -28,11 +28,10 @@ templ sandboxCard(connected bool) {
 			<span class="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700">Safe to experiment</span>
 		</div>
 		if connected {
-			<p class="text-sm text-gray-600 mb-4">&#10003; Connected</p>
-			<form method="POST" action="/fortnox/disconnect">
-				<input type="hidden" name="mode" value="sandbox"/>
-				<button type="submit" class="text-sm text-red-600 hover:text-red-800 hover:underline">Disconnect</button>
-			</form>
+			// Disconnect lives on the company row in the picker above, not
+			// here: a connection is per company now, so a mode-level
+			// Disconnect button cannot say WHICH one it would remove.
+			<p class="text-sm text-gray-600 mb-4">&#10003; Connected &mdash; manage companies above</p>
 		} else {
 			<p class="text-sm text-gray-500 mb-4">Not connected</p>
 			<a href="/fortnox/connect?mode=sandbox" class="inline-block rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">Connect Sandbox</a>
@@ -50,11 +49,10 @@ templ productionCard(connected bool) {
 			<p class="text-sm text-orange-800">&#9888; This connects to your live Fortnox company. All operations affect real data.</p>
 		</div>
 		if connected {
-			<p class="text-sm text-gray-600 mb-4">&#10003; Connected</p>
-			<form method="POST" action="/fortnox/disconnect">
-				<input type="hidden" name="mode" value="production"/>
-				<button type="submit" class="text-sm text-red-600 hover:text-red-800 hover:underline">Disconnect</button>
-			</form>
+			// Disconnect lives on the company row in the picker above, not
+			// here: a connection is per company now, so a mode-level
+			// Disconnect button cannot say WHICH one it would remove.
+			<p class="text-sm text-gray-600 mb-4">&#10003; Connected &mdash; manage companies above</p>
 		} else {
 			<p class="text-sm text-gray-500 mb-4">Not connected</p>
 			// Checkbox is a UX friction gate only — not a server-side guard.
@@ -98,14 +96,21 @@ templ companyPicker(companies []CompanyChoice) {
 							{ c.Name }
 							<span class="ml-2 text-xs text-gray-500">{ c.OrgNumber }</span>
 						</span>
-						if c.Active {
-							<span class="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700">Active</span>
-						} else {
-							<form method="POST" action="/fortnox/company">
+						<span class="flex items-center gap-3">
+							if c.Active {
+								<span class="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700">Active</span>
+							} else {
+								<form method="POST" action="/fortnox/company">
+									<input type="hidden" name="company" value={ c.OrgNumber }/>
+									<button type="submit" class="text-sm text-blue-600 hover:text-blue-800 hover:underline">Work with this</button>
+								</form>
+							}
+							<form method="POST" action="/fortnox/disconnect">
+								<input type="hidden" name="mode" value={ string(c.Mode) }/>
 								<input type="hidden" name="company" value={ c.OrgNumber }/>
-								<button type="submit" class="text-sm text-blue-600 hover:text-blue-800 hover:underline">Work with this</button>
+								<button type="submit" class="text-sm text-red-600 hover:text-red-800 hover:underline">Disconnect</button>
 							</form>
-						}
+						</span>
 					</li>
 				}
 			</ul>

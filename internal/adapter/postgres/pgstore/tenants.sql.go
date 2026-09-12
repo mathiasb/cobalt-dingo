@@ -89,6 +89,32 @@ func (q *Queries) GetTenant(ctx context.Context, id string) (Tenant, error) {
 	return i, err
 }
 
+const getUserByEmail = `-- name: GetUserByEmail :one
+SELECT id, email, created_at FROM users WHERE email = $1
+`
+
+func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUserByEmail, email)
+	var i User
+	err := row.Scan(&i.ID, &i.Email, &i.CreatedAt)
+	return i, err
+}
+
+const insertUser = `-- name: InsertUser :exec
+INSERT INTO users (id, email) VALUES ($1, $2)
+ON CONFLICT (email) DO NOTHING
+`
+
+type InsertUserParams struct {
+	ID    string
+	Email string
+}
+
+func (q *Queries) InsertUser(ctx context.Context, arg InsertUserParams) error {
+	_, err := q.db.ExecContext(ctx, insertUser, arg.ID, arg.Email)
+	return err
+}
+
 const listTenantsByPrefix = `-- name: ListTenantsByPrefix :many
 SELECT id, name, created_at
 FROM tenants
@@ -120,6 +146,23 @@ func (q *Queries) ListTenantsByPrefix(ctx context.Context, id string) ([]Tenant,
 		return nil, err
 	}
 	return items, nil
+}
+
+const recordUserSubject = `-- name: RecordUserSubject :exec
+INSERT INTO user_subjects (user_id, sub, issuer)
+VALUES ($1, $2, $3)
+ON CONFLICT (user_id, sub) DO UPDATE SET last_seen = NOW()
+`
+
+type RecordUserSubjectParams struct {
+	UserID string
+	Sub    string
+	Issuer string
+}
+
+func (q *Queries) RecordUserSubject(ctx context.Context, arg RecordUserSubjectParams) error {
+	_, err := q.db.ExecContext(ctx, recordUserSubject, arg.UserID, arg.Sub, arg.Issuer)
+	return err
 }
 
 const upsertDebtorAccount = `-- name: UpsertDebtorAccount :exec

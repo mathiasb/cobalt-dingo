@@ -64,7 +64,7 @@ func newTestConnector(store domain.TokenStore) *FortnoxConnector {
 
 func requestWithSession(method, target string, sub string) *http.Request {
 	r := httptest.NewRequest(method, target, nil)
-	sess := &auth.Session{Sub: sub, Email: sub + "@example.com", Mode: config.ModeSandbox}
+	sess := &auth.Session{Owner: sub, Sub: "sub-" + sub, Email: sub + "@example.com", Mode: config.ModeSandbox}
 	return r.WithContext(auth.WithSession(r.Context(), sess))
 }
 
@@ -103,25 +103,15 @@ func TestPageHandler_FlashMessage(t *testing.T) {
 	assert.Contains(t, w.Body.String(), "Successfully connected to")
 }
 
-// TestDisconnectHandler_DeletesTokenAndRedirects verifies the happy path.
-func TestDisconnectHandler_DeletesTokenAndRedirects(t *testing.T) {
-	store := newConnectorTokenStore("user1:sandbox")
-	c := newTestConnector(store)
-
-	form := url.Values{"mode": {"sandbox"}}
-	r := httptest.NewRequest("POST", "/fortnox/disconnect", strings.NewReader(form.Encode()))
-	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	sess := &auth.Session{Sub: "user1", Email: "user1@example.com", Mode: config.ModeSandbox}
-	r = r.WithContext(auth.WithSession(r.Context(), sess))
-	w := httptest.NewRecorder()
-
-	c.disconnectHandler(w, r)
-
-	assert.Equal(t, http.StatusSeeOther, w.Code)
-	assert.Contains(t, w.Header().Get("Location"), "disconnected=sandbox")
-	_, err := store.Load(context.Background(), "user1:sandbox")
-	assert.Error(t, err, "token should be deleted")
-}
+// The happy path moved to TestDisconnect_actuallyRemovesTheCompanysToken in
+// connection_status_test.go, which seeds the store via auth.TenantKey.
+//
+// The version that used to live here seeded "user1:sandbox" by hand and passed
+// no company. It agreed with the implementation because both were written
+// together — and both were wrong: disconnect deleted a two-part key no token
+// has ever been stored under, so the button reported success and removed
+// nothing. A test that hand-writes the key it expects cannot catch a key-format
+// bug, because it IS the bug, asserted.
 
 // TestDisconnectHandler_RequiresAuth verifies unauthenticated requests get 401.
 func TestDisconnectHandler_RequiresAuth(t *testing.T) {
@@ -138,7 +128,7 @@ func TestDisconnectHandler_InvalidMode(t *testing.T) {
 	form := url.Values{"mode": {"bogus"}}
 	r := httptest.NewRequest("POST", "/fortnox/disconnect", strings.NewReader(form.Encode()))
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	sess := &auth.Session{Sub: "user1", Email: "user1@example.com", Mode: config.ModeSandbox}
+	sess := &auth.Session{Owner: "user1", Sub: "sub-user1", Email: "user1@example.com", Mode: config.ModeSandbox}
 	r = r.WithContext(auth.WithSession(r.Context(), sess))
 	w := httptest.NewRecorder()
 	c.disconnectHandler(w, r)

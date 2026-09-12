@@ -47,3 +47,15 @@ ON CONFLICT (owner_id, mode) DO UPDATE SET
 
 -- name: DeleteIntegration :exec
 DELETE FROM fortnox_integrations WHERE owner_id = $1 AND mode = $2;
+
+-- name: GetUserByEmail :one
+SELECT id, email, created_at FROM users WHERE email = $1;
+
+-- name: InsertUser :exec
+INSERT INTO users (id, email) VALUES ($1, $2)
+ON CONFLICT (email) DO NOTHING;
+
+-- name: RecordUserSubject :exec
+INSERT INTO user_subjects (user_id, sub, issuer)
+VALUES ($1, $2, $3)
+ON CONFLICT (user_id, sub) DO UPDATE SET last_seen = NOW();

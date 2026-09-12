@@ -15,7 +15,7 @@ func TestTenantID_resolvesFromTheSessionsSelectedCompany(t *testing.T) {
 	srv := &Server{}
 	r := httptest.NewRequest("GET", "/invoices", nil)
 	r = r.WithContext(auth.WithSession(r.Context(), &auth.Session{
-		Sub: "user-1", Mode: config.ModeProduction, Company: "556677-8899",
+		Owner: "user-1", Mode: config.ModeProduction, Company: "556677-8899",
 	}))
 
 	tid, err := srv.tenantID(r)
@@ -40,7 +40,7 @@ func TestTenantID_refusesWhenNoCompanyIsSelected(t *testing.T) {
 	srv := &Server{}
 	r := httptest.NewRequest("GET", "/invoices", nil)
 	r = r.WithContext(auth.WithSession(r.Context(), &auth.Session{
-		Sub: "user-1", Mode: config.ModeProduction,
+		Owner: "user-1", Mode: config.ModeProduction,
 	}))
 
 	_, err := srv.tenantID(r)
