@@ -8,7 +8,7 @@ package ui
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-func FortnoxStatusPage(statuses []ModeStatus, flash string, nav *UserNav) templ.Component {
+func FortnoxStatusPage(statuses []ModeStatus, companies []CompanyChoice, flash string, nav *UserNav) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -60,7 +60,15 @@ func FortnoxStatusPage(statuses []ModeStatus, flash string, nav *UserNav) templ.
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, " <h1 class=\"text-2xl font-semibold text-gray-900 mb-6\">Fortnox Connections</h1><div class=\"space-y-4 max-w-xl\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, " <h1 class=\"text-2xl font-semibold text-gray-900 mb-6\">Fortnox Connections</h1>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = companyPicker(companies).Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, " <div class=\"space-y-4 max-w-xl\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -77,7 +85,7 @@ func FortnoxStatusPage(statuses []ModeStatus, flash string, nav *UserNav) templ.
 					}
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -112,22 +120,22 @@ func sandboxCard(connected bool) templ.Component {
 			templ_7745c5c3_Var4 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<div class=\"rounded-lg border border-green-300 bg-white p-6\"><div class=\"flex items-center justify-between mb-4\"><h2 class=\"text-lg font-medium text-gray-900\">Sandbox</h2><span class=\"rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700\">Safe to experiment</span></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<div class=\"rounded-lg border border-green-300 bg-white p-6\"><div class=\"flex items-center justify-between mb-4\"><h2 class=\"text-lg font-medium text-gray-900\">Sandbox</h2><span class=\"rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700\">Safe to experiment</span></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if connected {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<p class=\"text-sm text-gray-600 mb-4\">&#10003; Connected</p><form method=\"POST\" action=\"/fortnox/disconnect\"><input type=\"hidden\" name=\"mode\" value=\"sandbox\"> <button type=\"submit\" class=\"text-sm text-red-600 hover:text-red-800 hover:underline\">Disconnect</button></form>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<p class=\"text-sm text-gray-600 mb-4\">&#10003; Connected</p><form method=\"POST\" action=\"/fortnox/disconnect\"><input type=\"hidden\" name=\"mode\" value=\"sandbox\"> <button type=\"submit\" class=\"text-sm text-red-600 hover:text-red-800 hover:underline\">Disconnect</button></form>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<p class=\"text-sm text-gray-500 mb-4\">Not connected</p><a href=\"/fortnox/connect?mode=sandbox\" class=\"inline-block rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700\">Connect Sandbox</a>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<p class=\"text-sm text-gray-500 mb-4\">Not connected</p><a href=\"/fortnox/connect?mode=sandbox\" class=\"inline-block rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700\">Connect Sandbox</a>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -156,22 +164,132 @@ func productionCard(connected bool) templ.Component {
 			templ_7745c5c3_Var5 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<div class=\"rounded-lg border border-orange-300 bg-orange-50 p-6\"><div class=\"flex items-center justify-between mb-4\"><h2 class=\"text-lg font-medium text-gray-900\">Production</h2><span class=\"rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-700\">Real data &#183; Real money</span></div><div class=\"rounded border border-orange-200 bg-orange-100 px-3 py-2 mb-4\"><p class=\"text-sm text-orange-800\">&#9888; This connects to your live Fortnox company. All operations affect real data.</p></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<div class=\"rounded-lg border border-orange-300 bg-orange-50 p-6\"><div class=\"flex items-center justify-between mb-4\"><h2 class=\"text-lg font-medium text-gray-900\">Production</h2><span class=\"rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-700\">Real data &#183; Real money</span></div><div class=\"rounded border border-orange-200 bg-orange-100 px-3 py-2 mb-4\"><p class=\"text-sm text-orange-800\">&#9888; This connects to your live Fortnox company. All operations affect real data.</p></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if connected {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<p class=\"text-sm text-gray-600 mb-4\">&#10003; Connected</p><form method=\"POST\" action=\"/fortnox/disconnect\"><input type=\"hidden\" name=\"mode\" value=\"production\"> <button type=\"submit\" class=\"text-sm text-red-600 hover:text-red-800 hover:underline\">Disconnect</button></form>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<p class=\"text-sm text-gray-600 mb-4\">&#10003; Connected</p><form method=\"POST\" action=\"/fortnox/disconnect\"><input type=\"hidden\" name=\"mode\" value=\"production\"> <button type=\"submit\" class=\"text-sm text-red-600 hover:text-red-800 hover:underline\">Disconnect</button></form>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<p class=\"text-sm text-gray-500 mb-4\">Not connected</p>  <label class=\"flex items-start gap-2 mb-3 cursor-pointer\"><input type=\"checkbox\" id=\"prod-confirm\" class=\"mt-0.5 rounded border-orange-300\" onchange=\"var btn=document.getElementById('prod-btn');btn.classList.toggle('opacity-50',!this.checked);btn.classList.toggle('pointer-events-none',!this.checked);\"> <span class=\"text-sm text-orange-900\">I understand this will connect to my real Fortnox company</span></label> <a id=\"prod-btn\" href=\"/fortnox/connect?mode=production\" class=\"inline-block rounded bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 opacity-50 pointer-events-none\">Connect Production</a>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<p class=\"text-sm text-gray-500 mb-4\">Not connected</p>  <label class=\"flex items-start gap-2 mb-3 cursor-pointer\"><input type=\"checkbox\" id=\"prod-confirm\" class=\"mt-0.5 rounded border-orange-300\" onchange=\"var btn=document.getElementById('prod-btn');btn.classList.toggle('opacity-50',!this.checked);btn.classList.toggle('pointer-events-none',!this.checked);\"> <span class=\"text-sm text-orange-900\">I understand this will connect to my real Fortnox company</span></label> <a id=\"prod-btn\" href=\"/fortnox/connect?mode=production\" class=\"inline-block rounded bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 opacity-50 pointer-events-none\">Connect Production</a>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</div>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		return nil
+	})
+}
+
+// CompanyChoice is one connected company, for the switcher.
+// Active marks the one the session is currently working with.
+func companyPicker(companies []CompanyChoice) templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var6 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var6 == nil {
+			templ_7745c5c3_Var6 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<div class=\"mb-8 max-w-xl rounded-lg border border-gray-300 bg-white p-6\"><h2 class=\"text-lg font-medium text-gray-900 mb-1\">Working with</h2>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if len(companies) == 0 {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<p class=\"text-sm text-gray-500\">No company connected in this mode yet. Connect one below — cobalt-dingo reads which company it is from Fortnox, so there is nothing to type.</p>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<p class=\"text-sm text-gray-500 mb-4\">Every page shows the active company&#39;s data. Switching changes nothing in Fortnox.</p><ul class=\"space-y-2\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			for _, c := range companies {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<li class=\"flex items-center justify-between rounded border border-gray-200 px-3 py-2\"><span class=\"text-sm text-gray-900\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var7 string
+				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(c.Name)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/fortnox_status.templ`, Line: 98, Col: 15}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, " <span class=\"ml-2 text-xs text-gray-500\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var8 string
+				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(c.OrgNumber)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/fortnox_status.templ`, Line: 99, Col: 61}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</span></span> ")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				if c.Active {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<span class=\"rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700\">Active</span>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				} else {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "<form method=\"POST\" action=\"/fortnox/company\"><input type=\"hidden\" name=\"company\" value=\"")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var9 string
+					templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.ResolveAttributeValue(c.OrgNumber)
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/fortnox_status.templ`, Line: 105, Col: 63}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "\"> <button type=\"submit\" class=\"text-sm text-blue-600 hover:text-blue-800 hover:underline\">Work with this</button></form>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "</li>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "</ul>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

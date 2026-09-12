@@ -11,6 +11,7 @@ import (
 	"time"
 
 	adapterfortnox "github.com/mathiasb/cobalt-dingo/internal/adapter/fortnox"
+	"github.com/mathiasb/cobalt-dingo/internal/auth"
 	"github.com/mathiasb/cobalt-dingo/internal/config"
 	"github.com/mathiasb/cobalt-dingo/internal/domain"
 	"github.com/stretchr/testify/assert"
@@ -54,13 +55,56 @@ func newFortnoxBackedServer(t *testing.T, fortnoxURL string) *Server {
 
 // getInvoices drives a GET /invoices request through the full registered route
 // table and returns the recorder.
+//
+// The request carries a session with a selected company. It used to carry none
+// and rely on the tenant resolver defaulting to "default"; that fallback is
+// gone, because with a company in the tenant key a default names a real
+// company's books.
 func getInvoices(s *Server) *httptest.ResponseRecorder {
+	return getInvoicesAs(s, &auth.Session{
+		Sub: "test-user", Mode: config.ModeSandbox, Company: "556677-8899",
+	})
+}
+
+// getInvoicesAs drives the same request with an explicit session, so a test can
+// exercise the no-company and no-session paths.
+func getInvoicesAs(s *Server, sess *auth.Session) *httptest.ResponseRecorder {
 	mux := http.NewServeMux()
 	s.RegisterRoutes(mux)
 	r := httptest.NewRequest(http.MethodGet, "/invoices", nil)
+	if sess != nil {
+		r = r.WithContext(auth.WithSession(r.Context(), sess))
+	}
 	w := httptest.NewRecorder()
 	mux.ServeHTTP(w, r)
 	return w
+}
+
+// A logged-in user who has not picked a company yet is a normal state, not an
+// error: send them to the chooser. Serving invoices would mean picking a
+// company on their behalf.
+func TestInvoicesHandler_redirectsWhenNoCompanySelected(t *testing.T) {
+	fortnox := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"SupplierInvoices":[]}`))
+	}))
+	defer fortnox.Close()
+
+	w := getInvoicesAs(newFortnoxBackedServer(t, fortnox.URL),
+		&auth.Session{Sub: "test-user", Mode: config.ModeSandbox})
+
+	assert.Equal(t, http.StatusSeeOther, w.Code)
+	assert.Equal(t, "/fortnox/", w.Header().Get("Location"))
+}
+
+func TestInvoicesHandler_refusesWithNoSession(t *testing.T) {
+	fortnox := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"SupplierInvoices":[]}`))
+	}))
+	defer fortnox.Close()
+
+	w := getInvoicesAs(newFortnoxBackedServer(t, fortnox.URL), nil)
+
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
 }
 
 // Realistic Fortnox shapes using the QUOTED-STRING numeric forms that blocked

@@ -36,6 +36,13 @@ type BatchRepository interface {
 type TenantRepository interface {
 	Get(ctx context.Context, id TenantID) (Tenant, error)
 	UpsertTenant(ctx context.Context, t Tenant) error
+
+	// ListByPrefix returns every tenant whose id starts with prefix. Tenant ids
+	// are "<sub>:<mode>:<company>", so a prefix of "<sub>:<mode>:" is "every
+	// company this user has connected in this mode" — which is what the company
+	// switcher offers.
+	ListByPrefix(ctx context.Context, prefix string) ([]Tenant, error)
+
 	DefaultDebtorAccount(ctx context.Context, tenantID TenantID) (DebtorAccount, error)
 }
 

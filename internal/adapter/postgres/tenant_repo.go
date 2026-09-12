@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/mathiasb/cobalt-dingo/internal/adapter/postgres/pgstore"
 	"github.com/mathiasb/cobalt-dingo/internal/domain"
@@ -26,6 +27,30 @@ func (r *TenantRepo) Get(ctx context.Context, id domain.TenantID) (domain.Tenant
 		return domain.Tenant{}, fmt.Errorf("get tenant: %w", err)
 	}
 	return domain.Tenant{ID: domain.TenantID(row.ID), Name: row.Name}, nil
+}
+
+// ListByPrefix implements domain.TenantRepository.
+//
+// LIKE metacharacters in the prefix are escaped, so a tenant id containing `%`
+// or `_` cannot widen the match into another user's companies.
+func (r *TenantRepo) ListByPrefix(ctx context.Context, prefix string) ([]domain.Tenant, error) {
+	rows, err := r.s.queries.ListTenantsByPrefix(ctx, escapeLike(prefix)+"%")
+	if err != nil {
+		return nil, fmt.Errorf("list tenants by prefix: %w", err)
+	}
+	out := make([]domain.Tenant, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, domain.Tenant{ID: domain.TenantID(row.ID), Name: row.Name})
+	}
+	return out, nil
+}
+
+// escapeLike neutralises LIKE wildcards. Postgres LIKE has no metacharacters
+// beyond these three, and the default escape character is a backslash.
+func escapeLike(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, "%", `\%`)
+	return strings.ReplaceAll(s, "_", `\_`)
 }
 
 // UpsertTenant implements domain.TenantRepository.

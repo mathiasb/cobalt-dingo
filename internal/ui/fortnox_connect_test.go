@@ -58,7 +58,7 @@ func newTestConnector(store domain.TokenStore) *FortnoxConnector {
 			config.ModeSandbox:    {ClientID: "s"},
 			config.ModeProduction: {ClientID: "p"},
 		},
-		store, nil, slog.Default(),
+		store, nil, auth.NewSessionManager("test-secret-that-is-long-enough"), nil, nil, slog.Default(),
 	)
 }
 
@@ -153,6 +153,11 @@ func TestCallbackHandler_ExchangesCodeAndRedirects(t *testing.T) {
 	}
 	defer func() { exchangeFortnoxCodeFunc = old }()
 
+	// The callback now also asks Fortnox which company the token belongs to, so
+	// that call needs stubbing too. Without this the test made a real network
+	// request — which is how it first failed, in 0.10s of DNS.
+	stubbedExchangeAndDiscovery(t, domain.Company{Name: "Sandbox AB", OrgNumber: "556677-8899"}, nil)
+
 	store := newConnectorTokenStore()
 	c := newTestConnector(store)
 
@@ -164,7 +169,7 @@ func TestCallbackHandler_ExchangesCodeAndRedirects(t *testing.T) {
 	assert.Equal(t, http.StatusSeeOther, w.Code)
 	assert.Contains(t, w.Header().Get("Location"), "connected=sandbox")
 
-	tok, err := store.Load(context.Background(), "user1:sandbox")
+	tok, err := store.Load(context.Background(), "user1:sandbox:5566778899")
 	require.NoError(t, err)
-	assert.Equal(t, "atok", tok.AccessToken)
+	assert.Equal(t, "at", tok.AccessToken, "the stub from stubbedExchangeAndDiscovery wins")
 }

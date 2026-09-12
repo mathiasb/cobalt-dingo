@@ -7,12 +7,15 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/mathiasb/cobalt-dingo/internal/config"
+
+	"github.com/mathiasb/cobalt-dingo/internal/domain"
 )
 
 const cookieName = "cd_session"
@@ -21,19 +24,63 @@ type contextKey string
 
 const sessionKey contextKey = "session"
 
-// Session holds the authenticated user's identity and active Fortnox mode.
+// Session holds the authenticated user's identity, active Fortnox mode and
+// active company.
 type Session struct {
-	Sub       string      `json:"sub"`
-	Email     string      `json:"email"`
-	Name      string      `json:"name"`
-	Mode      config.Mode `json:"mode"`
-	ExpiresAt time.Time   `json:"exp"`
+	Sub   string      `json:"sub"`
+	Email string      `json:"email"`
+	Name  string      `json:"name"`
+	Mode  config.Mode `json:"mode"`
+
+	// Company is the normalised organisation number of the company being
+	// worked with — see CompanyKey. Empty means none selected, which is an
+	// error at TenantID() rather than a default.
+	Company string `json:"company,omitempty"`
+
+	ExpiresAt time.Time `json:"exp"`
 }
 
+// ErrNoCompanySelected is returned when a session has no active company.
+//
+// It is deliberately an error rather than a fallback. The previous key was
+// "<sub>:<mode>", which gave one connection per mode — so connecting a second
+// company overwrote the first, and any code that guessed a default would be
+// reading and writing whichever company happened to occupy that row.
+var ErrNoCompanySelected = errors.New("no company selected: pick one at /fortnox/ before touching company data")
+
 // TenantID returns the composite tenant key used for Fortnox token storage.
-// Format: "<sub>:<mode>" (e.g. "mathias-local:sandbox").
-func (s Session) TenantID() string {
-	return s.Sub + ":" + string(s.Mode)
+//
+// Format: "<sub>:<mode>:<company>", e.g. "mathias-local:production:5566778899".
+// All three parts are required: the same company in sandbox and in production
+// are separate connections, and two companies must never share a token row.
+func (s Session) TenantID() (domain.TenantID, error) {
+	if strings.TrimSpace(s.Sub) == "" {
+		return "", errors.New("session has no subject: cannot derive a tenant key")
+	}
+	if !s.Mode.IsValid() {
+		return "", fmt.Errorf("session has no valid Fortnox mode (got %q)", s.Mode)
+	}
+	company := CompanyKey(s.Company)
+	if company == "" {
+		return "", ErrNoCompanySelected
+	}
+	return domain.TenantID(s.Sub + ":" + string(s.Mode) + ":" + company), nil
+}
+
+// CompanyKey normalises a Fortnox organisation number into a stable key.
+//
+// Fortnox returns it formatted ("556677-8899"). Keeping only the digits means a
+// reconnect cannot create a second row for the same company because the
+// formatting differed — and an input with no digits at all yields "", which is
+// what lets TenantID fail closed.
+func CompanyKey(orgNumber string) string {
+	var b strings.Builder
+	for _, r := range orgNumber {
+		if r >= '0' && r <= '9' {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }
 
 // SessionManager encodes and decodes signed session cookies.

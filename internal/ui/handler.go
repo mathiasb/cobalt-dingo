@@ -3,6 +3,7 @@ package ui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -45,13 +46,37 @@ func NewServer(
 	}
 }
 
-// tenantID resolves the per-request tenant from the session.
-// Falls back to "default" when auth is disabled (dev mode without OIDC).
-func (s *Server) tenantID(r *http.Request) domain.TenantID {
-	if sess := auth.FromContext(r); sess != nil {
-		return domain.TenantID(sess.TenantID())
+// tenantID resolves the per-request tenant from the session's active company.
+//
+// It used to fall back to domain.TenantID("default") when there was no session,
+// for dev convenience. That fallback is gone: with a company in the key it
+// would serve one specific real company's books to an unauthenticated request,
+// and a resolver that cannot say which company it means must not answer.
+func (s *Server) tenantID(r *http.Request) (domain.TenantID, error) {
+	sess := auth.FromContext(r)
+	if sess == nil {
+		return "", errors.New("no session: refusing to resolve a tenant, since any default would name a real company")
 	}
-	return domain.TenantID("default")
+	return sess.TenantID()
+}
+
+// requireTenant resolves the tenant or ends the request.
+//
+// No company selected is a redirect to the chooser, not an error page: it is a
+// normal state for a user who has just logged in, and the fix is one click.
+// Anything else is a 401, because the only other way to get here is without a
+// session.
+func (s *Server) requireTenant(w http.ResponseWriter, r *http.Request) (domain.TenantID, bool) {
+	tid, err := s.tenantID(r)
+	if err == nil {
+		return tid, true
+	}
+	if errors.Is(err, auth.ErrNoCompanySelected) {
+		http.Redirect(w, r, "/fortnox/", http.StatusSeeOther)
+		return "", false
+	}
+	http.Error(w, "not authenticated", http.StatusUnauthorized)
+	return "", false
 }
 
 // RegisterRoutes wires the UI handlers onto mux.
@@ -94,7 +119,11 @@ func userNavFrom(r *http.Request) *UserNav {
 }
 
 func (s *Server) invoicesHandler(w http.ResponseWriter, r *http.Request) {
-	invoices, err := s.loadPendingInvoices(r)
+	tid, ok := s.requireTenant(w, r)
+	if !ok {
+		return
+	}
+	invoices, err := s.loadPendingInvoices(r, tid)
 	if err != nil {
 		s.log.Error("load invoices", "err", err)
 		http.Error(w, "failed to load invoices from Fortnox", http.StatusBadGateway)
@@ -104,14 +133,18 @@ func (s *Server) invoicesHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) batchHandler(w http.ResponseWriter, r *http.Request) {
-	invoices, err := s.loadPendingInvoices(r)
+	tid, ok := s.requireTenant(w, r)
+	if !ok {
+		return
+	}
+	invoices, err := s.loadPendingInvoices(r, tid)
 	if err != nil {
 		s.log.Error("load invoices for batch", "err", err)
 		http.Error(w, "failed to load invoices from Fortnox", http.StatusBadGateway)
 		return
 	}
 	debtor := payment.Debtor{Name: s.debtor.Name, IBAN: s.debtor.IBAN, BIC: s.debtor.BIC}
-	summary, err := buildBatchSummary(r.Context(), invoices, debtor, s.tenantID(r), s.batches)
+	summary, err := buildBatchSummary(r.Context(), invoices, debtor, tid, s.batches)
 	if err != nil {
 		s.log.Error("build batch", "err", err)
 		http.Error(w, fmt.Sprintf("batch generation failed: %v", err), http.StatusInternalServerError)
@@ -130,7 +163,11 @@ func (s *Server) submitHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "batch_id required", http.StatusBadRequest)
 		return
 	}
-	ref, err := s.batches.Submit(r.Context(), s.tenantID(r), batchID)
+	tid, ok := s.requireTenant(w, r)
+	if !ok {
+		return
+	}
+	ref, err := s.batches.Submit(r.Context(), tid, batchID)
 	if err != nil {
 		s.log.Error("submit batch", "batch_id", batchID, "err", err)
 		http.Error(w, fmt.Sprintf("submit failed: %v", err), http.StatusInternalServerError)
@@ -140,14 +177,18 @@ func (s *Server) submitHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) downloadHandler(w http.ResponseWriter, r *http.Request) {
-	invoices, err := s.loadPendingInvoices(r)
+	tid, ok := s.requireTenant(w, r)
+	if !ok {
+		return
+	}
+	invoices, err := s.loadPendingInvoices(r, tid)
 	if err != nil {
 		s.log.Error("load invoices for download", "err", err)
 		http.Error(w, "failed to load invoices from Fortnox", http.StatusBadGateway)
 		return
 	}
 	debtor := payment.Debtor{Name: s.debtor.Name, IBAN: s.debtor.IBAN, BIC: s.debtor.BIC}
-	summary, err := buildBatchSummary(r.Context(), invoices, debtor, s.tenantID(r), s.batches)
+	summary, err := buildBatchSummary(r.Context(), invoices, debtor, tid, s.batches)
 	if err != nil {
 		s.log.Error("build batch for download", "err", err)
 		http.Error(w, fmt.Sprintf("batch generation failed: %v", err), http.StatusInternalServerError)
@@ -159,8 +200,7 @@ func (s *Server) downloadHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // loadPendingInvoices runs the full pipeline: fetch → filter FCY → enrich with IBAN/BIC.
-func (s *Server) loadPendingInvoices(r *http.Request) ([]PendingInvoice, error) {
-	tid := s.tenantID(r)
+func (s *Server) loadPendingInvoices(r *http.Request, tid domain.TenantID) ([]PendingInvoice, error) {
 	ctx := r.Context()
 	all, err := s.invoices.UnpaidInvoices(ctx, tid)
 	if err != nil {
