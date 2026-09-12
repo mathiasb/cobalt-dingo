@@ -179,3 +179,16 @@ func TestWriteBack_EmptyPriorTokenIsRefused(t *testing.T) {
 		t.Fatalf("no UPDATE should be attempted, got %d", f.calls)
 	}
 }
+
+// The credential key is "<owner>:<mode>:<company>", so the mode sits in the
+// middle. A trailing pattern matched the old two-part key and silently matches
+// nothing now — which surfaces as "no sandbox token row" and reads exactly like
+// a genuinely missing connection.
+func TestSandboxTenantPattern_matchesTheThreePartKey(t *testing.T) {
+	if !strings.HasSuffix(sandboxTenant, ":%") {
+		t.Fatalf("sandboxTenant = %q — it must allow a company segment after the mode", sandboxTenant)
+	}
+	if strings.HasSuffix(sandboxTenant, ":sandbox") {
+		t.Fatalf("sandboxTenant = %q — that is the pre-company two-part key and matches nothing", sandboxTenant)
+	}
+}

@@ -31,9 +31,13 @@ import (
 	"github.com/mathiasb/cobalt-dingo/internal/crypto"
 )
 
-// sandboxTenant matches the sandbox tenant rows regardless of tenant prefix,
-// mirroring the `tenant_id LIKE '%:sandbox'` the CI steps used.
-const sandboxTenant = "%:sandbox"
+// sandboxTenant matches the sandbox tenant rows regardless of owner or company.
+//
+// The credential key is "<owner>:<mode>:<company>", so the mode is in the
+// MIDDLE — a trailing `%:sandbox` matched the old two-part key and matches
+// nothing now. Third hardcoded key shape found in this change; the others were
+// the mode status cards, the status endpoint and disconnect.
+const sandboxTenant = "%:sandbox:%"
 
 const (
 	tokenFile = ".fortnox-tokens-sandbox.json"
