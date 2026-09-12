@@ -24,7 +24,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	m, err := migrate.New("file://migrations", dbURL)
+	// Relative by default, so `task db:migrate` from the repo root keeps
+	// working. Overridable because in the container image the migrations live
+	// at an absolute path — running them as a k8s Job is how they reach the
+	// shared postgres without anyone handling the DSN by hand.
+	source := "file://migrations"
+	if dir := os.Getenv("MIGRATIONS_DIR"); dir != "" {
+		source = "file://" + dir
+	}
+
+	m, err := migrate.New(source, dbURL)
 	if err != nil {
 		log.Error("create migrator", "err", err)
 		os.Exit(1)
