@@ -14,6 +14,47 @@ the domain model or port interfaces will be called out explicitly.
 
 ---
 
+## [0.29.0] — 2026-09-12
+
+Multi-company working, and the first half of multi-tenancy. **ADR-0005
+accepted**: each tenant registers their own Fortnox integration.
+
+### Added
+
+- **Pick which company to work with, and switch between them**, at
+  `books.d-ma.be`, behind the existing auth. The company is discovered from
+  Fortnox (`/3/companyinformation`) rather than typed: the user approved a
+  company in Fortnox's own UI and nothing in the callback says which one, so
+  asking Fortnox is the only correct answer.
+- **Per-owner Fortnox integrations** (ADR-0005). `fortnox_integrations`,
+  one row per (owner, mode) — not per company, since one private integration
+  is activated by many companies. `client_id` is a plain column because
+  Fortnox hands it out to activate the integration; only the secret is sealed.
+- **`internal/crypto`** — AES-256-GCM with an HKDF-SHA256-derived key, so the
+  estate's existing secret-provisioning recipe works unchanged.
+- **`internal/integration.Resolve`** — the owner's own credentials if
+  registered, otherwise the application-level ones.
+
+### Fixed
+
+- **The tenant key was `<sub>:<mode>`, so connecting a second company
+  overwrote the first.** Multi-company was broken, not merely absent. It is now
+  `<sub>:<mode>:<company>`.
+- **A fail-open removed:** `internal/ui`'s tenant resolver fell back to
+  `TenantID("default")` when there was no session. With a company in the key
+  that serves one specific real company's books to an unauthenticated request.
+- A Fortnox mode with a client id but no secret was offered in the UI and then
+  failed at token exchange with an opaque error three steps from the missing
+  value. It is now omitted, and the reason is logged at startup.
+
+### Migration
+
+The existing sandbox token is keyed `<sub>:sandbox` and is unreachable. **It
+needs one reconnect.** Deliberately no fallback lookup: a key that falls back
+is how you read the wrong company's books.
+
+---
+
 ## [0.28.1] — 2026-09-11
 
 ### Added
