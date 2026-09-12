@@ -27,7 +27,19 @@ const sessionKey contextKey = "session"
 // Session holds the authenticated user's identity, active Fortnox mode and
 // active company.
 type Session struct {
-	Sub   string      `json:"sub"`
+	// Owner is the internal user ID that credentials are keyed by (ADR-0003).
+	// Minted at first login and resolved thereafter from the verified email, so
+	// an identity-provider change is a login concern and not a
+	// credential-affecting event.
+	Owner string `json:"owner"`
+
+	// Sub is the OIDC subject, kept for audit and debugging only. It is
+	// provider-scoped and opaque: Authentik's sub_mode alone changes its shape,
+	// and recreating a provider can change it with no migration involved. It
+	// MUST NOT be used as a credential lookup key — that orphaned a live
+	// Fortnox token once already, silently.
+	Sub string `json:"sub"`
+
 	Email string      `json:"email"`
 	Name  string      `json:"name"`
 	Mode  config.Mode `json:"mode"`
@@ -36,6 +48,17 @@ type Session struct {
 	// worked with — see CompanyKey. Empty means none selected, which is an
 	// error at TenantID() rather than a default.
 	Company string `json:"company,omitempty"`
+
+	// FortnoxNonce binds a Fortnox authorization to the session that started
+	// it, and FortnoxNonceAt bounds how long that binding is good for.
+	//
+	// Before these, `state` was just the mode — so the callback had no CSRF
+	// protection: anyone who could get a logged-in browser to issue the
+	// callback could bind a Fortnox authorization of their choosing (#83).
+	//
+	// Single-use: cleared on a successful callback, so a replay fails.
+	FortnoxNonce   string    `json:"fortnox_nonce,omitempty"`
+	FortnoxNonceAt time.Time `json:"fortnox_nonce_at,omitempty"`
 
 	ExpiresAt time.Time `json:"exp"`
 }
@@ -48,14 +71,74 @@ type Session struct {
 // reading and writing whichever company happened to occupy that row.
 var ErrNoCompanySelected = errors.New("no company selected: pick one at /fortnox/ before touching company data")
 
+// ErrEmailNotVerified is returned when the identity provider does not assert
+// that the email address is verified.
+//
+// ADR-0003 rests on the email claim being verified: keying credentials on an
+// unverified email is WORSE than keying on the subject, because it is
+// attacker-influenceable rather than merely unstable. So this refuses a session
+// rather than degrading to an unverified key.
+var ErrEmailNotVerified = errors.New("identity provider did not assert the email address is verified")
+
+// OwnerDirectory maps a verified email to the internal user ID credentials are
+// keyed by, minting one on first sight.
+//
+// It takes the subject too, so it can be recorded against the user for audit —
+// which is the only thing the subject is for now.
+type OwnerDirectory interface {
+	ResolveOwner(ctx context.Context, email, sub string) (string, error)
+}
+
+// NewSession builds a session from a verified identity, resolving the
+// credential owner from the verified email.
+//
+// It refuses rather than producing a session with an empty or unverified
+// identity: every one of those would yield a credential key that either
+// collides with another user's or names nobody.
+func NewSession(ctx context.Context, dir OwnerDirectory, ident verifiedIdentity, mode config.Mode) (Session, error) {
+	email := strings.TrimSpace(strings.ToLower(ident.Email))
+	if email == "" {
+		return Session{}, errors.New("identity provider returned no email address: cannot resolve a credential owner")
+	}
+	if !ident.EmailVerified {
+		return Session{}, fmt.Errorf("%w: %s", ErrEmailNotVerified, email)
+	}
+	if dir == nil {
+		return Session{}, errors.New("no owner directory configured: cannot resolve a credential owner")
+	}
+
+	owner, err := dir.ResolveOwner(ctx, email, ident.Sub)
+	if err != nil {
+		return Session{}, fmt.Errorf("resolve credential owner: %w", err)
+	}
+	if strings.TrimSpace(owner) == "" {
+		return Session{}, errors.New("owner directory returned an empty id")
+	}
+
+	return Session{
+		Owner: owner,
+		Sub:   ident.Sub,
+		Email: email,
+		Name:  ident.Name,
+		Mode:  mode,
+	}, nil
+}
+
 // TenantID returns the composite tenant key used for Fortnox token storage.
 //
-// Format: "<sub>:<mode>:<company>", e.g. "mathias-local:production:5566778899".
-// All three parts are required: the same company in sandbox and in production
-// are separate connections, and two companies must never share a token row.
+// Format: "<owner>:<mode>:<company>". All three parts are required: the same
+// company in sandbox and in production are separate connections, and two
+// companies must never share a token row.
+//
+// The owner is the internal user ID, NOT the OIDC subject (ADR-0003). A
+// subject-derived key orphaned a live Fortnox token during the Dex→Authentik
+// migration — the credential was not deleted, it sat under a key nobody would
+// ever compute again. scripts/assert-credential-key-stability.sh asserts on
+// this function's body for exactly that reason.
 func (s Session) TenantID() (domain.TenantID, error) {
-	if strings.TrimSpace(s.Sub) == "" {
-		return "", errors.New("session has no subject: cannot derive a tenant key")
+	owner := strings.TrimSpace(s.Owner)
+	if owner == "" {
+		return "", errors.New("session has no credential owner: cannot derive a tenant key")
 	}
 	if !s.Mode.IsValid() {
 		return "", fmt.Errorf("session has no valid Fortnox mode (got %q)", s.Mode)
@@ -64,7 +147,20 @@ func (s Session) TenantID() (domain.TenantID, error) {
 	if company == "" {
 		return "", ErrNoCompanySelected
 	}
-	return domain.TenantID(s.Sub + ":" + string(s.Mode) + ":" + company), nil
+	return TenantKey(owner, s.Mode, company), nil
+}
+
+// TenantKey builds the credential key. THE single derivation — every caller
+// must use it.
+//
+// It exists because the key was being rebuilt by hand in nine places, and
+// three of them still produced the pre-company two-part form after the company
+// was added. The result was a status page that always said "Not connected" and
+// a disconnect button that deleted nothing, because both probed a key no stored
+// token could ever have. A key with more than one construction site has more
+// than one format.
+func TenantKey(owner string, mode config.Mode, company string) domain.TenantID {
+	return domain.TenantID(owner + ":" + string(mode) + ":" + CompanyKey(company))
 }
 
 // CompanyKey normalises a Fortnox organisation number into a stable key.

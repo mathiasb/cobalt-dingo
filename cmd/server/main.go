@@ -67,8 +67,30 @@ func main() {
 
 	// Wire postgres adapters when DATABASE_URL is set.
 	var pgStore *postgres.Store
+	// Encryption key for everything stored at rest: tenant-supplied Fortnox
+	// client secrets (ADR-0005) and the OAuth tokens themselves (#85).
+	//
+	// Built before the stores because they require it. With a database
+	// configured this key is NOT optional: without it tokens cannot be stored
+	// at all, and storing them unencrypted in columns named _sealed would be
+	// undetectable by inspection.
+	var secretCipher *crypto.Cipher
+	if raw := os.Getenv("FORTNOX_INTEGRATION_KEY"); raw != "" {
+		k, err := crypto.NewCipher(raw)
+		if err != nil {
+			log.Error("FORTNOX_INTEGRATION_KEY is set but unusable", "err", err)
+			os.Exit(1)
+		}
+		secretCipher = k
+	}
+	if appCfg.DatabaseURL != "" && secretCipher == nil {
+		log.Error("DATABASE_URL is set but FORTNOX_INTEGRATION_KEY is not: Fortnox tokens are encrypted at rest (#85) and cannot be stored without it")
+		os.Exit(1)
+	}
+
 	var batchRepo domain.BatchRepository
 	var tenantRepo domain.TenantRepository
+	var ownerDirectory auth.OwnerDirectory
 	if appCfg.DatabaseURL != "" {
 		var dbErr error
 		pgStore, dbErr = postgres.NewStore(appCfg.DatabaseURL)
@@ -78,7 +100,8 @@ func main() {
 		}
 		batchRepo = postgres.NewBatchRepo(pgStore)
 		tenantRepo = postgres.NewTenantRepo(pgStore)
-		tokenStore = postgres.NewTokenStore(pgStore)
+		tokenStore = postgres.NewTokenStore(pgStore, secretCipher)
+		ownerDirectory = postgres.NewUserDirectory(pgStore, config.LoadOIDC().IssuerURL)
 		log.Info("postgres connected")
 	}
 
@@ -112,8 +135,16 @@ func main() {
 		if fortnoxEnabled {
 			defaultMode = cfg.Mode
 		}
+		if ownerDirectory == nil {
+			// ADR-0003: credentials are keyed by an internal user ID, which
+			// lives in postgres. Serving OIDC login without it would issue
+			// sessions with no credential owner — a login that reports success
+			// and then fails at every credential lookup. Refuse instead.
+			log.Error("OIDC is enabled but there is no database: credentials are keyed by an internal user ID (ADR-0003), which requires DATABASE_URL")
+			os.Exit(1)
+		}
 		var err error
-		oidcHandler, err = auth.NewOIDCHandler(context.Background(), oidcCfg, sessions, defaultMode, log)
+		oidcHandler, err = auth.NewOIDCHandler(context.Background(), oidcCfg, sessions, defaultMode, ownerDirectory, log)
 		if err != nil {
 			// Deliberately NOT a downgrade to unauthenticated serving. See
 			// secureHandler in wiring.go, which turns this nil into a refusal.
@@ -148,31 +179,12 @@ func main() {
 			// appear and a user wondering why.
 			log.Warn("fortnox mode not offered", "reason", reason)
 		}
-		// Per-owner Fortnox integrations (ADR-0005). Both nil unless the
-		// encryption key is configured: without it a stored tenant secret
-		// cannot be decrypted, and the resolver refuses rather than falling
-		// back to these application-level credentials.
-		var (
-			integrationStore domain.IntegrationStore
-			integrationKey   *crypto.Cipher
-		)
-		if raw := os.Getenv("FORTNOX_INTEGRATION_KEY"); raw != "" {
-			k, err := crypto.NewCipher(raw)
-			if err != nil {
-				// Refuse to start: a key that is present but unusable means
-				// every per-tenant integration silently stops working, and the
-				// symptom would appear at a tenant's first connect attempt.
-				log.Error("FORTNOX_INTEGRATION_KEY is set but unusable", "err", err)
-				os.Exit(1)
-			}
-			integrationKey = k
-			integrationStore = postgres.NewIntegrationRepo(pgStore)
-			log.Info("per-owner fortnox integrations enabled")
-		} else {
-			log.Info("per-owner fortnox integrations disabled (no FORTNOX_INTEGRATION_KEY) — using application-level credentials")
-		}
+		// Per-owner Fortnox integrations (ADR-0005). The cipher is already
+		// built and required above, so reaching here means it exists.
+		integrationStore := domain.IntegrationStore(postgres.NewIntegrationRepo(pgStore))
+		log.Info("per-owner fortnox integrations enabled")
 
-		connector := ui.NewFortnoxConnector(modes, tokenStore, tenantRepo, sessions, integrationStore, integrationKey, log)
+		connector := ui.NewFortnoxConnector(modes, tokenStore, tenantRepo, sessions, integrationStore, secretCipher, log)
 		connector.RegisterRoutes(mux)
 		log.Info("fortnox connect routes registered")
 	}

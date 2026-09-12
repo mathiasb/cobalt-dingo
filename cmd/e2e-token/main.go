@@ -27,6 +27,8 @@ import (
 	"time"
 
 	_ "github.com/lib/pq"
+
+	"github.com/mathiasb/cobalt-dingo/internal/crypto"
 )
 
 // sandboxTenant matches the sandbox tenant rows regardless of tenant prefix,
@@ -96,18 +98,31 @@ func fetch(db *sql.DB) error {
 		tok       token
 		expiresAt time.Time
 	)
-	err := db.QueryRow(
-		`SELECT access_token, refresh_token, expires_at
+	cipher, err := tokenCipher()
+	if err != nil {
+		return err
+	}
+
+	var sealedAccess, sealedRefresh string
+	err = db.QueryRow(
+		`SELECT access_token_sealed, refresh_token_sealed, expires_at
 		   FROM fortnox_tokens
 		  WHERE tenant_id LIKE $1
 		  ORDER BY expires_at DESC
 		  LIMIT 1`, sandboxTenant,
-	).Scan(&tok.AccessToken, &tok.RefreshToken, &expiresAt)
+	).Scan(&sealedAccess, &sealedRefresh, &expiresAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("no sandbox token row (tenant_id LIKE %q) — the sandbox tenant needs connecting once by hand", sandboxTenant)
 	}
 	if err != nil {
 		return fmt.Errorf("query sandbox token: %w", err)
+	}
+
+	if tok.AccessToken, err = cipher.Open(sealedAccess); err != nil {
+		return fmt.Errorf("decrypt sandbox access token: %w", err)
+	}
+	if tok.RefreshToken, err = cipher.Open(sealedRefresh); err != nil {
+		return fmt.Errorf("decrypt sandbox refresh token: %w", err)
 	}
 
 	tok.TokenType = "bearer"
@@ -196,12 +211,32 @@ func writeBack(db execer, tok token, oldRefresh string) error {
 	if strings.TrimSpace(oldRefresh) == "" {
 		return fmt.Errorf("refusing to compare-and-set against an empty prior refresh token: it can never match, so the rotated token would be lost while reporting success")
 	}
+	cipher, err := tokenCipher()
+	if err != nil {
+		return err
+	}
+	sealedAccess, err := cipher.Seal(tok.AccessToken)
+	if err != nil {
+		return fmt.Errorf("seal access token: %w", err)
+	}
+	sealedRefresh, err := cipher.Seal(tok.RefreshToken)
+	if err != nil {
+		return fmt.Errorf("seal refresh token: %w", err)
+	}
+
+	// CAS on the FINGERPRINT, not the ciphertext: AES-GCM is randomised, so
+	// the same token seals differently every time and comparing sealed values
+	// would never match — the write-back would silently no-op and report
+	// "the pod won", every run, losing the rotated token. Mirrors
+	// postgres.TokenStore.AtomicRefresh.
 	res, err := db.Exec(
 		`UPDATE fortnox_tokens
-		    SET access_token = $1, refresh_token = $2, expires_at = $3, updated_at = NOW()
-		  WHERE tenant_id LIKE $4
-		    AND refresh_token = $5`,
-		tok.AccessToken, tok.RefreshToken, tok.ExpiresAt, sandboxTenant, oldRefresh,
+		    SET access_token_sealed = $1, refresh_token_sealed = $2,
+		        refresh_token_fp = $3, expires_at = $4, updated_at = NOW()
+		  WHERE tenant_id LIKE $5
+		    AND refresh_token_fp = $6`,
+		sealedAccess, sealedRefresh, cipher.Fingerprint(tok.RefreshToken),
+		tok.ExpiresAt, sandboxTenant, cipher.Fingerprint(oldRefresh),
 	)
 	if err != nil {
 		return fmt.Errorf("persist rotated sandbox token (the rotated token is now lost; the next run needs re-auth): %w", err)
@@ -222,4 +257,21 @@ func writeBack(db execer, tok token, oldRefresh string) error {
 func fatal(err error) {
 	fmt.Fprintf(os.Stderr, "e2e-token: %v\n", err)
 	os.Exit(1)
+}
+
+// tokenCipher builds the cipher for the tokens stored at rest (#85).
+//
+// Required, and refused loudly when absent: without it this command cannot
+// read or write the token columns at all, and a fallback to plaintext would
+// write values the running application could not decrypt.
+func tokenCipher() (*crypto.Cipher, error) {
+	raw := os.Getenv("FORTNOX_INTEGRATION_KEY")
+	if raw == "" {
+		return nil, fmt.Errorf("FORTNOX_INTEGRATION_KEY is not set: Fortnox tokens are encrypted at rest (#85), so this command cannot read or write them without the key")
+	}
+	c, err := crypto.NewCipher(raw)
+	if err != nil {
+		return nil, fmt.Errorf("FORTNOX_INTEGRATION_KEY is unusable: %w", err)
+	}
+	return c, nil
 }

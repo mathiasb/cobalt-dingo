@@ -43,11 +43,12 @@ type FortnoxIntegration struct {
 }
 
 type FortnoxToken struct {
-	TenantID     string
-	AccessToken  string
-	RefreshToken string
-	ExpiresAt    time.Time
-	UpdatedAt    time.Time
+	TenantID           string
+	ExpiresAt          time.Time
+	UpdatedAt          time.Time
+	AccessTokenSealed  string
+	RefreshTokenSealed string
+	RefreshTokenFp     string
 }
 
 type PaymentBatch struct {
@@ -64,4 +65,18 @@ type Tenant struct {
 	ID        string
 	Name      string
 	CreatedAt time.Time
+}
+
+type User struct {
+	ID        string
+	Email     string
+	CreatedAt time.Time
+}
+
+type UserSubject struct {
+	UserID    string
+	Sub       string
+	Issuer    string
+	FirstSeen time.Time
+	LastSeen  time.Time
 }

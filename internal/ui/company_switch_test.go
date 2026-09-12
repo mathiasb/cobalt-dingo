@@ -32,7 +32,7 @@ func connectedConnector(t *testing.T, named map[domain.TenantID]string) *Fortnox
 }
 
 func sessionFor(sub string, mode config.Mode, company string) *auth.Session {
-	return &auth.Session{Sub: sub, Email: sub + "@example.com", Mode: mode, Company: company}
+	return &auth.Session{Owner: sub, Sub: "sub-" + sub, Email: sub + "@example.com", Mode: mode, Company: company}
 }
 
 func requestAs(method, target string, sess *auth.Session) *http.Request {

@@ -49,6 +49,10 @@ func newTestHandler(t *testing.T, v idTokenVerifier) *OIDCHandler {
 	t.Helper()
 	ts := tokenEndpoint(t)
 	return &OIDCHandler{
+		// A directory is required for a login to complete (ADR-0003). Tests
+		// that only exercise nonce/state handling still need one wired, or
+		// they fail for the wrong reason.
+		directory: newFakeDirectory(),
 		oauth2cfg: oauth2.Config{
 			ClientID:    "cobalt-dingo",
 			RedirectURL: "https://books.d-ma.be/auth/callback",
@@ -179,7 +183,11 @@ func TestCallbackHandler_RejectsMissingNonceCookie(t *testing.T) {
 
 func TestCallbackHandler_AcceptsMatchingNonce(t *testing.T) {
 	const n = "the-nonce-we-issued"
-	h := newTestHandler(t, fakeVerifier{ident: verifiedIdentity{Nonce: n, Sub: "u1", Email: "m@example.com"}})
+	// EmailVerified is required for a login to complete (ADR-0003): keying
+	// credentials on an unverified email is worse than keying on the subject.
+	h := newTestHandler(t, fakeVerifier{ident: verifiedIdentity{
+		Nonce: n, Sub: "u1", Email: "m@example.com", EmailVerified: true,
+	}})
 
 	w := httptest.NewRecorder()
 	h.CallbackHandler(w, callbackRequest("state-1", n))

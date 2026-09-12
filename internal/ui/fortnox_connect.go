@@ -31,6 +31,11 @@ type CompanyChoice struct {
 	Name      string
 	OrgNumber string
 	Active    bool
+
+	// Mode is carried so the Disconnect form can name it. Disconnect is
+	// per (mode, company); a mode-level button could not say which company it
+	// would remove.
+	Mode config.Mode
 }
 
 // FortnoxConnector handles the web-based Fortnox OAuth flow for a logged-in user.
@@ -87,7 +92,7 @@ func (c *FortnoxConnector) resolveFor(r *http.Request, sess *auth.Session, mode 
 	if !ok {
 		return config.Fortnox{}, fmt.Errorf("no Fortnox config for mode %s", mode)
 	}
-	return integration.Resolve(r.Context(), c.integrations, c.cipher, sess.Sub, appLevel)
+	return integration.Resolve(r.Context(), c.integrations, c.cipher, sess.Owner, appLevel)
 }
 
 // RegisterRoutes wires the connect/callback/status endpoints onto mux.
@@ -108,16 +113,7 @@ func (c *FortnoxConnector) pageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	orderedModes := []config.Mode{config.ModeSandbox, config.ModeProduction}
-	var statuses []ModeStatus
-	for _, mode := range orderedModes {
-		if _, ok := c.configs[mode]; !ok {
-			continue
-		}
-		tid := domain.TenantID(sess.Sub + ":" + string(mode))
-		_, err := c.tokenStore.Load(r.Context(), tid)
-		statuses = append(statuses, ModeStatus{Mode: mode, Connected: err == nil})
-	}
+	statuses := c.modeStatuses(r.Context(), sess)
 
 	var flash string
 	if m := r.URL.Query().Get("connected"); m != "" {
@@ -149,7 +145,19 @@ func (c *FortnoxConnector) disconnectHandler(w http.ResponseWriter, r *http.Requ
 		http.Error(w, fmt.Sprintf("no config for mode %s", mode), http.StatusBadRequest)
 		return
 	}
-	tenantID := domain.TenantID(sess.Sub + ":" + string(mode))
+	// A company is required. Before this, disconnect deleted "<owner>:<mode>" —
+	// a key no token has ever been stored under — so it reported success and
+	// removed nothing.
+	company := auth.CompanyKey(r.FormValue("company"))
+	if company == "" {
+		company = auth.CompanyKey(sess.Company)
+	}
+	if company == "" {
+		http.Error(w, "no company given: disconnect needs to know which company to disconnect", http.StatusBadRequest)
+		return
+	}
+
+	tenantID := auth.TenantKey(sess.Owner, mode, company)
 	if err := c.tokenStore.Delete(r.Context(), tenantID); err != nil {
 		c.log.Error("delete fortnox token", "tenant", tenantID, "err", err)
 		http.Error(w, "disconnect failed", http.StatusInternalServerError)
@@ -176,8 +184,30 @@ func (c *FortnoxConnector) connectHandler(w http.ResponseWriter, r *http.Request
 		// Fail closed. Falling back to the application-level credentials here
 		// would send the owner to authorize the OPERATOR's integration, which
 		// looks like it worked.
-		c.log.Error("resolve fortnox integration", "owner", sess.Sub, "mode", mode, "err", err)
+		c.log.Error("resolve fortnox integration", "owner", sess.Owner, "mode", mode, "err", err)
 		http.Error(w, "could not determine which Fortnox integration to use", http.StatusInternalServerError)
+		return
+	}
+
+	// Bind this authorization to this session. `state` used to be the mode
+	// alone, which meant it carried routing information and provided no CSRF
+	// protection at all (#83).
+	nonce, err := auth.NewOAuthNonce()
+	if err != nil {
+		c.log.Error("generate oauth nonce", "err", err)
+		http.Error(w, "could not start authorization", http.StatusInternalServerError)
+		return
+	}
+	if c.sessions == nil {
+		http.Error(w, "session manager unavailable", http.StatusInternalServerError)
+		return
+	}
+	pending := *sess
+	pending.FortnoxNonce = nonce
+	pending.FortnoxNonceAt = time.Now()
+	if err := c.sessions.Set(w, pending); err != nil {
+		c.log.Error("persist oauth nonce", "err", err)
+		http.Error(w, "session error", http.StatusInternalServerError)
 		return
 	}
 
@@ -187,7 +217,7 @@ func (c *FortnoxConnector) connectHandler(w http.ResponseWriter, r *http.Request
 		"redirect_uri":  {cfg.RedirectURI},
 		"scope":         {cfg.Scopes},
 		"response_type": {"code"},
-		"state":         {string(mode)}, // mode used as state to route callback
+		"state":         {auth.OAuthState(nonce, string(mode))},
 		"access_type":   {"offline"},
 	}
 	authURL := "https://apps.fortnox.se/oauth-v1/auth?" + params.Encode()
@@ -207,14 +237,30 @@ func (c *FortnoxConnector) callbackHandler(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "missing code", http.StatusBadRequest)
 		return
 	}
-	mode := config.Mode(r.URL.Query().Get("state"))
+	presentedNonce, modeFromState, ok := auth.ParseOAuthState(r.URL.Query().Get("state"))
+	if !ok {
+		// Includes the old mode-only format. Accepting that "for
+		// compatibility" would leave the hole open.
+		http.Error(w, "invalid state", http.StatusBadRequest)
+		return
+	}
+	if !sess.OAuthNonceValid(presentedNonce, time.Now()) {
+		// A callback carrying a nonce this session did not issue, or one that
+		// has expired. Refusing is the whole point: otherwise anyone able to
+		// make a logged-in browser issue this request could bind a Fortnox
+		// authorization of their choosing to this session (#83).
+		c.log.Error("fortnox callback refused: state nonce does not match this session", "owner", sess.Owner)
+		http.Error(w, "this authorization did not start here — please try connecting again", http.StatusBadRequest)
+		return
+	}
+	mode := config.Mode(modeFromState)
 	if !mode.IsValid() {
-		http.Error(w, "invalid state/mode", http.StatusBadRequest)
+		http.Error(w, "invalid mode in state", http.StatusBadRequest)
 		return
 	}
 	cfg, err := c.resolveFor(r, sess, mode)
 	if err != nil {
-		c.log.Error("resolve fortnox integration", "owner", sess.Sub, "mode", mode, "err", err)
+		c.log.Error("resolve fortnox integration", "owner", sess.Owner, "mode", mode, "err", err)
 		http.Error(w, "could not determine which Fortnox integration to use", http.StatusInternalServerError)
 		return
 	}
@@ -244,7 +290,7 @@ func (c *FortnoxConnector) callbackHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	tenantID := domain.TenantID(sess.Sub + ":" + string(mode) + ":" + companyKey)
+	tenantID := auth.TenantKey(sess.Owner, mode, companyKey)
 
 	// Ensure tenant row exists before storing token (FK constraint). Named
 	// after the company rather than the user's email address: the row exists to
@@ -266,7 +312,20 @@ func (c *FortnoxConnector) callbackHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	c.log.Info("fortnox connected", "tenant", tenantID, "mode", mode)
+	// Consume the nonce so a replayed callback fails, and make the
+	// just-connected company the active one — connecting it is what starting
+	// to work with it means.
+	updated := *sess
+	updated.FortnoxNonce = ""
+	updated.FortnoxNonceAt = time.Time{}
+	updated.Company = companyKey
+	if err := c.sessions.Set(w, updated); err != nil {
+		c.log.Error("persist session after connect", "tenant", tenantID, "err", err)
+		http.Error(w, "session error", http.StatusInternalServerError)
+		return
+	}
+
+	c.log.Info("fortnox connected", "tenant", tenantID, "mode", mode, "company", company.Name)
 	http.Redirect(w, r, "/fortnox/?connected="+string(mode), http.StatusSeeOther)
 }
 
@@ -279,11 +338,8 @@ func (c *FortnoxConnector) statusHandler(w http.ResponseWriter, r *http.Request)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	var parts []string
-	for mode := range c.configs {
-		tid := domain.TenantID(sess.Sub + ":" + string(mode))
-		_, err := c.tokenStore.Load(r.Context(), tid)
-		connected := err == nil
-		parts = append(parts, fmt.Sprintf(`%q:%v`, mode, connected))
+	for _, st := range c.modeStatuses(r.Context(), sess) {
+		parts = append(parts, fmt.Sprintf(`%q:%v`, st.Mode, st.Connected))
 	}
 	_, _ = fmt.Fprintf(w, "{%s}", strings.Join(parts, ","))
 }
@@ -364,7 +420,7 @@ func (c *FortnoxConnector) connectedCompanies(r *http.Request, sess *auth.Sessio
 	if c.tenantRepo == nil {
 		return nil
 	}
-	prefix := sess.Sub + ":" + string(sess.Mode) + ":"
+	prefix := sess.Owner + ":" + string(sess.Mode) + ":"
 	tenants, err := c.tenantRepo.ListByPrefix(r.Context(), prefix)
 	if err != nil {
 		c.log.Error("list connected companies", "prefix", prefix, "err", err)
@@ -378,7 +434,7 @@ func (c *FortnoxConnector) connectedCompanies(r *http.Request, sess *auth.Sessio
 		if key == string(t.ID) {
 			continue // not under this prefix; ListByPrefix should not return it
 		}
-		out = append(out, CompanyChoice{Name: t.Name, OrgNumber: key, Active: key == active})
+		out = append(out, CompanyChoice{Name: t.Name, OrgNumber: key, Active: key == active, Mode: sess.Mode})
 	}
 	return out
 }
@@ -406,7 +462,7 @@ func (c *FortnoxConnector) selectCompanyHandler(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	tenantID := domain.TenantID(sess.Sub + ":" + string(sess.Mode) + ":" + company)
+	tenantID := auth.TenantKey(sess.Owner, sess.Mode, company)
 	if _, err := c.tokenStore.Load(r.Context(), tenantID); err != nil {
 		c.log.Warn("company selection refused: no token", "tenant", tenantID)
 		http.Error(w, "that company is not connected in this mode", http.StatusBadRequest)
@@ -422,4 +478,46 @@ func (c *FortnoxConnector) selectCompanyHandler(w http.ResponseWriter, r *http.R
 	}
 	c.log.Info("company selected", "tenant", tenantID)
 	http.Redirect(w, r, "/fortnox/", http.StatusSeeOther)
+}
+
+// modeStatuses reports, per configured mode, whether the owner has any company
+// connected in it.
+//
+// "Connected" is now a property of (mode, company), so a mode is connected if
+// ANY of its companies is. The previous implementation probed a single
+// "<owner>:<mode>" key — the pre-company format — which no stored token
+// matches, so every mode reported disconnected regardless of reality.
+func (c *FortnoxConnector) modeStatuses(ctx context.Context, sess *auth.Session) []ModeStatus {
+	orderedModes := []config.Mode{config.ModeSandbox, config.ModeProduction}
+	statuses := make([]ModeStatus, 0, len(orderedModes))
+
+	for _, mode := range orderedModes {
+		if _, ok := c.configs[mode]; !ok {
+			continue
+		}
+		statuses = append(statuses, ModeStatus{Mode: mode, Connected: c.anyCompanyConnected(ctx, sess.Owner, mode)})
+	}
+	return statuses
+}
+
+// anyCompanyConnected reports whether a token exists for any company this
+// owner has registered in this mode.
+func (c *FortnoxConnector) anyCompanyConnected(ctx context.Context, owner string, mode config.Mode) bool {
+	if c.tenantRepo == nil {
+		return false
+	}
+	prefix := owner + ":" + string(mode) + ":"
+	tenants, err := c.tenantRepo.ListByPrefix(ctx, prefix)
+	if err != nil {
+		// Report disconnected rather than guessing connected: an unreadable
+		// registry must not render a Connect button as though it were done.
+		c.log.Error("list companies for mode status", "prefix", prefix, "err", err)
+		return false
+	}
+	for _, t := range tenants {
+		if _, err := c.tokenStore.Load(ctx, t.ID); err == nil {
+			return true
+		}
+	}
+	return false
 }

@@ -52,7 +52,7 @@ func TestCallback_keysTheTokenByTheCompanyFortnoxReports(t *testing.T) {
 	c := newTestConnector(store)
 
 	w := httptest.NewRecorder()
-	c.callbackHandler(w, requestWithSession("GET", "/fortnox/callback?code=abc&state=production", "user-1"))
+	c.callbackHandler(w, requestWithSession("GET", "/fortnox/callback?code=abc&state=test-oauth-nonce:production", "user-1"))
 
 	require.Equal(t, http.StatusSeeOther, w.Code, "body: %s", w.Body.String())
 	_, err := store.Load(context.Background(), domain.TenantID("user-1:production:5566778899"))
@@ -66,11 +66,11 @@ func TestCallback_doesNotOverwriteAnotherCompany(t *testing.T) {
 
 	stubbedExchangeAndDiscovery(t, domain.Company{Name: "First AB", OrgNumber: "556677-8899"}, nil)
 	c.callbackHandler(httptest.NewRecorder(),
-		requestWithSession("GET", "/fortnox/callback?code=abc&state=production", "user-1"))
+		requestWithSession("GET", "/fortnox/callback?code=abc&state=test-oauth-nonce:production", "user-1"))
 
 	stubbedExchangeAndDiscovery(t, domain.Company{Name: "Second AB", OrgNumber: "112233-4455"}, nil)
 	c.callbackHandler(httptest.NewRecorder(),
-		requestWithSession("GET", "/fortnox/callback?code=def&state=production", "user-1"))
+		requestWithSession("GET", "/fortnox/callback?code=def&state=test-oauth-nonce:production", "user-1"))
 
 	for _, key := range []string{"user-1:production:5566778899", "user-1:production:1122334455"} {
 		_, err := store.Load(context.Background(), domain.TenantID(key))
@@ -88,7 +88,7 @@ func TestCallback_namesTheTenantAfterTheCompany(t *testing.T) {
 	c.tenantRepo = repo
 
 	c.callbackHandler(httptest.NewRecorder(),
-		requestWithSession("GET", "/fortnox/callback?code=abc&state=production", "user-1"))
+		requestWithSession("GET", "/fortnox/callback?code=abc&state=test-oauth-nonce:production", "user-1"))
 
 	require.Len(t, repo.upserted, 1)
 	assert.Equal(t, "Definitely Mabe AB", repo.upserted[0].Name)
@@ -104,7 +104,7 @@ func TestCallback_storesNothingWhenTheCompanyCannotBeIdentified(t *testing.T) {
 	c := newTestConnector(store)
 
 	w := httptest.NewRecorder()
-	c.callbackHandler(w, requestWithSession("GET", "/fortnox/callback?code=abc&state=production", "user-1"))
+	c.callbackHandler(w, requestWithSession("GET", "/fortnox/callback?code=abc&state=test-oauth-nonce:production", "user-1"))
 
 	assert.Equal(t, http.StatusBadGateway, w.Code)
 	assert.Empty(t, store.tokens, "nothing may be stored without knowing the company")
@@ -118,7 +118,7 @@ func TestCallback_refusesACompanyWithNoUsableOrgNumber(t *testing.T) {
 	c := newTestConnector(store)
 
 	w := httptest.NewRecorder()
-	c.callbackHandler(w, requestWithSession("GET", "/fortnox/callback?code=abc&state=production", "user-1"))
+	c.callbackHandler(w, requestWithSession("GET", "/fortnox/callback?code=abc&state=test-oauth-nonce:production", "user-1"))
 
 	assert.Equal(t, http.StatusBadGateway, w.Code)
 	assert.Empty(t, store.tokens)

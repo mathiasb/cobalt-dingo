@@ -261,6 +261,11 @@ jobs:
       - name: Write credentials
         env:
           DATABASE_URL: ${{ secrets.COBALT_DINGO_DATABASE_URL }}
+          # Fortnox tokens are encrypted at rest (#85), so reading the stored
+          # sandbox token requires the same key the application uses. Same
+          # 1Password AgentSecrets item as the cluster's
+          # fortnox-integration-key ExternalSecret.
+          FORTNOX_INTEGRATION_KEY: ${{ secrets.COBALT_DINGO_FORTNOX_INTEGRATION_KEY }}
         run: |
           set -euo pipefail
           echo 'FORTNOX_SANDBOX_CLIENT_ID=${{ secrets.FORTNOX_CLIENT_ID }}'         > .env
@@ -311,6 +316,7 @@ jobs:
         if: always()
         env:
           DATABASE_URL: ${{ secrets.COBALT_DINGO_DATABASE_URL }}
+          FORTNOX_INTEGRATION_KEY: ${{ secrets.COBALT_DINGO_FORTNOX_INTEGRATION_KEY }}
         run: |
           set -euo pipefail
           # Compare-and-set on the refresh token read at fetch time: if the
