@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"sort"
 
 	gooidc "github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/oauth2"
@@ -32,10 +33,19 @@ const (
 // hand-built gooidc.IDToken cannot do (its claims are unexported, so Claims()
 // always fails on one).
 type verifiedIdentity struct {
-	Nonce             string
-	Sub               string
-	Email             string
-	EmailVerified     bool
+	Nonce         string
+	Sub           string
+	Email         string
+	EmailVerified bool
+
+	// EmailVerifiedPresent distinguishes "the provider said false" from "the
+	// provider did not send the claim at all". Different causes, different
+	// fixes, and a refusal that conflates them is a diagnosis sent astray.
+	EmailVerifiedPresent bool
+
+	// ClaimNames is the names of the claims the ID token carried. Names only —
+	// never values, which reach logs.
+	ClaimNames        []string
 	Name              string
 	PreferredUsername string
 }
@@ -52,6 +62,10 @@ type idTokenVerifier interface {
 type gooidcVerifier struct{ v *gooidc.IDTokenVerifier }
 
 func (g gooidcVerifier) Verify(ctx context.Context, rawIDToken string) (verifiedIdentity, error) {
+	var (
+		claimNames           []string
+		emailVerifiedPresent bool
+	)
 	tok, err := g.v.Verify(ctx, rawIDToken)
 	if err != nil {
 		return verifiedIdentity{}, fmt.Errorf("verify id_token: %w", err)
@@ -66,13 +80,31 @@ func (g gooidcVerifier) Verify(ctx context.Context, rawIDToken string) (verified
 	if err := tok.Claims(&c); err != nil {
 		return verifiedIdentity{}, fmt.Errorf("parse id_token claims: %w", err)
 	}
+
+	// Claim NAMES only, never values. "email_verified absent" and
+	// "email_verified false" are different problems with different fixes — the
+	// first means the claim is not reaching the ID token, the second means the
+	// identity provider genuinely does not vouch for the address — and a
+	// refusal that cannot tell them apart sends you looking in the wrong place.
+	var raw map[string]any
+	if err := tok.Claims(&raw); err == nil {
+		names := make([]string, 0, len(raw))
+		for k := range raw {
+			names = append(names, k)
+		}
+		sort.Strings(names)
+		claimNames = names
+		_, emailVerifiedPresent = raw["email_verified"]
+	}
 	return verifiedIdentity{
-		Nonce:             tok.Nonce,
-		Sub:               c.Sub,
-		Email:             c.Email,
-		EmailVerified:     c.EmailVerified,
-		Name:              c.Name,
-		PreferredUsername: c.PreferredUsername,
+		Nonce:                tok.Nonce,
+		Sub:                  c.Sub,
+		Email:                c.Email,
+		EmailVerified:        c.EmailVerified,
+		EmailVerifiedPresent: emailVerifiedPresent,
+		ClaimNames:           claimNames,
+		Name:                 c.Name,
+		PreferredUsername:    c.PreferredUsername,
 	}, nil
 }
 
@@ -208,7 +240,11 @@ func (h *OIDCHandler) CallbackHandler(w http.ResponseWriter, r *http.Request) {
 		// Fail closed on the premise ADR-0003 rests on. Not a 500: this is a
 		// legitimate refusal of an identity, and the operator fixes it in the
 		// identity provider rather than in this application.
-		h.log.Error("login refused: identity provider did not assert a verified email", "sub", ident.Sub)
+		h.log.Error("login refused: identity provider did not assert a verified email",
+			"sub", ident.Sub,
+			"email_verified_claim_present", ident.EmailVerifiedPresent,
+			"email_claim_non_empty", ident.Email != "",
+			"id_token_claims", ident.ClaimNames)
 		http.Error(w, "your email address is not verified with the identity provider", http.StatusForbidden)
 		return
 	}
