@@ -188,8 +188,33 @@ func clearLoginCookie(w http.ResponseWriter, name string) {
 
 // CallbackHandler exchanges the auth code, verifies the ID token, and sets the session.
 func (h *OIDCHandler) CallbackHandler(w http.ResponseWriter, r *http.Request) {
+	// Three distinct causes, one message, no logging — so a real lockout was
+	// indistinguishable from a replayed callback and had to be guessed at.
+	// Says which now. Presence and equality only: the values are single-use
+	// CSRF tokens and do not belong in a log.
+	queryState := r.URL.Query().Get("state")
 	gotState, err := r.Cookie(stateCookie)
-	if err != nil || gotState.Value != r.URL.Query().Get("state") {
+	switch {
+	case err != nil:
+		// Overwhelmingly the common case in practice: the cookies are
+		// single-use and cleared below, so a replayed or restored callback —
+		// a restored browser tab, a back-navigation, a bookmarked callback
+		// URL — arrives with none. The fix is to start a fresh login, which
+		// the message now says.
+		h.log.Warn("login callback rejected: no state cookie",
+			"state_param_present", queryState != "",
+			"hint", "replayed or stale callback; start a fresh login at /auth/login")
+		// Keeps "invalid state" in the body: the tests assert on it to prove
+		// WHICH guard fired, and losing that distinction to a tidier sentence
+		// would be the same mistake as the message this replaces.
+		http.Error(w, "invalid state — this login did not start here, or has already been used; start again from /auth/login", http.StatusBadRequest)
+		return
+	case queryState == "":
+		h.log.Warn("login callback rejected: no state parameter")
+		http.Error(w, "invalid state", http.StatusBadRequest)
+		return
+	case gotState.Value != queryState:
+		h.log.Warn("login callback rejected: state mismatch — the callback belongs to a different login")
 		http.Error(w, "invalid state", http.StatusBadRequest)
 		return
 	}
@@ -199,7 +224,10 @@ func (h *OIDCHandler) CallbackHandler(w http.ResponseWriter, r *http.Request) {
 	// the comparison.
 	gotNonce, err := r.Cookie(nonceCookie)
 	if err != nil || gotNonce.Value == "" {
-		http.Error(w, "invalid nonce", http.StatusBadRequest)
+		h.log.Warn("login callback rejected: no usable nonce cookie",
+			"cookie_present", err == nil,
+			"hint", "replayed or stale callback; start a fresh login at /auth/login")
+		http.Error(w, "invalid nonce — this login did not start here, or has already been used; start again from /auth/login", http.StatusBadRequest)
 		return
 	}
 
