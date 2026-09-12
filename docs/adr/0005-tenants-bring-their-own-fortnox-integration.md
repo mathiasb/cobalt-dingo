@@ -1,9 +1,9 @@
 ---
 adr:           0005
 title:         Each tenant registers their own Fortnox integration; cobalt-dingo stores the credentials encrypted
-status:        proposed
-date:          2026-09-11
-deciders:      "pending: Mathias"
+status:        accepted
+date:          2026-09-12
+deciders:      Mathias
 supersedes:    null
 ---
 
@@ -11,12 +11,17 @@ supersedes:    null
 
 ## Status
 
-**Proposed.** The direction was chosen by Mathias on 2026-09-11 in conversation —
-*"users bring their own"*, with the other users being *"a real SaaS product with
-paying tenants"* — and the first piece is built (`internal/crypto`, AES-256-GCM).
-This ADR exists because that choice has consequences well outside the storage
-question and none of them were written down. It needs accepting or amending
-before the per-tenant table lands.
+**Accepted by Mathias, 2026-09-12**, as written — including the kill condition.
+
+The direction was chosen on 2026-09-11 in conversation — *"users bring their
+own"*, with the other users being *"a real SaaS product with paying tenants"*.
+This ADR was written because that choice has consequences well outside the
+storage question and none of them were recorded.
+
+Open question 1 below (egress of tenant data to an LLM) was **resolved
+separately on 2026-09-12**: per-tenant choice, local inference by default, with
+the enforcement requirements on #84. It remains listed here because this ADR
+does not settle it and must not be read as if it did.
 
 ## Context
 
