@@ -156,12 +156,12 @@ tasks:
       - npx playwright test --ui
 
   e2e:seed:
-    desc: Seed sandbox with [E2E]-tagged test data (sandbox-only by precondition)
+    desc: Seed the E2E test company with [E2E]-tagged data (refuses any other company)
     cmds:
       - source .env && FORTNOX_MODE=sandbox go run ./cmd/e2e-seed
 
   e2e:teardown:
-    desc: Remove [E2E]-tagged data from the Fortnox sandbox
+    desc: Remove [E2E]-tagged data from the E2E test company (refuses any other company)
     cmds:
       - source .env && FORTNOX_MODE=sandbox go run ./cmd/e2e-teardown
 

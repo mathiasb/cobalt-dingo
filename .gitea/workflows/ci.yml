@@ -273,6 +273,13 @@ jobs:
           echo 'FORTNOX_SANDBOX_REDIRECT_URI=http://localhost:8080/callback'        >> .env
           echo 'FORTNOX_SANDBOX_SCOPES="companyinformation bookkeeping customer invoice supplier supplierinvoice currency project costcenter assets settings"' >> .env
           echo 'FORTNOX_SANDBOX_INVOICE_INBOX=${{ secrets.FORTNOX_INVOICE_INBOX }}' >> .env
+          # The company the E2E tools are allowed to write to, by the exact
+          # name Fortnox reports. FORTNOX_MODE only says which credentials were
+          # used; both modes call api.fortnox.se, and a Fortnox Developer licence
+          # puts test companies under the licence holder's own organisation
+          # number. Without this, a token for the production company passes every
+          # check these tools make and teardown starts cancelling real invoices.
+          echo 'FORTNOX_E2E_COMPANY="TEST Cobalt Dingo"'                          >> .env
           # Writes .fortnox-tokens-sandbox.json (0600) with the real expires_at,
           # plus .old-refresh for the post-run CAS write-back. Token values are
           # never printed — the command reports lengths and timestamps only.

@@ -271,6 +271,18 @@ func main() {
 		os.Exit(1)
 	}
 
+	// FORTNOX_MODE says which credentials were used; it does not say which
+	// company the resulting token opens. Both modes call api.fortnox.se, and a
+	// Fortnox Developer licence puts test companies under the licence holder's
+	// own organisation number — so neither the mode nor the org number can
+	// distinguish "TEST Cobalt Dingo" from the production company. Ask Fortnox
+	// before building a client that can write.
+	if err := fortnox.AssertCompany(cfg.BaseURL(), token.AccessToken, os.Getenv("FORTNOX_E2E_COMPANY")); err != nil {
+		log.Error("refusing to touch these books", "err", err,
+			"hint", "set FORTNOX_E2E_COMPANY to the exact company name Fortnox reports for the test company")
+		os.Exit(1)
+	}
+
 	client := fortnox.NewClient(cfg.BaseURL(), token.AccessToken, false)
 
 	// Build name→number index: reactivate existing E2E suppliers, create missing ones.

@@ -186,6 +186,51 @@ differently-named company, rather than replacing its token. Renaming a company
 in Fortnox trips the same guard, and the message says to disconnect and
 reconnect. A real discriminator is #87.
 
+## Which books am I actually touching?
+
+**There is no Fortnox sandbox.** `FORTNOX_MODE` selects which OAuth credentials
+this process uses; it does not select an environment. `config.Fortnox.BaseURL`
+returns `https://api.fortnox.se` for both modes, and says so in a comment:
+*"Sandbox and live use the same host — the environment is distinguished by the
+OAuth credentials, not the URL."*
+
+So the only thing separating test books from real books is **which company was
+picked on the Fortnox consent screen**. That makes the picker a safety control,
+and it is worth knowing what it looks like: a Fortnox Developer licence creates
+test companies *under the licence holder's own organisation number*, so the
+list shows the production company and its test companies adjacently, sharing a
+number, sometimes sharing a name.
+
+### Why the mode label is not a safeguard
+
+- `FORTNOX_MODE=sandbox` sets `AllowsWrites = true` unconditionally
+  (`internal/config/config.go`), so sandbox is the *writable* mode.
+- `cmd/e2e-seed` and `cmd/e2e-teardown` build clients with `readOnly=false` and
+  create, cancel and delete supplier invoices, customers, projects and assets.
+- Both guarded only on `cfg.Mode != config.ModeSandbox` — a string in the
+  environment.
+- The tenant key, the token filename and the log line all carry the mode and
+  the organisation number. With test companies under the licence holder's
+  number, **none of them can tell you which company you are about to write to.**
+
+One mis-click on the consent screen therefore put a production token where a
+test token was meant to go, and every downstream check agreed it was sandbox.
+
+### The control
+
+`fortnox.AssertCompany(baseURL, token, expected)` asks Fortnox which company a
+token opens and refuses unless it matches, using a read-only client so the
+check cannot itself write. `cmd/e2e-seed` and `cmd/e2e-teardown` call it before
+constructing a writable client, against `FORTNOX_E2E_COMPANY`.
+
+It fails closed three ways: unset expectation, unreadable company, any name
+mismatch. An unset variable is an error rather than "allow anything", because a
+forgotten variable would silently restore the original hazard.
+
+**Set `FORTNOX_E2E_COMPANY` in your local `.env`** to the exact name Fortnox
+reports for the test company — currently `TEST Cobalt Dingo`. CI writes it
+alongside the other sandbox values.
+
 ## Three corrections to what this document said before
 
 1. **The licence is a step, not a possible prompt.** This file called it an
