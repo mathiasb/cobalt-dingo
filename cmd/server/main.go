@@ -52,7 +52,12 @@ func main() {
 	appCfg := config.LoadApp()
 
 	if fortnoxEnabled {
-		log.Info("cobalt-dingo starting", "port", port, "fortnox_mode", cfg.Mode)
+		// allows_writes is logged because the mode name does not imply it and
+		// nothing else in the running process reveals it. Diagnosing whether a
+		// deployment could write to live books should not require reading the
+		// deployment manifest (#88).
+		log.Info("cobalt-dingo starting",
+			"port", port, "fortnox_mode", cfg.Mode, "allows_writes", cfg.AllowsWrites)
 	} else {
 		log.Info("cobalt-dingo starting (dev mode — Fortnox unconfigured)", "port", port)
 	}
