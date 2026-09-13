@@ -203,12 +203,17 @@ number, sometimes sharing a name.
 
 ### Why the mode label is not a safeguard
 
-- `FORTNOX_MODE=sandbox` sets `AllowsWrites = true` unconditionally
-  (`internal/config/config.go`), so sandbox is the *writable* mode.
+- `FORTNOX_MODE=sandbox` set `AllowsWrites = true` **unconditionally** until
+  2026-09-13, so sandbox was the *writable* mode — including in the deployed,
+  internet-facing, multi-tenant server. Writes are now opt-in per mode via
+  `FORTNOX_SANDBOX_ALLOW_WRITES` / `FORTNOX_PRODUCTION_ALLOW_WRITES`, both
+  default-off, both requiring exactly `"true"`.
 - `cmd/e2e-seed` and `cmd/e2e-teardown` build clients with `readOnly=false` and
   create, cancel and delete supplier invoices, customers, projects and assets.
 - Both guarded only on `cfg.Mode != config.ModeSandbox` — a string in the
-  environment.
+  environment. (They build their clients directly with `readOnly=false` rather
+  than from `AllowsWrites`, so they still work with writes opt-in off; what
+  gates them now is the company check.)
 - The tenant key, the token filename and the log line all carry the mode and
   the organisation number. With test companies under the licence holder's
   number, **none of them can tell you which company you are about to write to.**

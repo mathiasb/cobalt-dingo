@@ -127,7 +127,8 @@ func TestLoad_HappyPath_Sandbox(t *testing.T) {
 	assert.Equal(t, "sandbox-id", cfg.ClientID)
 	assert.Equal(t, "sandbox-secret", cfg.ClientSecret)
 	assert.True(t, cfg.IsSandbox())
-	assert.True(t, cfg.AllowsWrites)
+	assert.False(t, cfg.AllowsWrites,
+		"sandbox no longer implies writes: the mode picks credentials, not an environment")
 }
 
 // TestLoad_HappyPath_Production confirms production loads from its
@@ -163,6 +164,7 @@ func clearFortnoxEnv(t *testing.T) {
 		"FORTNOX_PRODUCTION_REDIRECT_URI", "FORTNOX_PRODUCTION_SCOPES",
 		"FORTNOX_PRODUCTION_INVOICE_INBOX",
 		"FORTNOX_PRODUCTION_ALLOW_WRITES",
+		"FORTNOX_SANDBOX_ALLOW_WRITES",
 	}
 	for _, k := range keys {
 		t.Setenv(k, "")
@@ -265,4 +267,60 @@ func TestLoad_DoesNotPopulateBaseURLOverride(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, cfg.BaseURLOverride)
 	assert.Equal(t, "https://api.fortnox.se", cfg.BaseURL())
+}
+
+// "Sandbox" names a set of credentials, not a safe place. Both modes call
+// api.fortnox.se, and a Fortnox Developer licence puts test companies under the
+// licence holder's own organisation number — so FORTNOX_MODE=sandbox says
+// nothing about whose books a token opens. It must therefore not be the thing
+// that grants write access.
+func TestLoad_sandboxIsReadOnlyUnlessWritesAreExplicitlyEnabled(t *testing.T) {
+	clearFortnoxEnv(t)
+	t.Setenv("FORTNOX_MODE", "sandbox")
+	t.Setenv("FORTNOX_SANDBOX_CLIENT_ID", "sandbox-id")
+	t.Setenv("FORTNOX_SANDBOX_CLIENT_SECRET", "sandbox-secret")
+	t.Setenv("FORTNOX_SANDBOX_REDIRECT_URI", "http://localhost:8080/callback")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	assert.False(t, cfg.AllowsWrites, "an unset FORTNOX_SANDBOX_ALLOW_WRITES must mean read-only")
+}
+
+func TestLoad_sandboxAllowsWritesOnlyWhenAskedFor(t *testing.T) {
+	clearFortnoxEnv(t)
+	t.Setenv("FORTNOX_MODE", "sandbox")
+	t.Setenv("FORTNOX_SANDBOX_CLIENT_ID", "sandbox-id")
+	t.Setenv("FORTNOX_SANDBOX_CLIENT_SECRET", "sandbox-secret")
+	t.Setenv("FORTNOX_SANDBOX_REDIRECT_URI", "http://localhost:8080/callback")
+
+	for _, tc := range []struct {
+		value string
+		want  bool
+	}{
+		{"true", true},
+		{"", false},
+		{"yes", false},
+		{"TRUE", false},
+		{"1", false},
+	} {
+		t.Setenv("FORTNOX_SANDBOX_ALLOW_WRITES", tc.value)
+		cfg, err := Load()
+		require.NoError(t, err)
+		assert.Equalf(t, tc.want, cfg.AllowsWrites, "FORTNOX_SANDBOX_ALLOW_WRITES=%q", tc.value)
+	}
+}
+
+// LoadAllModes feeds the running server, which is the deployment that faces
+// the internet and holds several tenants. It must default the same way.
+func TestLoadAllModes_sandboxIsReadOnlyByDefault(t *testing.T) {
+	clearFortnoxEnv(t)
+	t.Setenv("FORTNOX_SANDBOX_CLIENT_ID", "sandbox-id")
+	t.Setenv("FORTNOX_SANDBOX_CLIENT_SECRET", "sandbox-secret")
+	t.Setenv("FORTNOX_SANDBOX_REDIRECT_URI", "http://localhost:8080/callback")
+
+	modes, _ := LoadAllModes()
+	sandbox, ok := modes[ModeSandbox]
+	require.True(t, ok)
+	assert.False(t, sandbox.AllowsWrites,
+		"the deployed server must not be writable merely because its mode is called sandbox")
 }

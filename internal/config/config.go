@@ -17,13 +17,16 @@ import (
 type Mode string
 
 const (
-	// ModeSandbox targets the Fortnox sandbox via the SANDBOX-prefixed
-	// connected app. Writes are permitted; the sandbox is the only place
-	// e2e-seed and e2e-teardown will run.
+	// ModeSandbox selects the SANDBOX-prefixed connected app. It does NOT
+	// select a different Fortnox environment — there is no sandbox host; see
+	// Fortnox.BaseURL. Write access requires FORTNOX_SANDBOX_ALLOW_WRITES=true.
+	// e2e-seed and e2e-teardown refuse to run in any other mode, and separately
+	// verify which company the token opens (fortnox.AssertCompany).
 	ModeSandbox Mode = "sandbox"
 
-	// ModeProduction targets the live Fortnox environment. Write access
-	// requires FORTNOX_PRODUCTION_ALLOW_WRITES=true; otherwise reads only.
+	// ModeProduction selects the PRODUCTION-prefixed connected app. Write
+	// access requires FORTNOX_PRODUCTION_ALLOW_WRITES=true; otherwise reads
+	// only.
 	ModeProduction Mode = "production"
 )
 
@@ -272,12 +275,7 @@ func LoadAllModes() (map[Mode]Fortnox, []string) {
 				InvoiceInbox: os.Getenv(p + "INVOICE_INBOX"),
 				AccountType:  accountType,
 			}
-			switch m {
-			case ModeSandbox:
-				f.AllowsWrites = true
-			case ModeProduction:
-				f.AllowsWrites = os.Getenv("FORTNOX_PRODUCTION_ALLOW_WRITES") == "true"
-			}
+			f.AllowsWrites = os.Getenv(p+"ALLOW_WRITES") == "true"
 			modes[m] = f
 		}
 	}
@@ -308,12 +306,20 @@ func Load() (Fortnox, error) {
 		Scopes:       os.Getenv(p + "SCOPES"),
 		InvoiceInbox: os.Getenv(p + "INVOICE_INBOX"),
 	}
-	switch mode {
-	case ModeSandbox:
-		cfg.AllowsWrites = true
-	case ModeProduction:
-		cfg.AllowsWrites = os.Getenv("FORTNOX_PRODUCTION_ALLOW_WRITES") == "true"
-	}
+	// Writes are opt-in per mode, and "sandbox" does not imply one.
+	//
+	// FORTNOX_MODE selects credentials, not an environment: both modes call
+	// api.fortnox.se, and a Fortnox Developer licence creates test companies
+	// under the licence holder's own organisation number. So the mode name
+	// carries no information about whose books a token opens, and must not be
+	// what grants write access. Sandbox was writable unconditionally until
+	// 2026-09-13, which made the deployed multi-tenant server writable against
+	// whichever company happened to be connected (#88).
+	//
+	// Exactly "true" — not "1", not "TRUE". A near-miss spelling reads as
+	// intent to enable, and resolving it to read-only is the safe way to be
+	// wrong.
+	cfg.AllowsWrites = os.Getenv(p+"ALLOW_WRITES") == "true"
 	if cfg.ClientID == "" {
 		return Fortnox{}, fmt.Errorf("%sCLIENT_ID is not set (required for FORTNOX_MODE=%s)", p, mode)
 	}
