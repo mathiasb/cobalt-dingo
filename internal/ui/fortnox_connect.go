@@ -305,6 +305,29 @@ func (c *FortnoxConnector) callbackHandler(w http.ResponseWriter, r *http.Reques
 
 	tenantID := auth.TenantKey(sess.Owner, mode, companyKey)
 
+	// An organisation number does not identify a Fortnox company. One Fortnox
+	// account can hold several companies sharing one — observed live on
+	// 2026-09-13 with three under 556836-0688. Since the tenant key is the
+	// organisation number, the second authorization would replace the first
+	// company's token and rename its row, with nothing to see afterwards.
+	//
+	// Refuse instead. The cost is that renaming a company in Fortnox also
+	// trips this, which is why the message says how to clear it; the
+	// alternative is books changing underneath a user who cannot tell. A real
+	// discriminator needs an identifier Fortnox does not return from
+	// /3/companyinformation (#87).
+	if c.tenantRepo != nil {
+		if existing, err := c.tenantRepo.Get(r.Context(), tenantID); err == nil && existing.Name != company.Name {
+			c.log.Error("fortnox connect refused: organisation number already held by another company",
+				"tenant", tenantID, "connected", existing.Name, "authorized", company.Name)
+			http.Error(w, fmt.Sprintf(
+				"%q is already connected under organisation number %s, and Fortnox gives no way to tell it apart from %q. "+
+					"Nothing was changed. If you renamed the company, disconnect it first and connect again.",
+				existing.Name, companyKey, company.Name), http.StatusConflict)
+			return
+		}
+	}
+
 	// Ensure tenant row exists before storing token (FK constraint). Named
 	// after the company rather than the user's email address: the row exists to
 	// say which company this is, and an email address does not.

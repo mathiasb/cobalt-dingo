@@ -157,6 +157,35 @@ looks like a service one — a difference invisible afterwards and costing a
 re-authorization to correct. The sandbox stays a user authorization, because it
 is already connected and switching it would buy nothing.
 
+## One authorization is one company
+
+The Fortnox consent flow selects **one** company. `apps.fortnox.se` shows a
+company picker (*Välj företag*) before the consent dialog, and the token that
+comes back is scoped to whichever company was picked. Nothing in the callback
+says which one — `/3/companyinformation` is read with the fresh access token to
+find out.
+
+So **connecting several entities means running the flow once per entity**,
+accumulating one token per company. cobalt-dingo stores them under
+`<owner>:<mode>:<company>` and the page offers a "Connect another company" link
+for each mode whether or not one is already connected. Before 2026-09-13 that
+link was hidden as soon as a mode had any company, which left no way through
+the UI to add a second.
+
+### The organisation number is not a company identifier
+
+One Fortnox account can hold several companies sharing one organisation number
+— observed live with three under `556836-0688`, two of them identically named
+"Definitely Mabe AB" (Fortnox IDs 1 and 3) plus "TEST Cobalt Dingo". The Fortnox
+UI distinguishes them by an internal ID that `/3/companyinformation` does not
+return; that endpoint gives `CompanyName` and `OrganizationNumber` only.
+
+Since the tenant key is the organisation number, two such companies collide.
+The callback therefore **refuses with 409** when the key is already held by a
+differently-named company, rather than replacing its token. Renaming a company
+in Fortnox trips the same guard, and the message says to disconnect and
+reconnect. A real discriminator is #87.
+
 ## Three corrections to what this document said before
 
 1. **The licence is a step, not a possible prompt.** This file called it an

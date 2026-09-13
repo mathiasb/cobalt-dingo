@@ -27,15 +27,26 @@ templ sandboxCard(connected bool) {
 			<h2 class="text-lg font-medium text-gray-900">Sandbox</h2>
 			<span class="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700">Safe to experiment</span>
 		</div>
+		// Disconnect lives on the company row in the picker above, not here: a
+		// connection is per company now, so a mode-level Disconnect button
+		// cannot say WHICH one it would remove.
+		//
+		// Connect stays regardless of `connected`. A Fortnox authorization
+		// covers one company, so adding a second entity means running the flow
+		// again — and hiding the link once any company was connected left no
+		// way to do that.
 		if connected {
-			// Disconnect lives on the company row in the picker above, not
-			// here: a connection is per company now, so a mode-level
-			// Disconnect button cannot say WHICH one it would remove.
 			<p class="text-sm text-gray-600 mb-4">&#10003; Connected &mdash; manage companies above</p>
 		} else {
 			<p class="text-sm text-gray-500 mb-4">Not connected</p>
-			<a href="/fortnox/connect?mode=sandbox" class="inline-block rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">Connect Sandbox</a>
 		}
+		<a href="/fortnox/connect?mode=sandbox" class="inline-block rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">
+			if connected {
+				Connect another company
+			} else {
+				Connect Sandbox
+			}
+		</a>
 	</div>
 }
 
@@ -48,30 +59,41 @@ templ productionCard(connected bool) {
 		<div class="rounded border border-orange-200 bg-orange-100 px-3 py-2 mb-4">
 			<p class="text-sm text-orange-800">&#9888; This connects to your live Fortnox company. All operations affect real data.</p>
 		</div>
+		// Disconnect lives on the company row in the picker above, not here: a
+		// connection is per company now, so a mode-level Disconnect button
+		// cannot say WHICH one it would remove.
+		//
+		// Connect stays regardless of `connected` — one authorization is one
+		// company, so a second entity needs the flow run again. The
+		// confirmation gate stays with it: connecting a second set of live
+		// books is no less consequential than the first.
 		if connected {
-			// Disconnect lives on the company row in the picker above, not
-			// here: a connection is per company now, so a mode-level
-			// Disconnect button cannot say WHICH one it would remove.
 			<p class="text-sm text-gray-600 mb-4">&#10003; Connected &mdash; manage companies above</p>
 		} else {
 			<p class="text-sm text-gray-500 mb-4">Not connected</p>
-			// Checkbox is a UX friction gate only — not a server-side guard.
-			// The OAuth flow itself (Fortnox consent screen) is the real authorization step.
-			<label class="flex items-start gap-2 mb-3 cursor-pointer">
-				<input
-					type="checkbox"
-					id="prod-confirm"
-					class="mt-0.5 rounded border-orange-300"
-					onchange="var btn=document.getElementById('prod-btn');btn.classList.toggle('opacity-50',!this.checked);btn.classList.toggle('pointer-events-none',!this.checked);"
-				/>
-				<span class="text-sm text-orange-900">I understand this will connect to my real Fortnox company</span>
-			</label>
-			<a
-				id="prod-btn"
-				href="/fortnox/connect?mode=production"
-				class="inline-block rounded bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 opacity-50 pointer-events-none"
-			>Connect Production</a>
 		}
+		// Checkbox is a UX friction gate only — not a server-side guard.
+		// The OAuth flow itself (Fortnox consent screen) is the real authorization step.
+		<label class="flex items-start gap-2 mb-3 cursor-pointer">
+			<input
+				type="checkbox"
+				id="prod-confirm"
+				class="mt-0.5 rounded border-orange-300"
+				onchange="var btn=document.getElementById('prod-btn');btn.classList.toggle('opacity-50',!this.checked);btn.classList.toggle('pointer-events-none',!this.checked);"
+			/>
+			<span class="text-sm text-orange-900">I understand this will connect to my real Fortnox company</span>
+		</label>
+		<a
+			id="prod-btn"
+			href="/fortnox/connect?mode=production"
+			class="inline-block rounded bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 opacity-50 pointer-events-none"
+		>
+			if connected {
+				Connect another company
+			} else {
+				Connect Production
+			}
+		</a>
 	</div>
 }
 
