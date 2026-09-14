@@ -125,11 +125,17 @@ func TestRender_printsTheRowsOfAnUnbalancedVoucher(t *testing.T) {
 		},
 	}}
 
+	// Accounts and amounts are the diagnostic; the description is redacted by
+	// default because production voucher descriptions name counterparties —
+	// "Kundbet <customer> (29)" is a real one (#94).
 	out := report.Render(ov)
-	assert.Contains(t, out, "Lön september")
+	assert.NotContains(t, out, "Lön september")
 	assert.Contains(t, out, "7220")
 	assert.Contains(t, out, "683,428.00")
 	assert.Contains(t, out, "2710")
+	assert.Contains(t, out, "M/2")
+
+	assert.Contains(t, report.RenderWithNames(ov), "Lön september")
 }
 
 // A voucher for which no rows came back at all is a different diagnosis from
@@ -217,15 +223,19 @@ func TestRender_namesTheUnbookedInvoices(t *testing.T) {
 		InvoiceNumber: 31, CustomerName: "Kund AB", Balance: sek(18750), DueDate: "2026-10-15",
 	}}
 
+	// Default output: everything needed to act, no names (#94).
 	out := report.Render(ov)
 	assert.Contains(t, out, "UNBOOKED INVOICES")
 	assert.Contains(t, out, "9001")
-	assert.Contains(t, out, "Lev AB")
 	assert.Contains(t, out, "12,500.50")
 	assert.Contains(t, out, "2026-09-30")
 	assert.Contains(t, out, "LEV-77", "the supplier's own reference is what they will quote")
-	assert.Contains(t, out, "Kund AB")
 	assert.Contains(t, out, "18,750.00")
+	assert.NotContains(t, out, "Lev AB")
+
+	named := report.RenderWithNames(ov)
+	assert.Contains(t, named, "Lev AB")
+	assert.Contains(t, named, "Kund AB")
 }
 
 // The section must not appear when there is nothing unbooked — an empty

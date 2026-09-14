@@ -207,7 +207,21 @@ func run(log *slog.Logger) error {
 			return fmt.Errorf("unbooked customer invoices: %w", err)
 		}
 	}
-	fmt.Print(report.Render(ov.WithAgeing(time.Now())))
+	// Names are off unless explicitly enabled, and only by the exact string
+	// "true" — the same shape as FORTNOX_<MODE>_ALLOW_WRITES. "1", "yes" and
+	// "TRUE" do not enable it, because a value that ALMOST means true is how
+	// something gets switched on by accident.
+	//
+	// This output reaches a Job log, agent sessions read Job logs, and
+	// claudewatcher ingests those transcripts into the brain wiki — which the
+	// homelab client list must never reach (#94).
+	withAgeing := ov.WithAgeing(time.Now())
+	if os.Getenv("OVERVIEW_SHOW_COUNTERPARTIES") == "true" {
+		log.Warn("counterparty names ENABLED — do not paste this output anywhere that reaches the brain wiki or a cloud API")
+		fmt.Print(report.RenderWithNames(withAgeing))
+	} else {
+		fmt.Print(report.Render(withAgeing))
+	}
 
 	// Exit non-zero when the books do not balance. A report nobody reads is
 	// how a discrepancy becomes permanent; a failing Job gets noticed.

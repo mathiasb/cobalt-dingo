@@ -13,8 +13,46 @@ import (
 	"github.com/mathiasb/cobalt-dingo/internal/domain"
 )
 
-// Render writes the overview as plain text, suitable for a Job log.
+// names controls whether counterparty names appear in the output.
+//
+// Fail-closed by construction: namesRedacted is the ZERO value, so Render —
+// the function every caller reaches for — redacts, and showing names requires
+// naming the decision. Operator discipline is not a control, and a redaction
+// pass someone has to remember to apply is operator discipline with extra
+// steps (brain: structural-opt-in-marker-fail-closed).
+//
+// Why it matters here: this output lands in a Job log, agent sessions read Job
+// logs, and claudewatcher ingests those transcripts into the brain wiki —
+// which the homelab client list must never reach (#94). One of the two
+// unbooked invoices found on 2026-09-14 named a company on that list.
+type names int
+
+const (
+	namesRedacted names = iota // zero value
+	namesShown
+)
+
+// redactedName is what replaces a withheld name. Not an empty string: a blank
+// where a name should be reads as missing data, and someone will go looking
+// for the bug.
+const redactedName = "[name withheld]"
+
+// Render writes the overview as plain text with counterparty names REDACTED,
+// suitable for a Job log or a transcript.
+//
+// Invoice numbers, amounts and dates survive redaction, so the output stays
+// actionable — a document number is enough to find anything in Fortnox.
 func Render(ov domain.FinancialOverview) string {
+	return render(ov, namesRedacted)
+}
+
+// RenderWithNames includes counterparty names. For a destination that is known
+// not to flow into the brain wiki or a cloud API.
+func RenderWithNames(ov domain.FinancialOverview) string {
+	return render(ov, namesShown)
+}
+
+func render(ov domain.FinancialOverview, show names) string {
 	var b strings.Builder
 
 	fmt.Fprintf(&b, "FINANCIAL POSITION — financial year %d\n", ov.Year)
@@ -46,7 +84,7 @@ func Render(ov domain.FinancialOverview) string {
 	if len(ov.UnbalancedVouchers) > 0 {
 		fmt.Fprintf(&b, "  !! %d voucher(s) do not balance internally:\n", len(ov.UnbalancedVouchers))
 		for _, u := range ov.UnbalancedVouchers {
-			fmt.Fprintf(&b, "     %s/%d out by %s — %s\n", u.Series, u.Number, u.Difference.String(), u.Description)
+			fmt.Fprintf(&b, "     %s/%d out by %s — %s\n", u.Series, u.Number, u.Difference.String(), reveal(u.Description, show))
 			// The rows as read. Fortnox will not accept an unbalanced voucher
 			// through its own UI, so the difference means either the API
 			// returned an incomplete set or this code dropped some — and the
@@ -56,7 +94,7 @@ func Render(ov domain.FinancialOverview) string {
 			}
 			for _, r := range u.Rows {
 				fmt.Fprintf(&b, "        %-6d debit %16s  credit %16s  %s\n",
-					r.Account, r.Debit.String(), r.Credit.String(), r.Description)
+					r.Account, r.Debit.String(), r.Credit.String(), reveal(r.Description, show))
 			}
 		}
 	}
@@ -101,11 +139,11 @@ func Render(ov domain.FinancialOverview) string {
 		b.WriteString("\nUNBOOKED INVOICES (not in any ledger balance above)\n")
 		for _, inv := range ov.UnbookedSupplier {
 			fmt.Fprintf(&b, "  payable  #%-8d %-28s %16s  due %s  ref %s\n",
-				inv.InvoiceNumber, truncate(inv.SupplierName, 28), inv.Balance.String(), inv.DueDate, inv.SupplierReference)
+				inv.InvoiceNumber, truncate(reveal(inv.SupplierName, show), 28), inv.Balance.String(), inv.DueDate, inv.SupplierReference)
 		}
 		for _, inv := range ov.UnbookedCustomer {
 			fmt.Fprintf(&b, "  receivable #%-6d %-28s %16s  due %s\n",
-				inv.InvoiceNumber, truncate(inv.CustomerName, 28), inv.Balance.String(), inv.DueDate)
+				inv.InvoiceNumber, truncate(reveal(inv.CustomerName, show), 28), inv.Balance.String(), inv.DueDate)
 		}
 	}
 
@@ -137,6 +175,23 @@ func renderStates(b *strings.Builder, label string, counts []domain.InvoiceState
 	for _, c := range counts {
 		fmt.Fprintf(b, "  %-9s %-18s %6d\n", label, c.Filter, c.Count)
 	}
+}
+
+// reveal returns a counterparty-bearing string only when names are shown.
+//
+// Deliberately applied at every use site rather than by scrubbing the finished
+// output: a scrub is a denylist over free text, and this estate has already
+// proved that filtering output is not a control — an English keyword filter
+// missed a Swedish mail subject (email-triage-agent #16). Choosing per field
+// what is a name cannot silently miss one.
+func reveal(value string, show names) string {
+	if show == namesShown {
+		return value
+	}
+	if strings.TrimSpace(value) == "" {
+		return ""
+	}
+	return redactedName
 }
 
 func truncate(s string, n int) string {
