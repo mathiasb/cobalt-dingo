@@ -89,7 +89,7 @@ type VoucherCache interface {
 	// It deliberately does NOT report freshness: that needs Fortnox's live
 	// total, which is a network call and not this port's business. The caller
 	// builds a VoucherCacheState and asks it.
-	LoadYear(ctx context.Context, tenantID TenantID, yearID int) ([]Voucher, time.Time, error)
+	LoadYear(ctx context.Context, tenantID TenantID, yearID int) (CachedVouchers, error)
 
 	// SaveYear replaces the cached set for a year and records the remote total
 	// it was verified against.
@@ -98,7 +98,28 @@ type VoucherCache interface {
 	// posted vouchers are immutable, a cache that can only grow could never
 	// recover from a bad write. remoteTotal is stored so a later read can tell
 	// a cache that was verified complete from one that was merely written.
+	// SaveYear records VoucherFetchVersion itself rather than taking it as an
+	// argument. It is a constant of the build doing the writing, and an
+	// argument could be passed a stale value — which would defeat the check
+	// silently, the same way the missing financialyear parameter did.
 	SaveYear(ctx context.Context, tenantID TenantID, yearID int, vouchers []Voucher, remoteTotal int, syncedAt time.Time) error
+}
+
+// CachedVouchers is what the cache holds for one year, with the provenance
+// needed to judge it.
+//
+// One value rather than three returns, for the same reason VoucherSet exists:
+// SyncedAt and FetchVersion are not decoration, they are what makes the
+// vouchers usable or not, and a caller cannot drop them by accident.
+type CachedVouchers struct {
+	Vouchers []Voucher
+
+	// SyncedAt is when completeness was last verified. Zero means never.
+	SyncedAt time.Time
+
+	// FetchVersion is the VoucherFetchVersion that produced these rows. Zero
+	// means they predate versioning and their provenance is unknown.
+	FetchVersion int
 }
 
 // PaymentSubmitter initiates a payment batch via PSD2 PISP.

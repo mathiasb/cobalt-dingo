@@ -11,14 +11,22 @@ import (
 type fakeCache struct {
 	vouchers []Voucher
 	syncedAt time.Time
+	version  int
 	saved    []Voucher
 	savedTot int
 	saveErr  error
 	loadErr  error
 }
 
-func (f *fakeCache) LoadYear(context.Context, TenantID, int) ([]Voucher, time.Time, error) {
-	return f.vouchers, f.syncedAt, f.loadErr
+func (f *fakeCache) LoadYear(context.Context, TenantID, int) (CachedVouchers, error) {
+	// Defaults to the current version: these tests exercise the count, age and
+	// torn-read rules, and a zero version would make every one of them stale
+	// for the wrong reason.
+	v := f.version
+	if v == 0 {
+		v = VoucherFetchVersion
+	}
+	return CachedVouchers{Vouchers: f.vouchers, SyncedAt: f.syncedAt, FetchVersion: v}, f.loadErr
 }
 
 func (f *fakeCache) SaveYear(_ context.Context, _ TenantID, _ int, v []Voucher, remoteTotal int, _ time.Time) error {

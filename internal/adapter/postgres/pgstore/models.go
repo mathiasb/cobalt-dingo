@@ -63,10 +63,11 @@ type FortnoxVoucherCache struct {
 }
 
 type FortnoxVoucherSync struct {
-	TenantID    string
-	YearID      int32
-	SyncedAt    time.Time
-	RemoteTotal int32
+	TenantID     string
+	YearID       int32
+	SyncedAt     time.Time
+	RemoteTotal  int32
+	FetchVersion int32
 }
 
 type PaymentBatch struct {

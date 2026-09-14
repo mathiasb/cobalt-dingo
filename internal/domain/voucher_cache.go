@@ -28,6 +28,26 @@ const (
 	CacheUnverified CacheFreshness = "unverified"
 )
 
+// VoucherFetchVersion identifies the logic that produced the cached rows.
+//
+// It exists because the completeness check counts vouchers and can say nothing
+// about their CONTENT. On 2026-09-14 the voucher detail fetch was missing its
+// financialyear parameter, so four of 405 vouchers were stored with rows
+// belonging to other vouchers. The count matched — 405 == 405 — so the cache
+// reported itself verified complete and would have served those rows forever.
+// Nothing in a count, a timestamp or a remote total can notice that.
+//
+// So the producing code is part of the cache key in all but name. BUMP THIS
+// whenever the meaning or completeness of a cached row changes: a different
+// endpoint, different parameters, a changed conversion. Forgetting to bump it
+// is silent, which is why it sits next to the states it invalidates rather
+// than in the adapter.
+//
+//	1 — initial: rows from GET /3/vouchers/{series}/{number}, no financial year
+//	2 — detail fetch carries financialyear (v0.53.0); version 1 rows may hold
+//	    rows belonging to a voucher of the same series and number in another year
+const VoucherFetchVersion = 2
+
 // RemoteTotalUnknown marks a completeness check that could not be performed.
 // Zero cannot mean this: zero is a legitimate remote total for an empty year.
 const RemoteTotalUnknown = -1
@@ -54,6 +74,10 @@ type VoucherCacheState struct {
 
 	// SyncedAt is when the cache was last verified complete. Zero means never.
 	SyncedAt time.Time
+
+	// FetchVersion is the VoucherFetchVersion that wrote these rows. Zero
+	// means the rows predate versioning, so their provenance is unknown.
+	FetchVersion int
 }
 
 // Assess reports what may be done with the cache, and why.
@@ -64,6 +88,16 @@ type VoucherCacheState struct {
 func (s VoucherCacheState) Assess(now time.Time, maxAge time.Duration) (CacheFreshness, string) {
 	if s.SyncedAt.IsZero() {
 		return CacheStale, "never synced"
+	}
+
+	// Before anything about counts or age: were these rows produced by the
+	// logic this binary uses? A mismatch means the rows may be wrong in ways
+	// no count can reveal, so it is not an old sync to age out — it is data of
+	// unknown meaning.
+	if s.FetchVersion != VoucherFetchVersion {
+		return CacheStale, fmt.Sprintf(
+			"cached rows were written by fetch version %d, this build uses %d — the count check cannot verify row CONTENT, so these rows must be re-read",
+			s.FetchVersion, VoucherFetchVersion)
 	}
 
 	if s.RemoteTotal == RemoteTotalUnknown {

@@ -28,7 +28,7 @@ func (q *Queries) DeleteCachedYear(ctx context.Context, arg DeleteCachedYearPara
 }
 
 const getVoucherSync = `-- name: GetVoucherSync :one
-SELECT synced_at, remote_total
+SELECT synced_at, remote_total, fetch_version
 FROM fortnox_voucher_sync
 WHERE tenant_id = $1 AND year_id = $2
 `
@@ -39,14 +39,15 @@ type GetVoucherSyncParams struct {
 }
 
 type GetVoucherSyncRow struct {
-	SyncedAt    time.Time
-	RemoteTotal int32
+	SyncedAt     time.Time
+	RemoteTotal  int32
+	FetchVersion int32
 }
 
 func (q *Queries) GetVoucherSync(ctx context.Context, arg GetVoucherSyncParams) (GetVoucherSyncRow, error) {
 	row := q.db.QueryRowContext(ctx, getVoucherSync, arg.TenantID, arg.YearID)
 	var i GetVoucherSyncRow
-	err := row.Scan(&i.SyncedAt, &i.RemoteTotal)
+	err := row.Scan(&i.SyncedAt, &i.RemoteTotal, &i.FetchVersion)
 	return i, err
 }
 
@@ -137,25 +138,32 @@ func (q *Queries) UpsertCachedVoucher(ctx context.Context, arg UpsertCachedVouch
 }
 
 const upsertVoucherSync = `-- name: UpsertVoucherSync :exec
-INSERT INTO fortnox_voucher_sync (tenant_id, year_id, synced_at, remote_total)
-VALUES ($1, $2, $3, $4)
+INSERT INTO fortnox_voucher_sync (tenant_id, year_id, synced_at, remote_total, fetch_version)
+VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT (tenant_id, year_id) DO UPDATE
-SET synced_at = EXCLUDED.synced_at, remote_total = EXCLUDED.remote_total
+SET synced_at     = EXCLUDED.synced_at,
+    remote_total  = EXCLUDED.remote_total,
+    fetch_version = EXCLUDED.fetch_version
 `
 
 type UpsertVoucherSyncParams struct {
-	TenantID    string
-	YearID      int32
-	SyncedAt    time.Time
-	RemoteTotal int32
+	TenantID     string
+	YearID       int32
+	SyncedAt     time.Time
+	RemoteTotal  int32
+	FetchVersion int32
 }
 
+// fetch_version records which code produced the rows. Without it, a change to
+// how rows are read leaves the count identical and every cached row wrong —
+// see domain.VoucherFetchVersion.
 func (q *Queries) UpsertVoucherSync(ctx context.Context, arg UpsertVoucherSyncParams) error {
 	_, err := q.db.ExecContext(ctx, upsertVoucherSync,
 		arg.TenantID,
 		arg.YearID,
 		arg.SyncedAt,
 		arg.RemoteTotal,
+		arg.FetchVersion,
 	)
 	return err
 }

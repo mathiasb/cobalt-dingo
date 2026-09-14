@@ -56,10 +56,11 @@ func NewVoucherService(cache VoucherCache, src VoucherSource, maxAge time.Durati
 // Vouchers returns the year's vouchers, refreshing the cache if its
 // completeness cannot be established.
 func (s *VoucherService) Vouchers(ctx context.Context, tenantID TenantID, yearID int) (VoucherSet, error) {
-	cached, syncedAt, err := s.cache.LoadYear(ctx, tenantID, yearID)
+	stored, err := s.cache.LoadYear(ctx, tenantID, yearID)
 	if err != nil {
 		return VoucherSet{}, fmt.Errorf("read voucher cache: %w", err)
 	}
+	cached, syncedAt := stored.Vouchers, stored.SyncedAt
 
 	remoteTotal := RemoteTotalUnknown
 	if total, terr := s.src.RemoteTotal(ctx, tenantID, yearID); terr == nil {
@@ -71,7 +72,12 @@ func (s *VoucherService) Vouchers(ctx context.Context, tenantID TenantID, yearID
 		return VoucherSet{}, fmt.Errorf("voucher count unavailable and nothing cached: %w", terr)
 	}
 
-	state := VoucherCacheState{CachedCount: len(cached), RemoteTotal: remoteTotal, SyncedAt: syncedAt}
+	state := VoucherCacheState{
+		CachedCount:  len(cached),
+		RemoteTotal:  remoteTotal,
+		SyncedAt:     syncedAt,
+		FetchVersion: stored.FetchVersion,
+	}
 	freshness, reason := state.Assess(s.now(), s.maxAge)
 
 	// All three states handled explicitly. The exhaustive linter objected to

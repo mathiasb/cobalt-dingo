@@ -44,13 +44,13 @@ type cachedRow struct {
 // A missing sync row yields the zero time, which Assess treats as stale
 // however many vouchers are present — a cache with rows and no record of
 // having been verified is exactly what ADR-0006 refuses to serve.
-func (c *VoucherCache) LoadYear(ctx context.Context, tenantID domain.TenantID, yearID int) ([]domain.Voucher, time.Time, error) {
+func (c *VoucherCache) LoadYear(ctx context.Context, tenantID domain.TenantID, yearID int) (domain.CachedVouchers, error) {
 	rows, err := c.s.queries.ListCachedVouchers(ctx, pgstore.ListCachedVouchersParams{
 		TenantID: string(tenantID),
 		YearID:   int32(yearID),
 	})
 	if err != nil {
-		return nil, time.Time{}, fmt.Errorf("list cached vouchers: %w", err)
+		return domain.CachedVouchers{}, fmt.Errorf("list cached vouchers: %w", err)
 	}
 
 	out := make([]domain.Voucher, 0, len(rows))
@@ -60,7 +60,7 @@ func (c *VoucherCache) LoadYear(ctx context.Context, tenantID domain.TenantID, y
 			// Refuse rather than skip. A voucher whose rows will not decode is
 			// a corrupt cache entry, and dropping it returns a short set that
 			// looks complete — the failure this whole design exists to remove.
-			return nil, time.Time{}, fmt.Errorf("decode cached rows for voucher %s/%d: %w", r.Series, r.Number, err)
+			return domain.CachedVouchers{}, fmt.Errorf("decode cached rows for voucher %s/%d: %w", r.Series, r.Number, err)
 		}
 		v := domain.Voucher{
 			Series:          r.Series,
@@ -88,12 +88,18 @@ func (c *VoucherCache) LoadYear(ctx context.Context, tenantID domain.TenantID, y
 		YearID:   int32(yearID),
 	})
 	if errors.Is(err, sql.ErrNoRows) {
-		return out, time.Time{}, nil
+		// No sync row: rows with no record of having been verified. Assess
+		// treats the zero time as stale however many are present.
+		return domain.CachedVouchers{Vouchers: out}, nil
 	}
 	if err != nil {
-		return nil, time.Time{}, fmt.Errorf("get voucher sync: %w", err)
+		return domain.CachedVouchers{}, fmt.Errorf("get voucher sync: %w", err)
 	}
-	return out, sync.SyncedAt, nil
+	return domain.CachedVouchers{
+		Vouchers:     out,
+		SyncedAt:     sync.SyncedAt,
+		FetchVersion: int(sync.FetchVersion),
+	}, nil
 }
 
 // SaveYear implements domain.VoucherCache.
@@ -164,6 +170,11 @@ func (c *VoucherCache) SaveYear(
 		YearID:      int32(yearID),
 		SyncedAt:    syncedAt,
 		RemoteTotal: int32(remoteTotal),
+		// The constant of THIS build, not a parameter. The rows were just
+		// produced by this code, so nothing else can be the right answer, and
+		// an argument here could carry a stale value and defeat the check
+		// silently.
+		FetchVersion: domain.VoucherFetchVersion,
 	}); err != nil {
 		return fmt.Errorf("record voucher sync: %w", err)
 	}

@@ -23,12 +23,17 @@ WHERE tenant_id = $1 AND year_id = $2
 ORDER BY transaction_date, series, number;
 
 -- name: UpsertVoucherSync :exec
-INSERT INTO fortnox_voucher_sync (tenant_id, year_id, synced_at, remote_total)
-VALUES ($1, $2, $3, $4)
+-- fetch_version records which code produced the rows. Without it, a change to
+-- how rows are read leaves the count identical and every cached row wrong —
+-- see domain.VoucherFetchVersion.
+INSERT INTO fortnox_voucher_sync (tenant_id, year_id, synced_at, remote_total, fetch_version)
+VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT (tenant_id, year_id) DO UPDATE
-SET synced_at = EXCLUDED.synced_at, remote_total = EXCLUDED.remote_total;
+SET synced_at     = EXCLUDED.synced_at,
+    remote_total  = EXCLUDED.remote_total,
+    fetch_version = EXCLUDED.fetch_version;
 
 -- name: GetVoucherSync :one
-SELECT synced_at, remote_total
+SELECT synced_at, remote_total, fetch_version
 FROM fortnox_voucher_sync
 WHERE tenant_id = $1 AND year_id = $2;
