@@ -1,7 +1,7 @@
 ---
 adr:           0006
 title:         Cache Fortnox vouchers, and never serve a cached answer whose completeness was not checked
-status:        accepted
+status:        amended
 date:          2026-09-14
 deciders:      Mathias
 supersedes:    null
@@ -129,3 +129,49 @@ as-of date. The same reasoning produced the three-state contract in
 - **Revisit trigger:** `lastmodified` returning an already-cached voucher
   number, which would mean posted vouchers are mutable after all and this ADR's
   first premise is wrong.
+
+## Amendment, 2026-09-14 — the count check says nothing about content
+
+Recorded the same day this ADR was accepted, after the design met production.
+
+The Consequences section above names the right hazard and scopes it too
+narrowly. It says the immutability assumption is the foundation and that the
+symptom to watch for is a *vendor* change — `lastmodified` returning an
+already-cached voucher. It does not consider the other way content can diverge
+while counts agree: **our own reader changing.**
+
+Within an hour of the first production run, two defects were found in how
+voucher rows were read — a missing `financialyear` parameter (v0.53.0), then an
+ignored `Removed` flag (v0.55.0) that double-counted deleted rows and put the
+trial balance SEK 122,881.80 out. Both fixes left the voucher count identical
+at 405, and the sync row still said "verified complete". Every cached row was
+wrong and every check in this ADR passed.
+
+So `@TotalResources` is load-bearing for *completeness* and mute on
+*correctness*. A count, a timestamp and a remote total are cardinality facts;
+none is a claim about what is inside a row.
+
+**Addition:** `domain.VoucherFetchVersion` travels with the cache, and a year
+written by any other version is stale — including a NEWER one, which is a
+rolled-back deployment reading rows a later version wrote. Zero means "written
+before versioning existed", which is why migration 007 defaults to it: the rows
+present at that moment were exactly the suspect ones, so they invalidated
+themselves on the next read. The version check runs before the count and age
+rules, so a mismatch is reported as data of unknown meaning rather than as an
+old sync.
+
+This does not change the decision. It corrects an incomplete account of what
+makes a cached answer valid: the producing code is one of the inputs to the
+cached value, so it belongs in the validity condition.
+
+**Additional revisit trigger:** a `VoucherFetchVersion` bump that someone
+forgets, which is silent by construction. The mitigation is that the constant
+lives next to the states it invalidates rather than in the adapter, and that
+`SaveYear` writes it rather than accepting it as an argument — but neither
+forces the bump. If a third content defect ships without a bump, this needs a
+mechanism rather than a convention.
+
+**What the kill condition got right:** it was not the cache that caught either
+defect. It was the accounting-identity check in the report built on top, which
+had no cache-related purpose at all. Worth generalising — a derived store wants
+an invariant that is independent of the store.
