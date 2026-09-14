@@ -244,8 +244,12 @@ func accountStatus(cfg config.Fortnox, token, acct string) string {
 		}
 	}
 	if len(vouchers) > 0 && withRows == 0 {
-		return fmt.Sprintf("UNKNOWN — %d voucher(s) in the year but none carry rows, so this check cannot see account activity at all",
-			len(vouchers))
+		// Rows are unavailable from the list endpoint, so fall back to the
+		// account's own balances. Brought-forward against carried-forward
+		// answers assumption A1's real question — is anything moving through
+		// this account — without needing one detail request per voucher.
+		return fmt.Sprintf("rows unavailable from the voucher list (%d vouchers, 0 with rows); %s",
+			len(vouchers), accountBalanceLine(gl, ctx, tenant, latest.ID, num))
 	}
 
 	sum := domain.SummariseAccount(vouchers, num)
@@ -394,4 +398,33 @@ func supplierInvoiceCount(baseURL, token, filter string) (int, error) {
 		return 0, err
 	}
 	return envelope.MetaInformation.TotalResources, nil
+}
+
+// accountBalanceLine reports an account's opening and closing balance.
+//
+// The balances come from /3/accounts, which carries BalanceBroughtForward and
+// BalanceCarriedForward per account and needs no voucher rows. A difference
+// between them means money moved through the account during the year, which is
+// what assumption A1 is really asking about; equality means nothing did.
+//
+// Deliberately NOT routed through AccountBalances, which drops any account
+// whose carried-forward balance is zero — the exact case that would need
+// reporting here.
+func accountBalanceLine(gl *adapterfortnox.GeneralLedgerAdapter, ctx context.Context, tenant domain.TenantID, yearID, num int) string {
+	accounts, err := gl.ChartOfAccounts(ctx, tenant, yearID)
+	if err != nil {
+		return "balances unreadable: " + err.Error()
+	}
+	for _, a := range accounts {
+		if a.Number != num {
+			continue
+		}
+		moved := a.BalanceBF.MinorUnits != a.BalanceCF.MinorUnits
+		verdict := "NO movement this year"
+		if moved {
+			verdict = "MOVED during the year"
+		}
+		return fmt.Sprintf("opening %s → closing %s — %s", a.BalanceBF.String(), a.BalanceCF.String(), verdict)
+	}
+	return fmt.Sprintf("account %d is not in the chart of accounts", num)
 }
