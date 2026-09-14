@@ -14,7 +14,13 @@ import (
 	"github.com/mathiasb/cobalt-dingo/internal/integration"
 )
 
-const testKey = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="
+// testKey must LOOK fake. NewCipher only requires >= 32 characters (cipher.go:74),
+// so the value is arbitrary -- but the previous literal was a real
+// `rand -base64 32` output, which gitleaks correctly cannot distinguish from
+// a live key. It fired SecretScanFindings (critical) against this repo for 31
+// hours. Keeping test keys visibly synthetic is what lets a high-entropy
+// string in this repo stay a real signal, rather than being allowlisted away.
+const testKey = "cobalt-dingo-resolve-test-key-not-a-real-secret-0123456789"
 
 type fakeStore struct {
 	rec domain.Integration
