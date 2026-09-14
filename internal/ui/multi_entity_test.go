@@ -157,3 +157,60 @@ func TestCallback_allowlistMatchesTheWholeNameOnly(t *testing.T) {
 		"a longer name that merely starts the same is a different company")
 	assert.Empty(t, store.tokens)
 }
+
+// Observed live 2026-09-14, immediately after the first production connect:
+// the flash said "Successfully connected to PRODUCTION", the Production card
+// said Connected, and "Working with" listed TEST Cobalt Dingo — because the
+// callback set the session's company and left its mode alone.
+//
+// The session then held mode=sandbox with the production company's key. Those
+// two companies share organisation number 556836-0688, so the key resolved to
+// a DIFFERENT COMPANY'S token and the user was reading test books while
+// believing they had just connected production. With any other pair of
+// companies it would instead have resolved to nothing.
+//
+// Connecting a company in a mode is choosing that mode. Leaving them to
+// disagree is how a credential page lies about which books it is showing.
+func TestCallback_makesTheConnectedModeActiveNotJustTheCompany(t *testing.T) {
+	store := newConnectorTokenStore()
+	c := newTestConnector(store)
+	c.tenantRepo = &recordingTenantRepo{}
+
+	stubbedExchangeAndDiscovery(t, domain.Company{Name: "Definitely Mabe AB", OrgNumber: "556836-0688"}, nil)
+	w := httptest.NewRecorder()
+	// The session starts in sandbox — the default, and what a user connecting
+	// production for the first time will always be in.
+	c.callbackHandler(w, requestWithSession("GET", "/fortnox/callback?code=abc&state=test-oauth-nonce:production", "user-1"))
+	require.Equal(t, http.StatusSeeOther, w.Code, "body: %s", w.Body.String())
+
+	sessions := auth.NewSessionManager("test-secret-that-is-long-enough")
+	got := sessionFromSetCookie(t, sessions, w)
+
+	assert.Equal(t, config.ModeProduction, got.Mode,
+		"connecting in production mode must make production the active mode")
+	assert.Equal(t, "5568360688", got.Company)
+
+	// The pair must resolve to the tenant that was just connected.
+	tid, err := got.TenantID()
+	require.NoError(t, err)
+	assert.Equal(t, auth.TenantKey("user-1", config.ModeProduction, "5568360688"), tid)
+}
+
+// sessionFromSetCookie reads back the session the handler wrote, by replaying
+// the Set-Cookie header into a request — so the assertion is about what the
+// browser will actually send next, not about internal state.
+func sessionFromSetCookie(t *testing.T, sessions *auth.SessionManager, w *httptest.ResponseRecorder) auth.Session {
+	t.Helper()
+	res := w.Result()
+	defer func() { _ = res.Body.Close() }()
+
+	next := httptest.NewRequest("GET", "/", nil)
+	for _, ck := range res.Cookies() {
+		next.AddCookie(ck)
+	}
+	sess := sessions.Get(next)
+	if sess == nil {
+		t.Fatal("no valid session cookie was set")
+	}
+	return *sess
+}

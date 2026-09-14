@@ -369,9 +369,19 @@ func (c *FortnoxConnector) callbackHandler(w http.ResponseWriter, r *http.Reques
 	// Consume the nonce so a replayed callback fails, and make the
 	// just-connected company the active one — connecting it is what starting
 	// to work with it means.
+	//
+	// The MODE moves too. Setting only the company left the session holding
+	// one mode and another mode's company, and the pair is what derives the
+	// tenant key: the user connected production and the key resolved under
+	// sandbox. Observed live on 2026-09-14, where both companies happened to
+	// share organisation number 556836-0688, so it silently resolved to the
+	// TEST company's token — reading test books while the page said production
+	// was connected. With any other pair it would have resolved to no token at
+	// all, showing "not connected" immediately after a successful connect.
 	updated := *sess
 	updated.FortnoxNonce = ""
 	updated.FortnoxNonceAt = time.Time{}
+	updated.Mode = mode
 	updated.Company = companyKey
 	if err := c.sessions.Set(w, updated); err != nil {
 		c.log.Error("persist session after connect", "tenant", tenantID, "err", err)
