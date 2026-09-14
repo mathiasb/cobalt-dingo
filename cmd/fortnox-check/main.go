@@ -219,11 +219,23 @@ func accountStatus(cfg config.Fortnox, token, acct string) string {
 		return "vouchers unreadable: " + err.Error()
 	}
 	sum := domain.SummariseAccount(vouchers, num)
+
+	// The total matters as much as the account's own count. An empty account
+	// in a year with hundreds of vouchers means nothing feeds THIS account; an
+	// empty account in a year with no vouchers at all means the books simply
+	// have not been written up yet. Those need opposite responses, and
+	// reporting only the account's count cannot tell them apart — which is
+	// exactly the ambiguity the first run of this check produced.
 	if sum.Count == 0 {
-		return fmt.Sprintf("NO activity in %s–%s — nothing is feeding this account",
-			latest.From.Format("2006-01-02"), latest.To.Format("2006-01-02"))
+		if len(vouchers) == 0 {
+			return fmt.Sprintf("no vouchers AT ALL in %s–%s — the year is unbooked, so this says nothing about the account",
+				latest.From.Format("2006-01-02"), latest.To.Format("2006-01-02"))
+		}
+		return fmt.Sprintf("NO activity, though the year holds %d voucher(s) — nothing feeds this account",
+			len(vouchers))
 	}
-	return fmt.Sprintf("%d voucher(s), %s → %s", sum.Count, sum.Earliest, sum.Latest)
+	return fmt.Sprintf("%d of %d voucher(s) in the year, %s → %s",
+		sum.Count, len(vouchers), sum.Earliest, sum.Latest)
 }
 
 // staticTokenStore serves one already-loaded token. The ledger adapters take a
