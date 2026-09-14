@@ -2,7 +2,6 @@ package fortnox
 
 import (
 	"encoding/json"
-	"fmt"
 )
 
 // CostCenterRow is a single cost center from the Fortnox API.
@@ -20,13 +19,8 @@ type CostCentersResponse struct {
 // ListCostCenters returns all cost centers.
 // Calls GET /3/costcenters.
 func (c *Client) ListCostCenters() ([]CostCenterRow, error) {
-	body, err := c.Get(c.baseURL + "/3/costcenters")
-	if err != nil {
-		return nil, fmt.Errorf("list cost centers: %w", err)
-	}
-	var envelope CostCentersResponse
-	if err := json.Unmarshal(body, &envelope); err != nil {
-		return nil, fmt.Errorf("decode cost centers: %w", err)
-	}
-	return envelope.CostCenters, nil
+	return listAll(c, c.baseURL+"/3/costcenters", "cost centers",
+		func(raw json.RawMessage) ([]CostCenterRow, error) {
+			return decodeInto(raw, func(e CostCentersResponse) []CostCenterRow { return e.CostCenters })
+		})
 }

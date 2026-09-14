@@ -31,16 +31,10 @@ type AssetDetailResponse struct {
 // ListAssets fetches all fixed assets from the asset register.
 // Calls GET /3/assets.
 func (c *Client) ListAssets() ([]AssetRow, error) {
-	u := c.baseURL + "/3/assets"
-	raw, err := c.Get(u)
-	if err != nil {
-		return nil, fmt.Errorf("list assets: %w", err)
-	}
-	var envelope AssetsResponse
-	if err := json.Unmarshal(raw, &envelope); err != nil {
-		return nil, fmt.Errorf("decode assets: %w", err)
-	}
-	return envelope.Assets, nil
+	return listAll(c, c.baseURL+"/3/assets", "assets",
+		func(raw json.RawMessage) ([]AssetRow, error) {
+			return decodeInto(raw, func(e AssetsResponse) []AssetRow { return e.Assets })
+		})
 }
 
 // GetAsset fetches a single fixed asset by ID.
