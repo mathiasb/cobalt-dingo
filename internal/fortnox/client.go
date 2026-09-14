@@ -433,16 +433,22 @@ type accountsResponse struct {
 // ListAccounts fetches the chart of accounts for a financial year.
 // Calls GET /3/accounts?financialyear={yearID}.
 func (c *Client) ListAccounts(yearID int) ([]AccountRow, error) {
-	u := fmt.Sprintf("%s/3/accounts?financialyear=%d", c.baseURL, yearID)
-	raw, err := c.Get(u)
+	// Every page. A BAS chart of accounts runs to several hundred entries, and
+	// reading the first page reported account 1930 as "not in the chart of
+	// accounts" for the company whose bank account it is (2026-09-14).
+	pages, err := c.GetAllPages(fmt.Sprintf("%s/3/accounts?financialyear=%d", c.baseURL, yearID))
 	if err != nil {
 		return nil, fmt.Errorf("list accounts: %w", err)
 	}
-	var envelope accountsResponse
-	if err := json.Unmarshal(raw, &envelope); err != nil {
-		return nil, fmt.Errorf("decode accounts: %w", err)
+	var out []AccountRow
+	for i, raw := range pages {
+		var envelope accountsResponse
+		if err := json.Unmarshal(raw, &envelope); err != nil {
+			return nil, fmt.Errorf("decode accounts page %d: %w", i+1, err)
+		}
+		out = append(out, envelope.Accounts...)
 	}
-	return envelope.Accounts, nil
+	return out, nil
 }
 
 // FinancialYearRow is the Fortnox JSON for a financial year from GET /3/financialyears.

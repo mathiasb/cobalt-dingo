@@ -80,3 +80,46 @@ func TestListVouchers_missingMetadataIsOnePage(t *testing.T) {
 	assert.Len(t, got, 1)
 	assert.Equal(t, 1, calls, "no metadata must not mean keep going")
 }
+
+// Same defect, found the same way: account 1930 reported "not in the chart of
+// accounts" for the company whose bank account it is. A BAS chart runs to
+// several hundred accounts and ListAccounts read the first page.
+//
+// This is the second endpoint to produce a confident wrong answer from a
+// truncated list in one session, which is why the audit of the rest is filed
+// rather than left to be discovered one probe at a time.
+func TestListAccounts_followsEveryPage(t *testing.T) {
+	var pages []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		page := r.URL.Query().Get("page")
+		if page == "" {
+			page = "1"
+		}
+		pages = append(pages, page)
+		// Page 1 holds 1010; the account we care about is on page 2.
+		body := `{"MetaInformation":{"@CurrentPage":1,"@TotalPages":2,"@TotalResources":2},
+		  "Accounts":[{"Number":1010,"Description":"Utvecklingsutgifter","Active":true}]}`
+		if page == "2" {
+			body = `{"MetaInformation":{"@CurrentPage":2,"@TotalPages":2,"@TotalResources":2},
+			  "Accounts":[{"Number":1930,"Description":"Företagskonto","Active":true,
+			               "BalanceBroughtForward":1000.5,"BalanceCarriedForward":2500.75}]}`
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(body))
+	}))
+	defer srv.Close()
+
+	got, err := NewClient(srv.URL, "tok", true).ListAccounts(3)
+	require.NoError(t, err)
+	require.Len(t, got, 2, "an account on page two must still be found")
+
+	var found bool
+	for _, a := range got {
+		if int(a.Number) == 1930 {
+			found = true
+			assert.InDelta(t, 2500.75, a.BalanceCarriedForward, 0.001)
+		}
+	}
+	assert.True(t, found, "1930 was on page 2 and must be returned")
+	assert.Equal(t, []string{"1", "2"}, pages)
+}
