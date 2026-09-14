@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -43,10 +44,36 @@ func TestCostCenterLedger_CostCenters(t *testing.T) {
 }
 
 func TestCostCenterLedger_CostCenterTransactions(t *testing.T) {
+	ccVouchers := []map[string]any{
+		{
+			"VoucherSeries":   "A",
+			"VoucherNumber":   1,
+			"Description":     "Invoice",
+			"TransactionDate": "2025-03-15",
+			"Year":            1,
+			"VoucherRows": []map[string]any{
+				{"Account": 4010, "Debit": 1000.0, "Credit": 0.0, "CostCenter": "100", "Project": ""},
+				{"Account": 2440, "Debit": 0.0, "Credit": 1000.0, "CostCenter": "200", "Project": ""},
+			},
+		},
+		{
+			"VoucherSeries":   "B",
+			"VoucherNumber":   2,
+			"Description":     "Other",
+			"TransactionDate": "2025-06-01",
+			"Year":            1,
+			"VoucherRows": []map[string]any{
+				{"Account": 5010, "Debit": 500.0, "Credit": 0.0, "CostCenter": "100", "Project": ""},
+			},
+		},
+	}
 	// The adapter calls FinancialYears first, then Vouchers for the matching year.
 	// We serve all three endpoints from a single mux.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		if serveVoucherDetail(w, r.URL.Path, ccVouchers) {
+			return
+		}
 		switch r.URL.Path {
 		case "/3/financialyears":
 			_ = json.NewEncoder(w).Encode(map[string]any{
@@ -56,31 +83,7 @@ func TestCostCenterLedger_CostCenterTransactions(t *testing.T) {
 			})
 		case "/3/vouchers":
 			assert.Equal(t, "1", r.URL.Query().Get("financialyear"))
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"Vouchers": []map[string]any{
-					{
-						"VoucherSeries":   "A",
-						"VoucherNumber":   1,
-						"Description":     "Invoice",
-						"TransactionDate": "2025-03-15",
-						"Year":            1,
-						"VoucherRows": []map[string]any{
-							{"Account": 4010, "Debit": 1000.0, "Credit": 0.0, "CostCenter": "100", "Project": ""},
-							{"Account": 2440, "Debit": 0.0, "Credit": 1000.0, "CostCenter": "200", "Project": ""},
-						},
-					},
-					{
-						"VoucherSeries":   "B",
-						"VoucherNumber":   2,
-						"Description":     "Other",
-						"TransactionDate": "2025-06-01",
-						"Year":            1,
-						"VoucherRows": []map[string]any{
-							{"Account": 5010, "Debit": 500.0, "Credit": 0.0, "CostCenter": "100", "Project": ""},
-						},
-					},
-				},
-			})
+			_ = json.NewEncoder(w).Encode(map[string]any{"Vouchers": ccVouchers})
 		default:
 			w.WriteHeader(http.StatusNotFound)
 			_, _ = fmt.Fprintf(w, `{"error": "not found: %s"}`, r.URL.Path)
@@ -102,4 +105,28 @@ func TestCostCenterLedger_CostCenterTransactions(t *testing.T) {
 	assert.Equal(t, "100", rows[0].CostCenter)
 	assert.Equal(t, 5010, rows[1].Account)
 	assert.Equal(t, "100", rows[1].CostCenter)
+}
+
+// serveVoucherDetail answers GET /3/vouchers/{series}/{number} from the same
+// fixture the list uses.
+//
+// Fortnox returns VoucherRows ONLY from the detail endpoint (#89); the list
+// declares them and leaves them empty. These fixtures kept rows in the list,
+// which made them self-consistent and wrong in the same direction as the code —
+// so the tests passed while production returned nothing.
+func serveVoucherDetail(w http.ResponseWriter, path string, vouchers []map[string]any) bool {
+	if !strings.HasPrefix(path, "/3/vouchers/") {
+		return false
+	}
+	parts := strings.Split(strings.TrimPrefix(path, "/3/vouchers/"), "/")
+	if len(parts) != 2 {
+		return false
+	}
+	for _, v := range vouchers {
+		if v["VoucherSeries"] == parts[0] && fmt.Sprint(v["VoucherNumber"]) == parts[1] {
+			_ = json.NewEncoder(w).Encode(map[string]any{"Voucher": v})
+			return true
+		}
+	}
+	return false
 }

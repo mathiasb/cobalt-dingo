@@ -45,11 +45,41 @@ func TestProjectLedger_Projects(t *testing.T) {
 }
 
 func TestProjectLedger_ProjectTransactions(t *testing.T) {
+	plVouchers := []map[string]any{
+		{
+			"VoucherSeries":   "A",
+			"VoucherNumber":   1,
+			"Description":     "Project costs",
+			"TransactionDate": "2025-03-15",
+			"Year":            1,
+			"VoucherRows": []map[string]any{
+				{
+					"Account":                1930,
+					"Debit":                  0.0,
+					"Credit":                 5000.0,
+					"TransactionInformation": "Payment",
+					"CostCenter":             "",
+					"Project":                "P001",
+				},
+				{
+					"Account":                5400,
+					"Debit":                  5000.0,
+					"Credit":                 0.0,
+					"TransactionInformation": "Other cost",
+					"CostCenter":             "",
+					"Project":                "P002",
+				},
+			},
+		},
+	}
 	// Stub server handles both /3/financialyears and /3/vouchers
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "Bearer test-access-token", r.Header.Get("Authorization"))
 		w.Header().Set("Content-Type", "application/json")
 
+		if serveVoucherDetail(w, r.URL.Path, plVouchers) {
+			return
+		}
 		switch r.URL.Path {
 		case "/3/financialyears":
 			_ = json.NewEncoder(w).Encode(map[string]any{
@@ -62,35 +92,7 @@ func TestProjectLedger_ProjectTransactions(t *testing.T) {
 				},
 			})
 		case "/3/vouchers":
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"Vouchers": []map[string]any{
-					{
-						"VoucherSeries":   "A",
-						"VoucherNumber":   1,
-						"Description":     "Project costs",
-						"TransactionDate": "2025-03-15",
-						"Year":            1,
-						"VoucherRows": []map[string]any{
-							{
-								"Account":                1930,
-								"Debit":                  0.0,
-								"Credit":                 5000.0,
-								"TransactionInformation": "Payment",
-								"CostCenter":             "",
-								"Project":                "P001",
-							},
-							{
-								"Account":                5400,
-								"Debit":                  5000.0,
-								"Credit":                 0.0,
-								"TransactionInformation": "Other cost",
-								"CostCenter":             "",
-								"Project":                "P002",
-							},
-						},
-					},
-				},
-			})
+			_ = json.NewEncoder(w).Encode(map[string]any{"Vouchers": plVouchers})
 		default:
 			http.NotFound(w, r)
 		}
