@@ -1,21 +1,38 @@
 // Command fortnox-check verifies the Fortnox API connection and confirms
 // the environment (sandbox vs production) by listing unpaid supplier invoices.
 //
+// Read-only throughout: every client it builds passes readOnly=true, so the
+// write gate in Client.do refuses any non-GET before it reaches the network.
+//
+// Token source. With DATABASE_URL set it reads the stored token for the
+// configured mode — which is the only way to check a connection that was made
+// through the web UI, since that token never touches a file. Without it, the
+// local token file is used, which is the original CLI path.
+//
 // Usage:
 //
-//	source .env && go run ./cmd/fortnox-check
+//	source .env && go run ./cmd/fortnox-check          # local token file
+//	DATABASE_URL=... FORTNOX_INTEGRATION_KEY=... \
+//	  FORTNOX_MODE=production go run ./cmd/fortnox-check
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 
+	adapterfortnox "github.com/mathiasb/cobalt-dingo/internal/adapter/fortnox"
+	"github.com/mathiasb/cobalt-dingo/internal/adapter/postgres"
 	"github.com/mathiasb/cobalt-dingo/internal/config"
+	"github.com/mathiasb/cobalt-dingo/internal/crypto"
+	"github.com/mathiasb/cobalt-dingo/internal/domain"
 	"github.com/mathiasb/cobalt-dingo/internal/fortnox"
 )
 
@@ -47,6 +64,9 @@ func main() {
 	fmt.Printf("  Writes allowed       : %v\n", cfg.AllowsWrites)
 	fmt.Printf("  Unpaid invoices      : %d\n", count)
 	fmt.Printf("  Inbox (Arkivplats)   : %s\n", inboxStatus(cfg.BaseURL(), token.AccessToken, cfg.InvoiceInbox))
+	if acct := os.Getenv("FORTNOX_CHECK_ACCOUNT"); acct != "" {
+		fmt.Printf("  Account %-13s: %s\n", acct, accountStatus(cfg, token.AccessToken, acct))
+	}
 	fmt.Println("─────────────────────────────────────")
 
 	switch cfg.Mode {
@@ -62,6 +82,17 @@ func main() {
 }
 
 func loadValidToken(cfg config.Fortnox, log *slog.Logger) (fortnox.Token, error) {
+	// A connection made through the web UI stores its token in postgres and
+	// never writes a file, so the file path cannot check the deployed state at
+	// all. When a database is configured, that is the authoritative source.
+	if dsn := os.Getenv("DATABASE_URL"); dsn != "" {
+		t, err := tokenFromPostgres(dsn, cfg, log)
+		if err != nil {
+			return fortnox.Token{}, err
+		}
+		return t, nil
+	}
+
 	tokenPath := cfg.Mode.TokenFile()
 	t, err := fortnox.LoadToken(tokenPath)
 	if err != nil {
@@ -149,4 +180,114 @@ func inboxStatus(baseURL, token, configured string) string {
 		}
 	}
 	return fmt.Sprintf("reachable, %d file(s), address %s", files, match)
+}
+
+// accountStatus answers assumption A1: is anything still arriving in a GL
+// account? Reported as a count and a date span, which is what can be compared
+// against the bank's own record — no Fortnox endpoint exposes the bank side, so
+// the comparison is always against a human looking at their internet bank.
+//
+// Scoped to the latest financial year. A year boundary would otherwise make an
+// active account look dormant every January.
+func accountStatus(cfg config.Fortnox, token, acct string) string {
+	num, err := strconv.Atoi(strings.TrimSpace(acct))
+	if err != nil {
+		return fmt.Sprintf("not a number: %q", acct)
+	}
+
+	tenant := domain.TenantID("check")
+	store := staticTokenStore{token: domain.OAuthToken{AccessToken: token, ExpiresAt: time.Now().Add(time.Hour)}}
+	gl := adapterfortnox.NewGeneralLedgerAdapter(cfg.BaseURL(), store, true)
+
+	ctx := context.Background()
+	years, err := gl.FinancialYears(ctx, tenant)
+	if err != nil {
+		return "financial years unreadable: " + err.Error()
+	}
+	if len(years) == 0 {
+		return "no financial years in Fortnox"
+	}
+	latest := years[0]
+	for _, y := range years {
+		if y.From.After(latest.From) {
+			latest = y
+		}
+	}
+
+	vouchers, err := gl.Vouchers(ctx, tenant, latest.ID, latest.From, latest.To)
+	if err != nil {
+		return "vouchers unreadable: " + err.Error()
+	}
+	sum := domain.SummariseAccount(vouchers, num)
+	if sum.Count == 0 {
+		return fmt.Sprintf("NO activity in %s–%s — nothing is feeding this account",
+			latest.From.Format("2006-01-02"), latest.To.Format("2006-01-02"))
+	}
+	return fmt.Sprintf("%d voucher(s), %s → %s", sum.Count, sum.Earliest, sum.Latest)
+}
+
+// staticTokenStore serves one already-loaded token. The ledger adapters take a
+// TokenStore because the server has many tenants; this command has one token
+// and no reason to reach for the database twice.
+type staticTokenStore struct{ token domain.OAuthToken }
+
+func (s staticTokenStore) Load(context.Context, domain.TenantID) (domain.OAuthToken, error) {
+	return s.token, nil
+}
+
+func (s staticTokenStore) Save(context.Context, domain.TenantID, domain.OAuthToken) error {
+	return errors.New("fortnox-check never writes tokens")
+}
+
+func (s staticTokenStore) AtomicRefresh(context.Context, domain.TenantID, domain.OAuthToken, domain.OAuthToken) error {
+	return errors.New("fortnox-check never writes tokens")
+}
+
+func (s staticTokenStore) Delete(context.Context, domain.TenantID) error {
+	return errors.New("fortnox-check never writes tokens")
+}
+
+// tokenFromPostgres reads the stored token for the configured mode.
+//
+// Refreshing is deliberately left to the server. This command is a read-only
+// check, and a CLI that refreshed would consume the rotating refresh token out
+// from under the running pod — Fortnox rotates it on every use, so two writers
+// is how a live connection dies (#37).
+func tokenFromPostgres(dsn string, cfg config.Fortnox, log *slog.Logger) (fortnox.Token, error) {
+	raw := os.Getenv("FORTNOX_INTEGRATION_KEY")
+	if raw == "" {
+		return fortnox.Token{}, errors.New("DATABASE_URL is set but FORTNOX_INTEGRATION_KEY is not: stored tokens are encrypted at rest and cannot be read without it")
+	}
+	cipher, err := crypto.NewCipher(raw)
+	if err != nil {
+		return fortnox.Token{}, fmt.Errorf("FORTNOX_INTEGRATION_KEY unusable: %w", err)
+	}
+	store, err := postgres.NewStore(dsn)
+	if err != nil {
+		return fortnox.Token{}, fmt.Errorf("connect to postgres: %w", err)
+	}
+	defer func() { _ = store.Close() }()
+
+	tenants, err := postgres.NewTenantRepo(store).ListByPrefix(context.Background(), "")
+	if err != nil {
+		return fortnox.Token{}, fmt.Errorf("list tenants: %w", err)
+	}
+
+	tokens := postgres.NewTokenStore(store, cipher)
+	suffix := ":" + string(cfg.Mode) + ":"
+	for _, t := range tenants {
+		if !strings.Contains(string(t.ID), suffix) {
+			continue
+		}
+		tok, err := tokens.Load(context.Background(), t.ID)
+		if err != nil {
+			continue
+		}
+		// Named, so the operator can see WHICH company was checked. Getting
+		// this wrong silently is the whole hazard with two companies sharing an
+		// organisation number.
+		log.Info("using stored token", "tenant", t.ID, "company", t.Name)
+		return fortnox.Token{AccessToken: tok.AccessToken, RefreshToken: tok.RefreshToken, ExpiresAt: tok.ExpiresAt}, nil
+	}
+	return fortnox.Token{}, fmt.Errorf("no stored token for mode %s — connect the company in the web UI first", cfg.Mode)
 }
