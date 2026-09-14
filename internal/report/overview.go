@@ -97,6 +97,18 @@ func Render(ov domain.FinancialOverview) string {
 	fmt.Fprintf(&b, "    overdue 31-90 d          %20s\n", ov.PayablesOverdue31to90.String())
 	fmt.Fprintf(&b, "    overdue 90+ d            %20s\n", ov.PayablesOverdue90Plus.String())
 
+	if len(ov.UnbookedSupplier) > 0 || len(ov.UnbookedCustomer) > 0 {
+		b.WriteString("\nUNBOOKED INVOICES (not in any ledger balance above)\n")
+		for _, inv := range ov.UnbookedSupplier {
+			fmt.Fprintf(&b, "  payable  #%-8d %-28s %16s  due %s  ref %s\n",
+				inv.InvoiceNumber, truncate(inv.SupplierName, 28), inv.Balance.String(), inv.DueDate, inv.SupplierReference)
+		}
+		for _, inv := range ov.UnbookedCustomer {
+			fmt.Fprintf(&b, "  receivable #%-6d %-28s %16s  due %s\n",
+				inv.InvoiceNumber, truncate(inv.CustomerName, 28), inv.Balance.String(), inv.DueDate)
+		}
+	}
+
 	if len(ov.Obligations.Supplier) > 0 || len(ov.Obligations.Customer) > 0 {
 		b.WriteString("\nINVOICES BY STATUS (counts, from Fortnox's own totals)\n")
 		renderStates(&b, "supplier", ov.Obligations.Supplier)

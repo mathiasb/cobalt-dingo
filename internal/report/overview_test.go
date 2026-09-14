@@ -203,3 +203,33 @@ func TestRender_statusTableIsOneLinePerFilter(t *testing.T) {
 	}
 	assert.Equal(t, 2, lines)
 }
+
+// A count is a finding; an invoice is actionable. #91 resolved to one unbooked
+// supplier and one unbooked customer invoice, and the next question was
+// immediately "which, for how much, due when".
+func TestRender_namesTheUnbookedInvoices(t *testing.T) {
+	ov := overview()
+	ov.UnbookedSupplier = []domain.SupplierInvoice{{
+		InvoiceNumber: 9001, SupplierName: "Lev AB", SupplierReference: "LEV-77",
+		Balance: sek(12500.50), DueDate: "2026-09-30",
+	}}
+	ov.UnbookedCustomer = []domain.CustomerInvoice{{
+		InvoiceNumber: 31, CustomerName: "Kund AB", Balance: sek(18750), DueDate: "2026-10-15",
+	}}
+
+	out := report.Render(ov)
+	assert.Contains(t, out, "UNBOOKED INVOICES")
+	assert.Contains(t, out, "9001")
+	assert.Contains(t, out, "Lev AB")
+	assert.Contains(t, out, "12,500.50")
+	assert.Contains(t, out, "2026-09-30")
+	assert.Contains(t, out, "LEV-77", "the supplier's own reference is what they will quote")
+	assert.Contains(t, out, "Kund AB")
+	assert.Contains(t, out, "18,750.00")
+}
+
+// The section must not appear when there is nothing unbooked — an empty
+// heading reads like a failed measurement.
+func TestRender_noUnbookedSectionWhenThereAreNone(t *testing.T) {
+	assert.NotContains(t, report.Render(overview()), "UNBOOKED INVOICES")
+}

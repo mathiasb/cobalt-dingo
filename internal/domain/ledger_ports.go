@@ -15,6 +15,12 @@ type SupplierLedger interface {
 	// StateCounts returns the invoice count under every documented status
 	// filter, so a zero elsewhere can be told apart from an unmeasured one.
 	StateCounts(ctx context.Context, tenantID TenantID) ([]InvoiceStateCount, error)
+
+	// UnbookedInvoices returns invoices registered but not booked. They are
+	// obligations that appear in neither the unpaid view nor the general
+	// ledger, so a count of them is not enough — the report has to be able to
+	// name them (#91).
+	UnbookedInvoices(ctx context.Context, tenantID TenantID) ([]SupplierInvoice, error)
 	InvoicePayments(ctx context.Context, tenantID TenantID, invoiceNumber int) ([]SupplierPayment, error)
 	SupplierDetail(ctx context.Context, tenantID TenantID, supplierNumber int) (Supplier, error)
 }
@@ -26,6 +32,10 @@ type CustomerLedger interface {
 	// StateCounts returns the invoice count under every documented status
 	// filter — see SupplierLedger.StateCounts.
 	StateCounts(ctx context.Context, tenantID TenantID) ([]InvoiceStateCount, error)
+
+	// UnbookedInvoices returns invoices registered but not booked — money owed
+	// TO the company that no ledger balance reflects.
+	UnbookedInvoices(ctx context.Context, tenantID TenantID) ([]CustomerInvoice, error)
 	InvoicePayments(ctx context.Context, tenantID TenantID, invoiceNumber int) ([]CustomerPayment, error)
 	CustomerDetail(ctx context.Context, tenantID TenantID, customerNumber int) (Customer, error)
 }

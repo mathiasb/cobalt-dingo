@@ -196,6 +196,17 @@ func run(log *slog.Logger) error {
 		return fmt.Errorf("build overview: %w", err)
 	}
 	ov.Obligations = domain.InvoiceStates{Supplier: supplierStates, Customer: customerStates}
+
+	// Fetch the unbooked invoices whenever the counts say there are any. A
+	// count is a finding; the invoices are what someone can act on (#91).
+	if verdict, _ := ov.Obligations.Assess(); verdict != domain.ObligationsNone {
+		if ov.UnbookedSupplier, err = supplierLdg.UnbookedInvoices(ctx, tenant.ID); err != nil {
+			return fmt.Errorf("unbooked supplier invoices: %w", err)
+		}
+		if ov.UnbookedCustomer, err = customerLdg.UnbookedInvoices(ctx, tenant.ID); err != nil {
+			return fmt.Errorf("unbooked customer invoices: %w", err)
+		}
+	}
 	fmt.Print(report.Render(ov.WithAgeing(time.Now())))
 
 	// Exit non-zero when the books do not balance. A report nobody reads is

@@ -84,6 +84,12 @@ type FinancialOverview struct {
 	// two verify each other.
 	Obligations InvoiceStates
 
+	// UnbookedSupplier and UnbookedCustomer are the unbooked invoices
+	// themselves. A count tells you there is a problem; only the invoices tell
+	// you what to do about it (#91).
+	UnbookedSupplier []SupplierInvoice
+	UnbookedCustomer []CustomerInvoice
+
 	ReceivablesNotYetDue     Money
 	ReceivablesOverdue0to30  Money
 	ReceivablesOverdue31to90 Money

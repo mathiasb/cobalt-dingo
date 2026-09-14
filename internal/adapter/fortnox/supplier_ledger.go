@@ -114,3 +114,16 @@ func (a *SupplierLedgerAdapter) StateCounts(ctx context.Context, tenantID domain
 	}
 	return out, nil
 }
+
+// UnbookedInvoices implements domain.SupplierLedger.
+func (a *SupplierLedgerAdapter) UnbookedInvoices(ctx context.Context, tenantID domain.TenantID) ([]domain.SupplierInvoice, error) {
+	c, err := a.client(ctx, tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("supplier ledger unbooked invoices: %w", err)
+	}
+	invoices, err := c.UnbookedSupplierInvoices()
+	if err != nil {
+		return nil, fmt.Errorf("supplier ledger unbooked invoices: %w", err)
+	}
+	return invoices, nil
+}

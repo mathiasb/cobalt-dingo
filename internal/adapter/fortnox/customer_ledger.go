@@ -45,7 +45,25 @@ func (a *CustomerLedgerAdapter) UnpaidInvoices(ctx context.Context, tenantID dom
 	if err != nil {
 		return nil, fmt.Errorf("customer ledger: %w", err)
 	}
+	return convertCustomerInvoices(rows)
+}
 
+// UnbookedInvoices implements domain.CustomerLedger.
+func (a *CustomerLedgerAdapter) UnbookedInvoices(ctx context.Context, tenantID domain.TenantID) ([]domain.CustomerInvoice, error) {
+	c, err := a.client(ctx, tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("customer ledger unbooked invoices: %w", err)
+	}
+	rows, err := c.UnbookedCustomerInvoices()
+	if err != nil {
+		return nil, fmt.Errorf("customer ledger unbooked invoices: %w", err)
+	}
+	return convertCustomerInvoices(rows)
+}
+
+// convertCustomerInvoices is shared by every filter, so a conversion fix
+// cannot land in one caller and not the other.
+func convertCustomerInvoices(rows []rawfortnox.CustomerInvoiceRow) ([]domain.CustomerInvoice, error) {
 	invoices := make([]domain.CustomerInvoice, len(rows))
 	for i, row := range rows {
 		customerNum, err := strconv.Atoi(row.CustomerNumber)
