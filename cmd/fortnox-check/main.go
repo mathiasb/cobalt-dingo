@@ -70,6 +70,13 @@ func main() {
 	// discriminator available: a company that has traded for years has several,
 	// a freshly created one has one.
 	fmt.Printf("  Financial years      : %s\n", financialYearSummary(cfg, token.AccessToken))
+	// Counted across every documented filter, because "unpaid" has a specific
+	// meaning in Fortnox: an invoice must be bookkept before it is a liability.
+	// Invoices sitting unbooked or awaiting approval do not appear under
+	// `unpaid`, so a zero there is not evidence that there are no invoices —
+	// it is evidence about one state, and reporting it alone asks the wrong
+	// question.
+	fmt.Printf("  Supplier invoices    : %s\n", supplierInvoiceStates(cfg.BaseURL(), token.AccessToken))
 	if acct := os.Getenv("FORTNOX_CHECK_ACCOUNT"); acct != "" {
 		fmt.Printf("  Account %-13s: %s\n", acct, accountStatus(cfg, token.AccessToken, acct))
 	}
@@ -331,4 +338,43 @@ func financialYearSummary(cfg config.Fortnox, token string) string {
 		parts = append(parts, fmt.Sprintf("id=%d %s→%s", y.ID, y.From.Format("2006-01-02"), y.To.Format("2006-01-02")))
 	}
 	return fmt.Sprintf("%d: %s", len(years), strings.Join(parts, ", "))
+}
+
+// supplierInvoiceStates reports the count under each documented filter value.
+//
+// The enum comes from the vendored OpenAPI spec rather than from guessing:
+// cancelled, fullypaid, unpaid, unpaidoverdue, unbooked, pendingpayment,
+// authorizepending.
+func supplierInvoiceStates(baseURL, token string) string {
+	filters := []string{"unpaid", "unpaidoverdue", "unbooked", "authorizepending", "pendingpayment", "fullypaid"}
+	parts := make([]string, 0, len(filters))
+	for _, f := range filters {
+		n, err := supplierInvoiceCount(baseURL, token, f)
+		if err != nil {
+			parts = append(parts, fmt.Sprintf("%s=ERR(%v)", f, err))
+			continue
+		}
+		parts = append(parts, fmt.Sprintf("%s=%d", f, n))
+	}
+	return strings.Join(parts, " ")
+}
+
+// supplierInvoiceCount reads @TotalResources for one filter, which is the
+// total across pages rather than the length of page one — the distinction that
+// makes this a count and not a sample.
+func supplierInvoiceCount(baseURL, token, filter string) (int, error) {
+	c := fortnox.NewClient(baseURL, token, true)
+	raw, err := c.Get(fmt.Sprintf("%s/3/supplierinvoices?filter=%s", baseURL, filter))
+	if err != nil {
+		return 0, err
+	}
+	var envelope struct {
+		MetaInformation struct {
+			TotalResources int `json:"@TotalResources"`
+		} `json:"MetaInformation"`
+	}
+	if err := json.Unmarshal(raw, &envelope); err != nil {
+		return 0, err
+	}
+	return envelope.MetaInformation.TotalResources, nil
 }
