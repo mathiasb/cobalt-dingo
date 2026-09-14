@@ -140,3 +140,44 @@ func (c *Client) ListPredefinedAccounts() ([]PredefinedAccountRow, error) {
 	}
 	return envelope.PreDefinedAccounts, nil
 }
+
+// voucherTotalEnvelope reads only the count from a voucher list response.
+//
+// Both levels are POINTERS on purpose. Decoded into plain ints, a response
+// that omits MetaInformation entirely — an error page, a changed API shape, a
+// proxy returning something else — yields TotalResources == 0, which is
+// exactly what a genuinely empty financial year yields. VoucherCacheState
+// then sees an empty cache agreeing with an empty remote and reports FRESH: a
+// failed measurement served as a verified figure.
+type voucherTotalEnvelope struct {
+	Meta *struct {
+		TotalResources *int `json:"@TotalResources"`
+	} `json:"MetaInformation"`
+}
+
+// VoucherTotal returns Fortnox's own voucher count for a financial year.
+//
+// One request, no pagination: this is the cheap integrity check the voucher
+// cache is built on (ADR-0006), and a check that costs as much as the fetch it
+// guards is not a check. It reads @TotalResources from the first page and
+// discards the vouchers.
+//
+// Zero is a valid answer. Absent is an error — see voucherTotalEnvelope.
+func (c *Client) VoucherTotal(yearID int) (int, error) {
+	u := fmt.Sprintf("%s/3/vouchers?financialyear=%d", c.baseURL, yearID)
+	raw, err := c.Get(u)
+	if err != nil {
+		return 0, fmt.Errorf("voucher total for year %d: %w", yearID, err)
+	}
+	var env voucherTotalEnvelope
+	if err := json.Unmarshal(raw, &env); err != nil {
+		return 0, fmt.Errorf("decode voucher total for year %d: %w", yearID, err)
+	}
+	if env.Meta == nil || env.Meta.TotalResources == nil {
+		return 0, fmt.Errorf(
+			"voucher total for year %d: response carried no MetaInformation.@TotalResources — refusing to report 0, which would be indistinguishable from an empty year",
+			yearID,
+		)
+	}
+	return *env.Meta.TotalResources, nil
+}
