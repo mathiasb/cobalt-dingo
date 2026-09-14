@@ -470,6 +470,18 @@ func (c *FortnoxConnector) connectedCompanies(r *http.Request, sess *auth.Sessio
 		if key == string(t.ID) {
 			continue // not under this prefix; ListByPrefix should not return it
 		}
+		// A tenant row is not a connection. Disconnect deletes the token and
+		// leaves the row — deliberately, because the row records which company
+		// an id refers to and other tables reference it — so listing rows
+		// showed a company as connected after it had been disconnected, while
+		// the mode card beside it correctly said "Not connected" (reported from
+		// the live UI 2026-09-14).
+		//
+		// Both views now answer the same question: does a token exist? They
+		// disagreed because they answered different ones.
+		if _, err := c.tokenStore.Load(r.Context(), t.ID); err != nil {
+			continue
+		}
 		out = append(out, CompanyChoice{Name: t.Name, OrgNumber: key, Active: key == active, Mode: sess.Mode})
 	}
 	return out

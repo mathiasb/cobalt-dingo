@@ -141,3 +141,35 @@ func TestCompaniesPage_worksWithNothingConnected(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code)
 	assert.True(t, strings.Contains(w.Body.String(), "Fortnox"), "the page still renders")
 }
+
+// Reported from the live UI 2026-09-14: after disconnecting, the company was
+// still listed under "Working with" while the mode card correctly said "Not
+// connected". The two disagreed because they answered different questions —
+// the card asks whether a TOKEN exists, the picker listed TENANT ROWS, and
+// disconnect deletes the token and leaves the row.
+//
+// A credential page that shows a connection which is not there is the same
+// class of defect as one that hides a connection which is (#67): the user
+// cannot tell what the system actually holds.
+func TestCompaniesPage_doesNotListACompanyWhoseTokenIsGone(t *testing.T) {
+	repo := &recordingTenantRepo{}
+	for id, name := range map[domain.TenantID]string{
+		"user-1:production:5566778899": "Still Connected AB",
+		"user-1:production:1122334455": "Disconnected AB",
+	} {
+		require.NoError(t, repo.UpsertTenant(context.Background(), domain.Tenant{ID: id, Name: name}))
+	}
+	// Only the first has a token: the second is what disconnect leaves behind.
+	c := newTestConnector(newConnectorTokenStore("user-1:production:5566778899"))
+	c.tenantRepo = repo
+	c.sessions = auth.NewSessionManager("test-secret-that-is-long-enough")
+
+	w := httptest.NewRecorder()
+	c.pageHandler(w, requestAs("GET", "/fortnox/", sessionFor("user-1", config.ModeProduction, "5566778899")))
+
+	require.Equal(t, http.StatusOK, w.Code)
+	body := w.Body.String()
+	assert.Contains(t, body, "Still Connected AB")
+	assert.NotContains(t, body, "Disconnected AB",
+		"a tenant row with no token is not a connection — offering Disconnect and 'Work with this' for it is a lie the user cannot check")
+}
