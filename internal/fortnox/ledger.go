@@ -38,16 +38,28 @@ type voucherResponse struct {
 // ListVouchers returns all vouchers for the given financial year.
 // Calls GET /3/vouchers?financialyear={yearID}.
 func (c *Client) ListVouchers(yearID int) ([]VoucherJSON, error) {
-	u := fmt.Sprintf("%s/3/vouchers?financialyear=%d", c.baseURL, yearID)
-	raw, err := c.Get(u)
+	// Every page, via the existing helper. Reading page one returned exactly
+	// 100 vouchers for a year that holds more, and produced a confident wrong
+	// answer about account 1930 (2026-09-14). A truncated list is worse than
+	// an error because it is plausible.
+	//
+	// GetAllPages already existed, with a test and no callers — the gap was
+	// never that pagination was unknown here, only that this endpoint did not
+	// use it. Adding a second loop instead would have left two implementations
+	// to drift apart.
+	pages, err := c.GetAllPages(fmt.Sprintf("%s/3/vouchers?financialyear=%d", c.baseURL, yearID))
 	if err != nil {
 		return nil, fmt.Errorf("list vouchers: %w", err)
 	}
-	var envelope vouchersResponse
-	if err := json.Unmarshal(raw, &envelope); err != nil {
-		return nil, fmt.Errorf("decode vouchers: %w", err)
+	var out []VoucherJSON
+	for i, raw := range pages {
+		var envelope vouchersResponse
+		if err := json.Unmarshal(raw, &envelope); err != nil {
+			return nil, fmt.Errorf("decode vouchers page %d: %w", i+1, err)
+		}
+		out = append(out, envelope.Vouchers...)
 	}
-	return envelope.Vouchers, nil
+	return out, nil
 }
 
 // GetVoucher fetches a single journal entry by series and number.
