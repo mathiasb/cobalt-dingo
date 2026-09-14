@@ -62,6 +62,43 @@ func (c *Client) ListVouchers(yearID int) ([]VoucherJSON, error) {
 	return out, nil
 }
 
+// ListVouchersWithRows returns the year's vouchers WITH their rows.
+//
+// GET /3/vouchers declares VoucherRows in the OpenAPI spec and returns them
+// empty; rows arrive only from the per-voucher detail endpoint. Measured on
+// live production 2026-09-14: 405 vouchers, 0 with rows. Every row-level
+// analysis therefore returned nothing and looked like an answer (#89).
+//
+// The cost is one request per voucher. At the documented limit — 300 per
+// minute, 25 per 5 seconds, and this client's limiter is set to 18 for
+// headroom — a 405-voucher year takes roughly two minutes. That is the price
+// of a correct answer from this API shape, and it belongs in a scheduled
+// snapshot rather than behind an interactive call. Caching the details is the
+// recorded follow-up.
+//
+// A voucher whose detail cannot be read is an ERROR, not an omission. Skipping
+// it would return a short list that looks complete, which is the same defect
+// this function exists to remove.
+func (c *Client) ListVouchersWithRows(yearID int) ([]VoucherJSON, error) {
+	heads, err := c.ListVouchers(yearID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]VoucherJSON, 0, len(heads))
+	for _, h := range heads {
+		full, err := c.GetVoucher(h.VoucherSeries, int(h.VoucherNumber))
+		if err != nil {
+			return nil, fmt.Errorf("voucher %s/%d: %w", h.VoucherSeries, int(h.VoucherNumber), err)
+		}
+		// Keep the list's transaction date: the detail endpoint agrees, but the
+		// list is what the caller filtered on, so preferring it keeps the set
+		// self-consistent if they ever diverge.
+		full.TransactionDate = h.TransactionDate
+		out = append(out, full)
+	}
+	return out, nil
+}
+
 // GetVoucher fetches a single journal entry by series and number.
 // Calls GET /3/vouchers/{series}/{number}.
 func (c *Client) GetVoucher(series string, number int) (VoucherJSON, error) {

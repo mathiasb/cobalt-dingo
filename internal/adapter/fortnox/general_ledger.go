@@ -109,7 +109,11 @@ func (a *GeneralLedgerAdapter) Vouchers(ctx context.Context, tenantID domain.Ten
 	if err != nil {
 		return nil, fmt.Errorf("general ledger vouchers: %w", err)
 	}
-	rawVouchers, err := c.ListVouchers(yearID)
+	// Rows are required here: callers filter by account, project and cost
+	// centre. The list endpoint returns none, so the detail endpoint is the
+	// only source (#89) — one request per voucher, about two minutes for a
+	// 405-voucher year under the Fortnox rate limit.
+	rawVouchers, err := c.ListVouchersWithRows(yearID)
 	if err != nil {
 		return nil, fmt.Errorf("general ledger vouchers: %w", err)
 	}
