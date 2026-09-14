@@ -231,6 +231,23 @@ func accountStatus(cfg config.Fortnox, token, acct string) string {
 	if err != nil {
 		return "vouchers unreadable: " + err.Error()
 	}
+	// How many of those vouchers actually carry rows. Fortnox's list endpoint
+	// declares VoucherRows in the spec but commonly returns them empty —
+	// rows arrive from the per-voucher detail endpoint. If none carry rows then
+	// an account check over this data is structurally blind and CANNOT find
+	// activity, whatever the books contain. Reporting it is the difference
+	// between an answer and a coincidence.
+	withRows := 0
+	for _, v := range vouchers {
+		if len(v.Rows) > 0 {
+			withRows++
+		}
+	}
+	if len(vouchers) > 0 && withRows == 0 {
+		return fmt.Sprintf("UNKNOWN — %d voucher(s) in the year but none carry rows, so this check cannot see account activity at all",
+			len(vouchers))
+	}
+
 	sum := domain.SummariseAccount(vouchers, num)
 
 	// The total matters as much as the account's own count. An empty account
@@ -244,11 +261,11 @@ func accountStatus(cfg config.Fortnox, token, acct string) string {
 			return fmt.Sprintf("no vouchers AT ALL in %s–%s — the year is unbooked, so this says nothing about the account",
 				latest.From.Format("2006-01-02"), latest.To.Format("2006-01-02"))
 		}
-		return fmt.Sprintf("NO activity, though the year holds %d voucher(s) — nothing feeds this account",
-			len(vouchers))
+		return fmt.Sprintf("NO activity, though the year holds %d voucher(s) of which %d carry rows — nothing feeds this account",
+			len(vouchers), withRows)
 	}
-	return fmt.Sprintf("%d of %d voucher(s) in the year, %s → %s",
-		sum.Count, len(vouchers), sum.Earliest, sum.Latest)
+	return fmt.Sprintf("%d of %d voucher(s) (%d carry rows), %s → %s",
+		sum.Count, len(vouchers), withRows, sum.Earliest, sum.Latest)
 }
 
 // staticTokenStore serves one already-loaded token. The ledger adapters take a
