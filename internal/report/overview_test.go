@@ -141,3 +141,65 @@ func TestRender_saysWhenNoRowsCameBackAtAll(t *testing.T) {
 
 	assert.Contains(t, report.Render(ov), "no rows returned at all")
 }
+
+// #91: "Receivables SEK 0.00" is only meaningful next to the invoice
+// population. A reader who sees the zero and stops has been told the company
+// is owed nothing, which holds only if unbooked invoices were counted.
+func TestRender_zeroReceivablesWithoutAnInvoiceMeasurementSaysUnknown(t *testing.T) {
+	ov := overview()
+	ov.Receivables = sek(0)
+	ov.Payables = sek(0)
+
+	out := report.Render(ov)
+	assert.Contains(t, out, "UNKNOWN")
+	assert.Contains(t, out, "not measured")
+}
+
+func TestRender_unbookedInvoicesAreFlaggedNextToTheZero(t *testing.T) {
+	ov := overview()
+	ov.Receivables = sek(0)
+	ov.Obligations = domain.InvoiceStates{
+		Supplier: []domain.InvoiceStateCount{{Filter: "unpaid", Count: 0}, {Filter: "unbooked", Count: 7}},
+		Customer: []domain.InvoiceStateCount{{Filter: "unpaid", Count: 0}, {Filter: "unbooked", Count: 0}},
+	}
+
+	out := report.Render(ov)
+	assert.Contains(t, out, "!! Outstanding:")
+	assert.Contains(t, out, "does NOT mean nothing is owed")
+	// And the counts themselves, so the claim is checkable.
+	assert.Contains(t, out, "unbooked")
+}
+
+// A settled company must be able to say so plainly, with its evidence.
+func TestRender_settledLedgersStateTheEvidence(t *testing.T) {
+	ov := overview()
+	ov.Obligations = domain.InvoiceStates{
+		Supplier: []domain.InvoiceStateCount{{Filter: "unpaid", Count: 0}, {Filter: "unbooked", Count: 0}, {Filter: "fullypaid", Count: 140}},
+		Customer: []domain.InvoiceStateCount{{Filter: "unpaid", Count: 0}, {Filter: "unbooked", Count: 0}, {Filter: "fullypaid", Count: 29}},
+	}
+
+	out := report.Render(ov)
+	assert.Contains(t, out, "Outstanding: none")
+	assert.Contains(t, out, "140")
+	assert.NotContains(t, out, "!! Outstanding")
+}
+
+// The status table must be one line per filter and stable, since it lands in a
+// Job log and gets grepped.
+func TestRender_statusTableIsOneLinePerFilter(t *testing.T) {
+	ov := overview()
+	ov.Obligations = domain.InvoiceStates{
+		Supplier: []domain.InvoiceStateCount{{Filter: "unpaid", Count: 0}, {Filter: "unbooked", Count: 2}},
+	}
+
+	first := report.Render(ov)
+	assert.Equal(t, first, report.Render(ov), "rendering must be deterministic")
+
+	var lines int
+	for _, l := range strings.Split(first, "\n") {
+		if strings.HasPrefix(l, "  supplier ") {
+			lines++
+		}
+	}
+	assert.Equal(t, 2, lines)
+}

@@ -73,6 +73,17 @@ type FinancialOverview struct {
 	Receivables Money
 	Payables    Money
 
+	// Obligations is the invoice population by status, which is what makes
+	// Receivables and Payables interpretable. Zero receivable can mean
+	// "settled" or "every invoice is unbooked", and the two lead to opposite
+	// conclusions — see InvoiceStates.Assess (#91).
+	//
+	// Set separately from BuildFinancialOverview: it is a different
+	// measurement, taken from the invoice endpoints rather than derived from
+	// the vouchers, so folding it into the ledger arithmetic would imply the
+	// two verify each other.
+	Obligations InvoiceStates
+
 	ReceivablesNotYetDue     Money
 	ReceivablesOverdue0to30  Money
 	ReceivablesOverdue31to90 Money

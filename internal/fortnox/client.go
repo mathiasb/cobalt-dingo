@@ -69,37 +69,36 @@ type SupplierInvoicesResponse struct {
 }
 
 // UnpaidSupplierInvoices fetches all unpaid supplier invoices from Fortnox.
+//
+// Every page, via GetAllPages. This read page one only, and Fortnox paginates
+// at 100 — so a company with more than 100 open invoices would have
+// under-reported what it owes, with nothing about the result to notice (#90).
+// It was invisible because both ledgers are currently empty (#91), which is
+// the argument for fixing it now rather than when it bites.
+//
+// Note that `unpaid` is one of seven documented filters and does NOT include
+// unbooked invoices — see SupplierInvoiceFilters. This function answers
+// "what is unpaid", not "what does the company owe".
 func (c *Client) UnpaidSupplierInvoices() ([]domain.SupplierInvoice, error) {
-	req, err := http.NewRequest(http.MethodGet, c.baseURL+"/3/supplierinvoices?filter=unpaid", nil)
+	pages, err := c.GetAllPages(c.baseURL + "/3/supplierinvoices?filter=unpaid")
 	if err != nil {
-		return nil, fmt.Errorf("build request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+c.token)
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := c.do(req)
-	if err != nil {
-		return nil, fmt.Errorf("GET supplierinvoices: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GET supplierinvoices: unexpected status %d", resp.StatusCode)
+		return nil, fmt.Errorf("unpaid supplier invoices: %w", err)
 	}
 
-	var envelope SupplierInvoicesResponse
-	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
-		return nil, fmt.Errorf("decode supplierinvoices: %w", err)
-	}
-
-	invoices := make([]domain.SupplierInvoice, len(envelope.SupplierInvoices))
-	for i, row := range envelope.SupplierInvoices {
-		invoices[i] = domain.SupplierInvoice{
-			InvoiceNumber:  int(row.InvoiceNumber),
-			SupplierNumber: int(row.SupplierNumber),
-			SupplierName:   row.SupplierName,
-			Amount:         domain.MoneyFromFloat(row.TotalInvoiceCurrency, row.Currency),
-			DueDate:        row.DueDate,
+	var invoices []domain.SupplierInvoice
+	for i, raw := range pages {
+		var envelope SupplierInvoicesResponse
+		if err := json.Unmarshal(raw, &envelope); err != nil {
+			return nil, fmt.Errorf("decode supplierinvoices page %d: %w", i+1, err)
+		}
+		for _, row := range envelope.SupplierInvoices {
+			invoices = append(invoices, domain.SupplierInvoice{
+				InvoiceNumber:  int(row.InvoiceNumber),
+				SupplierNumber: int(row.SupplierNumber),
+				SupplierName:   row.SupplierName,
+				Amount:         domain.MoneyFromFloat(row.TotalInvoiceCurrency, row.Currency),
+				DueDate:        row.DueDate,
+			})
 		}
 	}
 	return invoices, nil
@@ -341,18 +340,24 @@ type customerInvoicesResponse struct {
 }
 
 // UnpaidCustomerInvoices fetches all unpaid customer invoices.
-// Calls GET /3/invoices?filter=unpaid.
+// Calls GET /3/invoices?filter=unpaid, every page.
+//
+// `unpaid` excludes unbooked invoices, which are a separate filter value —
+// see CustomerInvoiceFilters.
 func (c *Client) UnpaidCustomerInvoices() ([]CustomerInvoiceRow, error) {
-	u := c.baseURL + "/3/invoices?filter=unpaid"
-	raw, err := c.Get(u)
+	pages, err := c.GetAllPages(c.baseURL + "/3/invoices?filter=unpaid")
 	if err != nil {
 		return nil, fmt.Errorf("unpaid customer invoices: %w", err)
 	}
-	var envelope customerInvoicesResponse
-	if err := json.Unmarshal(raw, &envelope); err != nil {
-		return nil, fmt.Errorf("decode customer invoices: %w", err)
+	var out []CustomerInvoiceRow
+	for i, raw := range pages {
+		var envelope customerInvoicesResponse
+		if err := json.Unmarshal(raw, &envelope); err != nil {
+			return nil, fmt.Errorf("decode customer invoices page %d: %w", i+1, err)
+		}
+		out = append(out, envelope.Invoices...)
 	}
-	return envelope.Invoices, nil
+	return out, nil
 }
 
 // CustomerInvoicePaymentRow is the Fortnox JSON for a customer invoice payment.

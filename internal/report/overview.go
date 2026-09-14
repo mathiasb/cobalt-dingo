@@ -69,6 +69,23 @@ func Render(ov domain.FinancialOverview) string {
 	fmt.Fprintf(&b, "  Result                     %20s\n", ov.Result.String())
 
 	b.WriteString("\nWORKING CAPITAL\n")
+	// The verdict comes FIRST, before the figures it qualifies. A reader who
+	// sees "Receivables SEK 0.00" and stops has been told the company is owed
+	// nothing, which is only true if unbooked invoices were counted and found
+	// to be zero (#91).
+	verdict, why := ov.Obligations.Assess()
+	switch verdict {
+	case domain.ObligationsNone:
+		fmt.Fprintf(&b, "  Outstanding: none — %s\n", why)
+	case domain.ObligationsOpen:
+		fmt.Fprintf(&b, "  Outstanding: %s\n", why)
+	case domain.ObligationsHidden:
+		fmt.Fprintf(&b, "  !! Outstanding: %s\n", why)
+	case domain.ObligationsUnknown:
+		fmt.Fprintf(&b, "  !! Outstanding: UNKNOWN — %s\n", why)
+	default:
+		fmt.Fprintf(&b, "  !! Outstanding: unrecognised verdict %q\n", verdict)
+	}
 	fmt.Fprintf(&b, "  Receivables                %20s\n", ov.Receivables.String())
 	fmt.Fprintf(&b, "    not yet due              %20s\n", ov.ReceivablesNotYetDue.String())
 	fmt.Fprintf(&b, "    overdue 1-30 d           %20s\n", ov.ReceivablesOverdue0to30.String())
@@ -80,6 +97,12 @@ func Render(ov domain.FinancialOverview) string {
 	fmt.Fprintf(&b, "    overdue 31-90 d          %20s\n", ov.PayablesOverdue31to90.String())
 	fmt.Fprintf(&b, "    overdue 90+ d            %20s\n", ov.PayablesOverdue90Plus.String())
 
+	if len(ov.Obligations.Supplier) > 0 || len(ov.Obligations.Customer) > 0 {
+		b.WriteString("\nINVOICES BY STATUS (counts, from Fortnox's own totals)\n")
+		renderStates(&b, "supplier", ov.Obligations.Supplier)
+		renderStates(&b, "customer", ov.Obligations.Customer)
+	}
+
 	// One account per line, because the first thing anyone does with a Job log
 	// is grep it for an account number.
 	b.WriteString("\nACCOUNTS (opening + movement = closing)\n")
@@ -90,6 +113,18 @@ func Render(ov domain.FinancialOverview) string {
 	}
 
 	return b.String()
+}
+
+// renderStates prints one filter per line, in the order measured, so two
+// identical measurements render identically.
+func renderStates(b *strings.Builder, label string, counts []domain.InvoiceStateCount) {
+	if len(counts) == 0 {
+		fmt.Fprintf(b, "  %-9s (not measured)\n", label)
+		return
+	}
+	for _, c := range counts {
+		fmt.Fprintf(b, "  %-9s %-18s %6d\n", label, c.Filter, c.Count)
+	}
 }
 
 func truncate(s string, n int) string {

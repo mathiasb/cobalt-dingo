@@ -118,3 +118,24 @@ func (a *CustomerLedgerAdapter) CustomerDetail(ctx context.Context, tenantID dom
 		Active:         row.Active,
 	}, nil
 }
+
+// StateCounts implements the ledger port.
+//
+// Ordered by rawfortnox.CustomerInvoiceFilters rather than by map iteration, so two
+// identical measurements render identically — an unstable order in a report
+// makes two correct answers look like a change.
+func (a *CustomerLedgerAdapter) StateCounts(ctx context.Context, tenantID domain.TenantID) ([]domain.InvoiceStateCount, error) {
+	c, err := a.client(ctx, tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("invoice state counts: %w", err)
+	}
+	counts, err := c.CustomerInvoiceStateCounts()
+	if err != nil {
+		return nil, fmt.Errorf("invoice state counts: %w", err)
+	}
+	out := make([]domain.InvoiceStateCount, 0, len(counts))
+	for _, f := range rawfortnox.CustomerInvoiceFilters {
+		out = append(out, domain.InvoiceStateCount{Filter: f, Count: counts[f]})
+	}
+	return out, nil
+}

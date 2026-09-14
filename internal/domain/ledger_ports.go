@@ -7,7 +7,14 @@ import (
 
 // SupplierLedger provides access to the accounts payable sub-ledger.
 type SupplierLedger interface {
+	// UnpaidInvoices answers "what is unpaid", which is NOT "what does the
+	// company owe": Fortnox's `unpaid` filter excludes unbooked invoices.
+	// StateCounts is what makes an empty result here interpretable.
 	UnpaidInvoices(ctx context.Context, tenantID TenantID) ([]SupplierInvoice, error)
+
+	// StateCounts returns the invoice count under every documented status
+	// filter, so a zero elsewhere can be told apart from an unmeasured one.
+	StateCounts(ctx context.Context, tenantID TenantID) ([]InvoiceStateCount, error)
 	InvoicePayments(ctx context.Context, tenantID TenantID, invoiceNumber int) ([]SupplierPayment, error)
 	SupplierDetail(ctx context.Context, tenantID TenantID, supplierNumber int) (Supplier, error)
 }
@@ -15,6 +22,10 @@ type SupplierLedger interface {
 // CustomerLedger provides access to the accounts receivable sub-ledger.
 type CustomerLedger interface {
 	UnpaidInvoices(ctx context.Context, tenantID TenantID) ([]CustomerInvoice, error)
+
+	// StateCounts returns the invoice count under every documented status
+	// filter — see SupplierLedger.StateCounts.
+	StateCounts(ctx context.Context, tenantID TenantID) ([]InvoiceStateCount, error)
 	InvoicePayments(ctx context.Context, tenantID TenantID, invoiceNumber int) ([]CustomerPayment, error)
 	CustomerDetail(ctx context.Context, tenantID TenantID, customerNumber int) (Customer, error)
 }

@@ -166,19 +166,36 @@ func run(log *slog.Logger) error {
 	}
 	log.Info("vouchers", "count", len(vouchers.Vouchers), "freshness", vouchers.Freshness, "reason", vouchers.Reason)
 
-	receivables, err := adapterfortnox.NewCustomerLedgerAdapter(cfg.BaseURL(), tokens, true).UnpaidInvoices(ctx, tenant.ID)
+	customerLdg := adapterfortnox.NewCustomerLedgerAdapter(cfg.BaseURL(), tokens, true)
+	supplierLdg := adapterfortnox.NewSupplierLedgerAdapter(cfg.BaseURL(), tokens, true)
+
+	receivables, err := customerLdg.UnpaidInvoices(ctx, tenant.ID)
 	if err != nil {
 		return fmt.Errorf("unpaid customer invoices: %w", err)
 	}
-	payables, err := adapterfortnox.NewSupplierLedgerAdapter(cfg.BaseURL(), tokens, true).UnpaidInvoices(ctx, tenant.ID)
+	payables, err := supplierLdg.UnpaidInvoices(ctx, tenant.ID)
 	if err != nil {
 		return fmt.Errorf("unpaid supplier invoices: %w", err)
+	}
+
+	// Count every invoice status, not just unpaid. Fortnox's `unpaid` filter
+	// excludes unbooked invoices, so without this a receivable of zero cannot
+	// be told apart from a ledger full of unbooked obligations (#91). Twelve
+	// requests, none of which fetches an invoice.
+	supplierStates, err := supplierLdg.StateCounts(ctx, tenant.ID)
+	if err != nil {
+		return fmt.Errorf("supplier invoice states: %w", err)
+	}
+	customerStates, err := customerLdg.StateCounts(ctx, tenant.ID)
+	if err != nil {
+		return fmt.Errorf("customer invoice states: %w", err)
 	}
 
 	ov, err := domain.BuildFinancialOverview(yearID, accounts, vouchers, receivables, payables)
 	if err != nil {
 		return fmt.Errorf("build overview: %w", err)
 	}
+	ov.Obligations = domain.InvoiceStates{Supplier: supplierStates, Customer: customerStates}
 	fmt.Print(report.Render(ov.WithAgeing(time.Now())))
 
 	// Exit non-zero when the books do not balance. A report nobody reads is
