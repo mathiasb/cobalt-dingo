@@ -4,6 +4,7 @@ package domain
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 )
@@ -17,11 +18,19 @@ type Money struct {
 	Currency   string // ISO 4217
 }
 
-// MoneyFromFloat converts a float64 amount (as returned by the Fortnox API) to Money.
-// Rounds to nearest minor unit.
+// MoneyFromFloat converts a float64 amount (as returned by the Fortnox API) to
+// Money, rounding half away from zero.
+//
+// math.Round rather than the obvious `int64(amount*100 + 0.5)`: adding a half
+// and truncating rounds toward zero on NEGATIVE input, so -410527.94 became
+// -41052793 — one öre light. Negatives are not an edge case in a ledger. Every
+// credit, liability and equity balance is negative, so the error landed at
+// least once per voucher, and it broke the accounting identity the financial
+// overview checks: two negative opening balances put a correct trial balance
+// 2 öre out. Found 2026-09-14, by that check, on the first year it ran against.
 func MoneyFromFloat(amount float64, currency string) Money {
 	return Money{
-		MinorUnits: int64(amount*100 + 0.5),
+		MinorUnits: int64(math.Round(amount * 100)),
 		Currency:   currency,
 	}
 }
