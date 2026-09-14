@@ -6,6 +6,9 @@ import (
 )
 
 // VoucherRowJSON is a single line in a Fortnox journal entry.
+//
+// Faithful to the API shape, including Removed — filtering belongs at the
+// domain boundary, not here.
 type VoucherRowJSON struct {
 	Account                FlexInt `json:"Account"`
 	Debit                  float64 `json:"Debit"`
@@ -13,6 +16,13 @@ type VoucherRowJSON struct {
 	TransactionInformation string  `json:"TransactionInformation"`
 	CostCenter             string  `json:"CostCenter"`
 	Project                string  `json:"Project"`
+
+	// Removed marks a row that was deleted in Fortnox. The detail endpoint
+	// returns removed rows alongside live ones, so a reader that ignores this
+	// flag counts corrections twice — and the voucher then appears not to
+	// balance. Fortnox will not accept an unbalanced voucher through its own
+	// UI, so an unbalanced voucher always means we are reading it wrong.
+	Removed bool `json:"Removed"`
 }
 
 // VoucherJSON is the Fortnox JSON representation of a complete journal entry.

@@ -46,7 +46,10 @@ const (
 //	1 — initial: rows from GET /3/vouchers/{series}/{number}, no financial year
 //	2 — detail fetch carries financialyear (v0.53.0); version 1 rows may hold
 //	    rows belonging to a voucher of the same series and number in another year
-const VoucherFetchVersion = 2
+//	3 — rows marked Removed by Fortnox are excluded (v0.55.0); versions 1 and 2
+//	    counted deleted rows, so corrections were counted twice and affected
+//	    vouchers did not balance
+const VoucherFetchVersion = 3
 
 // RemoteTotalUnknown marks a completeness check that could not be performed.
 // Zero cannot mean this: zero is a legitimate remote total for an empty year.

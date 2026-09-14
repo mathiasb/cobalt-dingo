@@ -197,17 +197,29 @@ func (a *GeneralLedgerAdapter) PredefinedAccounts(ctx context.Context, tenantID 
 }
 
 // convertVoucher converts a raw Fortnox VoucherJSON to a domain.Voucher.
+//
+// Removed rows are dropped. Fortnox returns rows that were deleted in the UI
+// alongside live ones, and counting them double-counts corrections: four of
+// 405 production vouchers appeared not to balance for exactly this reason on
+// 2026-09-14, putting the company's trial balance SEK 122,881.80 out.
+//
+// Dropped here rather than in the client because VoucherJSON is meant to be
+// faithful to the API, and because this is the boundary where the domain's
+// rule — a voucher's rows are the ones that count — applies.
 func convertVoucher(rv rawfortnox.VoucherJSON) domain.Voucher {
-	rows := make([]domain.VoucherRow, len(rv.VoucherRows))
-	for i, r := range rv.VoucherRows {
-		rows[i] = domain.VoucherRow{
+	rows := make([]domain.VoucherRow, 0, len(rv.VoucherRows))
+	for _, r := range rv.VoucherRows {
+		if r.Removed {
+			continue
+		}
+		rows = append(rows, domain.VoucherRow{
 			Account:     int(r.Account),
 			Debit:       domain.MoneyFromFloat(r.Debit, "SEK"),
 			Credit:      domain.MoneyFromFloat(r.Credit, "SEK"),
 			Description: r.TransactionInformation,
 			CostCenter:  r.CostCenter,
 			Project:     r.Project,
-		}
+		})
 	}
 	return domain.Voucher{
 		Series:          rv.VoucherSeries,
