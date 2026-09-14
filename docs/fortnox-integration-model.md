@@ -312,3 +312,55 @@ alongside the other sandbox values.
 - **#43** (refresh-conflict testability) is upgraded by #57 landing on option C.
 - Scope changes require re-authorization, so the grant decision is made once,
   before connecting — not iterated.
+
+## The vendored OpenAPI spec, and why a lookup tool rather than a RAG
+
+`docs/vendor/fortnox-openapi.json` — 249 paths, 672 schemas, OpenAPI 3.0.3,
+downloaded 2026-09-14. Vendored deliberately: it pins the version this code was
+written against, and a diff on a later download is the cheapest possible change
+detector for a vendor API.
+
+Query it with `scripts/fortnox-api.py`:
+
+```sh
+scripts/fortnox-api.py paths inbox        # which paths match (falls back to tags)
+scripts/fortnox-api.py show /3/inbox      # methods, params, response fields
+scripts/fortnox-api.py schema Supplier    # a named schema's fields
+```
+
+**Why not a RAG over the docs.** The spec is structured, so an exact query
+answers exactly; BM25 over the same content answers approximately and can be
+confidently wrong. The two Fortnox mistakes in this repo's history that survived
+*reading the prose documentation* were both field-shape questions the HTML docs
+do not contain at all — no amount of retrieval over them would have helped.
+
+A RAG remains the right tool for the **guides** — scopes, licensing, the service
+account model, the FAQ. Those are prose, genuinely unstructured, and are where
+the other three mistakes came from. Different content, different retrieval.
+
+### What the spec settled that the HTML docs could not
+
+**`/3/inbox` has no timestamp and no processed flag.**
+
+```
+Folder: @url, Email, Files[], Folders[], Id, Name
+File:   @url, ArchiveFileId, Comments, Id, Name, Path, Size
+```
+
+So *"how long has this document been sitting unbooked"* is **unanswerable** from
+this endpoint. Any design assuming an upload date is wrong.
+
+**`Folder.Email` is the authoritative arkivplats address.** The addresses this
+repo forwards to are configured by hand in `config/receipts/receipt-sources.yml`,
+which is how a stale `inbox.lev.<org>` address kept accepting mail that never
+arrived (#80). Fortnox will simply tell us the correct one.
+
+**`/3/supplierinvoicefileconnections` links a file to an invoice:**
+
+```
+FileId, SupplierInvoiceNumber, SupplierName, Name
+```
+
+Which means *processed* IS answerable, just not where it was looked for: a file
+in the inbox with no connection has not been booked. That is the join
+email-triage-agent#19 needs, and it was not visible in the prose documentation.
