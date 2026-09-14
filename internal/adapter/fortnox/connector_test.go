@@ -22,9 +22,9 @@ import (
 // must survive FlexInt decoding. A SEK row is included so the caller-side FCY
 // filter has something to drop — the Connector itself returns every row.
 const connectorInvoicesQuoted = `{"SupplierInvoices":[
-	{"InvoiceNumber":"1042","SupplierNumber":"1","SupplierName":"Acme GmbH","Currency":"EUR","TotalInvoiceCurrency":2450.00,"DueDate":"2026-05-03"},
-	{"InvoiceNumber":1043,"SupplierNumber":2,"SupplierName":"Nordic Supply AB","Currency":"USD","TotalInvoiceCurrency":1890.00,"DueDate":"2026-05-10"},
-	{"InvoiceNumber":"9001","SupplierNumber":"3","SupplierName":"Svensk Leverantor AB","Currency":"SEK","TotalInvoiceCurrency":5000.00,"DueDate":"2026-05-15"}
+	{"GivenNumber":"1042","InvoiceNumber":"ACME-1","SupplierNumber":"1","SupplierName":"Acme GmbH","Currency":"EUR","Total":"2450.00","Balance":"2450.00","DueDate":"2026-05-03"},
+	{"GivenNumber":1043,"InvoiceNumber":"NS-2","SupplierNumber":2,"SupplierName":"Nordic Supply AB","Currency":"USD","Total":1890.00,"Balance":1890.00,"DueDate":"2026-05-10"},
+	{"GivenNumber":"9001","InvoiceNumber":"SL-3","SupplierNumber":"3","SupplierName":"Svensk Leverantor AB","Currency":"SEK","Total":"5000.00","Balance":"5000.00","DueDate":"2026-05-15"}
 ]}`
 
 const connectorSupplierQuoted = `{"Supplier":{"SupplierNumber":"1","IBAN":"DE89370400440532013000","BIC":"COBADEFFXXX"}}`

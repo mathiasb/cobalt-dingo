@@ -230,10 +230,20 @@ func BuildFinancialOverview(
 	}
 	ov.Receivables.Currency = currency
 	for _, inv := range payables {
-		if err := assertCurrency(inv.Amount, currency, fmt.Sprintf("supplier invoice %d", inv.InvoiceNumber)); err != nil {
+		// A cancelled invoice is not an obligation. Fortnox reports the flag
+		// and this code used to ignore it, which would have inflated payables
+		// by every invoice ever voided.
+		if inv.Cancelled {
+			continue
+		}
+		// Balance, not Amount: Balance is what remains owing, so a partly paid
+		// invoice would otherwise overstate the obligation by the amount
+		// already paid. Fortnox reports both, so using the wrong one is a
+		// choice.
+		if err := assertCurrency(inv.Balance, currency, fmt.Sprintf("supplier invoice %d", inv.InvoiceNumber)); err != nil {
 			return FinancialOverview{}, err
 		}
-		ov.Payables.MinorUnits += inv.Amount.MinorUnits
+		ov.Payables.MinorUnits += inv.Balance.MinorUnits
 	}
 	ov.Payables.Currency = currency
 
@@ -252,9 +262,12 @@ func (ov FinancialOverview) WithAgeing(today time.Time) FinancialOverview {
 			inv.DueDate, inv.Balance, today)
 	}
 	for _, inv := range ov.payableInvoices {
+		if inv.Cancelled {
+			continue
+		}
 		bucket(&ov.PayablesNotYetDue, &ov.PayablesOverdue0to30,
 			&ov.PayablesOverdue31to90, &ov.PayablesOverdue90Plus,
-			inv.DueDate, inv.Amount, today)
+			inv.DueDate, inv.Balance, today)
 	}
 	return ov
 }

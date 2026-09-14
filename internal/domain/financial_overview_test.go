@@ -157,7 +157,7 @@ func TestFinancialOverview_agesReceivablesAndPayables(t *testing.T) {
 		{InvoiceNumber: 3, CustomerName: "Kund C", Balance: sek(3000), DueDate: "2026-06-01"},
 	}
 	ap := []domain.SupplierInvoice{
-		{InvoiceNumber: 10, SupplierName: "Lev A", Amount: sek(4000), DueDate: "2026-09-20"},
+		{InvoiceNumber: 10, SupplierName: "Lev A", Amount: sek(4000), Balance: sek(4000), DueDate: "2026-09-20"},
 	}
 
 	ov, err := domain.BuildFinancialOverview(2, accounts, set, ar, ap)
@@ -220,4 +220,51 @@ func TestFinancialOverview_unparseableDueDateAgesToTheWorstBucket(t *testing.T) 
 		ov.ReceivablesNotYetDue.MinorUnits+ov.ReceivablesOverdue0to30.MinorUnits+
 			ov.ReceivablesOverdue31to90.MinorUnits+ov.ReceivablesOverdue90Plus.MinorUnits,
 		"buckets must account for every öre of the total")
+}
+
+// Payables must sum what is OWING, not what was invoiced. A partly paid
+// invoice otherwise overstates the obligation by the amount already paid —
+// and Fortnox reports both figures, so there is no excuse for using the wrong
+// one. Receivables already used Balance; supplier invoices did not have one
+// until the live field shape was checked.
+func TestFinancialOverview_payablesSumTheOutstandingBalance(t *testing.T) {
+	accounts, set := balancedYear()
+	ap := []domain.SupplierInvoice{
+		{InvoiceNumber: 1, SupplierName: "Lev A", Amount: sek(10000), Balance: sek(2500), DueDate: "2026-09-20"},
+		{InvoiceNumber: 2, SupplierName: "Lev B", Amount: sek(4000), Balance: sek(4000), DueDate: "2026-10-01"},
+	}
+
+	ov, err := domain.BuildFinancialOverview(2, accounts, set, nil, ap)
+	require.NoError(t, err)
+
+	assert.Equal(t, sek(6500), ov.Payables, "2,500 still owing + 4,000, not 10,000 + 4,000")
+}
+
+func TestFinancialOverview_payableAgeingUsesTheOutstandingBalance(t *testing.T) {
+	accounts, set := balancedYear()
+	ap := []domain.SupplierInvoice{
+		{InvoiceNumber: 1, SupplierName: "Lev A", Amount: sek(10000), Balance: sek(2500), DueDate: "2026-08-01"},
+	}
+
+	ov, err := domain.BuildFinancialOverview(2, accounts, set, nil, ap)
+	require.NoError(t, err)
+	ov = ov.WithAgeing(time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC))
+
+	assert.Equal(t, sek(2500), ov.PayablesOverdue31to90)
+	assert.Zero(t, ov.PayablesOverdue0to30.MinorUnits)
+}
+
+// A cancelled invoice is not an obligation, and an unbooked one has not
+// reached the ledger. Neither belongs in a payables total that sits beside
+// derived GL balances.
+func TestFinancialOverview_cancelledPayablesAreExcluded(t *testing.T) {
+	accounts, set := balancedYear()
+	ap := []domain.SupplierInvoice{
+		{InvoiceNumber: 1, SupplierName: "Lev A", Amount: sek(4000), Balance: sek(4000), Booked: true},
+		{InvoiceNumber: 2, SupplierName: "Lev B", Amount: sek(9999), Balance: sek(9999), Cancelled: true},
+	}
+
+	ov, err := domain.BuildFinancialOverview(2, accounts, set, nil, ap)
+	require.NoError(t, err)
+	assert.Equal(t, sek(4000), ov.Payables)
 }

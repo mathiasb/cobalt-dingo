@@ -54,13 +54,30 @@ func NewClient(baseURL, token string, readOnly bool) *Client {
 
 // SupplierInvoiceRow is the Fortnox JSON representation of a supplier invoice.
 // Fortnox returns InvoiceNumber and SupplierNumber as strings or numbers inconsistently.
+// Field names and types verified against the live API on 2026-09-14 with
+// cmd/fortnox-shape, not taken from the vendored spec — the spec omits some of
+// what Fortnox sends, and previously this struct read TotalInvoiceCurrency,
+// which Fortnox sends from no endpoint at all.
+//
+// Total and Balance are FlexFloat because /3/supplierinvoices sends them as
+// STRINGS, while /3/invoices sends the same concepts as numbers.
 type SupplierInvoiceRow struct {
-	InvoiceNumber        FlexInt `json:"InvoiceNumber"`
-	SupplierNumber       FlexInt `json:"SupplierNumber"`
-	SupplierName         string  `json:"SupplierName"`
-	Currency             string  `json:"Currency"`
-	TotalInvoiceCurrency float64 `json:"TotalInvoiceCurrency"`
-	DueDate              string  `json:"DueDate"`
+	// GivenNumber is Fortnox's document identifier — the value its URLs take.
+	GivenNumber FlexInt `json:"GivenNumber"`
+
+	// InvoiceNumber is the SUPPLIER's own reference, a string that need not be
+	// numeric. It is not an identity in Fortnox. FlexString because a supplier
+	// could plausibly fill it with digits.
+	InvoiceNumber FlexString `json:"InvoiceNumber"`
+
+	SupplierNumber FlexInt   `json:"SupplierNumber"`
+	SupplierName   string    `json:"SupplierName"`
+	Currency       string    `json:"Currency"`
+	Total          FlexFloat `json:"Total"`
+	Balance        FlexFloat `json:"Balance"`
+	DueDate        string    `json:"DueDate"`
+	Booked         bool      `json:"Booked"`
+	Cancelled      bool      `json:"Cancelled"`
 }
 
 // SupplierInvoicesResponse is the top-level envelope returned by GET /3/supplierinvoices.
@@ -107,11 +124,15 @@ func (c *Client) supplierInvoicesByFilter(filter string) ([]domain.SupplierInvoi
 		}
 		for _, row := range envelope.SupplierInvoices {
 			invoices = append(invoices, domain.SupplierInvoice{
-				InvoiceNumber:  int(row.InvoiceNumber),
-				SupplierNumber: int(row.SupplierNumber),
-				SupplierName:   row.SupplierName,
-				Amount:         domain.MoneyFromFloat(row.TotalInvoiceCurrency, row.Currency),
-				DueDate:        row.DueDate,
+				InvoiceNumber:     int(row.GivenNumber),
+				SupplierNumber:    int(row.SupplierNumber),
+				SupplierName:      row.SupplierName,
+				SupplierReference: string(row.InvoiceNumber),
+				Amount:            domain.MoneyFromFloat(float64(row.Total), row.Currency),
+				Balance:           domain.MoneyFromFloat(float64(row.Balance), row.Currency),
+				DueDate:           row.DueDate,
+				Booked:            row.Booked,
+				Cancelled:         row.Cancelled,
 			})
 		}
 	}

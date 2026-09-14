@@ -53,14 +53,14 @@ var probes = []probe{
 		path:       "/3/supplierinvoices?filter=fullypaid",
 		collection: "SupplierInvoices",
 		// internal/fortnox.SupplierInvoiceRow
-		ourFields: []string{"InvoiceNumber", "SupplierNumber", "SupplierName", "Currency", "TotalInvoiceCurrency", "DueDate"},
+		ourFields: []string{"GivenNumber", "InvoiceNumber", "SupplierNumber", "SupplierName", "Currency", "Total", "Balance", "DueDate", "Booked", "Cancelled"},
 	},
 	{
 		name:       "customer invoices",
 		path:       "/3/invoices?filter=fullypaid",
 		collection: "Invoices",
 		// internal/fortnox.CustomerInvoiceRow
-		ourFields: []string{"DocumentNumber", "CustomerNumber", "CustomerName", "Total", "Balance", "DueDate", "InvoiceDate", "Booked", "Cancelled", "Sent"},
+		ourFields: []string{"DocumentNumber", "CustomerNumber", "CustomerName", "Currency", "Total", "Balance", "DueDate", "InvoiceDate", "Booked", "Cancelled", "Sent"},
 	},
 	{
 		name:       "accounts",

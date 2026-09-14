@@ -110,10 +110,17 @@ func TestInvoicesHandler_refusesWithNoSession(t *testing.T) {
 // Realistic Fortnox shapes using the QUOTED-STRING numeric forms that blocked
 // #26 — InvoiceNumber/SupplierNumber arrive as quoted strings and must decode
 // through FlexInt. A SEK invoice is included to confirm the FCY filter drops it.
-const fortnoxInvoicesQuoted = `{"SupplierInvoices":[
-	{"InvoiceNumber":"1042","SupplierNumber":"1","SupplierName":"Acme GmbH","Currency":"EUR","TotalInvoiceCurrency":2450.00,"DueDate":"2026-05-03"},
-	{"InvoiceNumber":"1043","SupplierNumber":"2","SupplierName":"Nordic Supply AB","Currency":"USD","TotalInvoiceCurrency":1890.00,"DueDate":"2026-05-10"},
-	{"InvoiceNumber":"9001","SupplierNumber":"3","SupplierName":"Svensk Leverantor AB","Currency":"SEK","TotalInvoiceCurrency":5000.00,"DueDate":"2026-05-15"}
+// The LIVE shape, verified against production with cmd/fortnox-shape on
+// 2026-09-14: GivenNumber is the document identity, InvoiceNumber is the
+// supplier's own reference, and Total/Balance arrive as STRINGS.
+//
+// This fixture previously used TotalInvoiceCurrency, which Fortnox sends from
+// no endpoint — so this test rendered amounts the production path could not
+// produce, and the invoices page showed every supplier invoice as 0.00.
+const fortnoxInvoicesQuoted = `{"MetaInformation":{"@CurrentPage":1,"@TotalPages":1,"@TotalResources":3},"SupplierInvoices":[
+	{"GivenNumber":"1042","InvoiceNumber":"ACME-77","SupplierNumber":"1","SupplierName":"Acme GmbH","Currency":"EUR","Total":"2450.00","Balance":"2450.00","DueDate":"2026-05-03"},
+	{"GivenNumber":"1043","InvoiceNumber":"NS-88","SupplierNumber":"2","SupplierName":"Nordic Supply AB","Currency":"USD","Total":"1890.00","Balance":"1890.00","DueDate":"2026-05-10"},
+	{"GivenNumber":"9001","InvoiceNumber":"SL-99","SupplierNumber":"3","SupplierName":"Svensk Leverantor AB","Currency":"SEK","Total":"5000.00","Balance":"5000.00","DueDate":"2026-05-15"}
 ]}`
 
 func supplierResponseQuoted(supplierNumber, iban, bic string) string {

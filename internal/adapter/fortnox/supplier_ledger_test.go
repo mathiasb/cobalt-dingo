@@ -21,13 +21,22 @@ func TestSupplierLedger_UnpaidInvoices(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"SupplierInvoices": []map[string]any{
+				// The LIVE shape, verified with cmd/fortnox-shape on
+				// 2026-09-14: GivenNumber is the identity, InvoiceNumber is the
+				// supplier's own reference, and Total/Balance are STRINGS. The
+				// previous fixture used TotalInvoiceCurrency, which Fortnox
+				// sends from no endpoint — so this test passed while every
+				// real invoice amount was SEK 0.00.
 				{
-					"InvoiceNumber":        "42",
-					"SupplierNumber":       "7",
-					"SupplierName":         "Acme GmbH",
-					"Currency":             "EUR",
-					"TotalInvoiceCurrency": 1000.50,
-					"DueDate":              "2026-05-01",
+					"GivenNumber":    "42",
+					"InvoiceNumber":  "ACME-2026-9",
+					"SupplierNumber": "7",
+					"SupplierName":   "Acme GmbH",
+					"Currency":       "EUR",
+					"Total":          "1000.50",
+					"Balance":        "1000.50",
+					"DueDate":        "2026-05-01",
+					"Booked":         true,
 				},
 			},
 		})

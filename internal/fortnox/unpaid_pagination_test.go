@@ -25,8 +25,8 @@ func TestUnpaidSupplierInvoices_readsEveryPage(t *testing.T) {
 		}
 		assert.Equal(t, "unpaid", r.URL.Query().Get("filter"), "the filter must survive pagination")
 		_, _ = fmt.Fprintf(w, `{"MetaInformation":{"@CurrentPage":%s,"@TotalPages":3,"@TotalResources":3},
-			"SupplierInvoices":[{"GivenNumber":%s,"SupplierNumber":1,"SupplierName":"Lev",
-			"Currency":"SEK","TotalInvoiceCurrency":100.0,"DueDate":"2026-10-01"}]}`, page, page)
+			"SupplierInvoices":[{"GivenNumber":"%s","SupplierNumber":"1","SupplierName":"Lev",
+			"Currency":"SEK","Total":"100.00","Balance":"100.00","DueDate":"2026-10-01"}]}`, page, page)
 	}))
 	defer srv.Close()
 

@@ -127,6 +127,25 @@ func GeneratePAIN001(invoices []domain.EnrichedInvoice, debtor Debtor, msgID str
 		return nil, fmt.Errorf("generate pain.001: no invoices provided")
 	}
 
+	// Refuse a non-positive instructed amount, and fail the WHOLE file rather
+	// than dropping the invoice: a batch silently missing a payment leaves a
+	// supplier unpaid with nothing to say so.
+	//
+	// Not hypothetical. Until 2026-09-14 every supplier invoice read from
+	// Fortnox had Amount 0.00, because this code read TotalInvoiceCurrency — a
+	// field Fortnox sends from no endpoint. A file generated then would have
+	// instructed a bank to pay zero against real invoices, and the amount is
+	// the one field nobody re-checks when the supplier and IBAN look right.
+	// The decode is fixed; this refuses the state anyway, because the next
+	// cause of a zero amount will be a different one.
+	for _, inv := range invoices {
+		if inv.Amount.MinorUnits <= 0 {
+			return nil, fmt.Errorf(
+				"generate pain.001: invoice %d (%s) has a non-positive amount %s — refusing to instruct a payment that cannot be correct",
+				inv.InvoiceNumber, inv.SupplierName, inv.Amount.String())
+		}
+	}
+
 	// Group by currency, preserving first-seen order for deterministic output.
 	order := []string{}
 	grouped := map[string][]domain.EnrichedInvoice{}

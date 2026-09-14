@@ -27,17 +27,23 @@ func aFortnoxAPIStubReturningTheseUnpaidSupplierInvoices(table *godog.Table) err
 	for _, row := range table.Rows[1:] {
 		num, err := strconv.Atoi(row.Cells[0].Value)
 		if err != nil {
-			return fmt.Errorf("parse InvoiceNumber: %w", err)
+			return fmt.Errorf("parse GivenNumber: %w", err)
 		}
 		total, err := strconv.ParseFloat(row.Cells[2].Value, 64)
 		if err != nil {
-			return fmt.Errorf("parse TotalInvoiceCurrency: %w", err)
+			return fmt.Errorf("parse Total: %w", err)
 		}
+		// GivenNumber is the identity and Total/Balance carry the amount —
+		// the live shape, verified with cmd/fortnox-shape on 2026-09-14.
+		// This step previously built TotalInvoiceCurrency, a field Fortnox
+		// sends from no endpoint, so the scenario asserted amounts that the
+		// production path could never produce.
 		rows = append(rows, fortnox.SupplierInvoiceRow{
-			InvoiceNumber:        fortnox.FlexInt(num),
-			Currency:             row.Cells[1].Value,
-			TotalInvoiceCurrency: total,
-			DueDate:              row.Cells[3].Value,
+			GivenNumber: fortnox.FlexInt(num),
+			Currency:    row.Cells[1].Value,
+			Total:       fortnox.FlexFloat(total),
+			Balance:     fortnox.FlexFloat(total),
+			DueDate:     row.Cells[3].Value,
 		})
 	}
 

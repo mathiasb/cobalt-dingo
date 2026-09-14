@@ -17,8 +17,9 @@ func TestUnbookedSupplierInvoices_fetchesTheUnbookedFilter(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotFilter = r.URL.Query().Get("filter")
 		_, _ = w.Write([]byte(`{"MetaInformation":{"@CurrentPage":1,"@TotalPages":1,"@TotalResources":1},
-			"SupplierInvoices":[{"InvoiceNumber":9001,"SupplierNumber":42,"SupplierName":"Lev AB",
-			"Currency":"SEK","TotalInvoiceCurrency":12500.0,"DueDate":"2026-09-30"}]}`))
+			"SupplierInvoices":[{"GivenNumber":"9001","InvoiceNumber":"LEV-1","SupplierNumber":"42",
+			"SupplierName":"Lev AB","Currency":"SEK","Total":"12500.00","Balance":"12500.00",
+			"DueDate":"2026-09-30"}]}`))
 	}))
 	defer srv.Close()
 
@@ -58,7 +59,7 @@ func TestUnbookedSupplierInvoices_readsEveryPage(t *testing.T) {
 			page = "1"
 		}
 		_, _ = w.Write([]byte(`{"MetaInformation":{"@CurrentPage":` + page + `,"@TotalPages":2,"@TotalResources":2},
-			"SupplierInvoices":[{"GivenNumber":1,"SupplierName":"Lev","Currency":"SEK","TotalInvoiceCurrency":1.0}]}`))
+			"SupplierInvoices":[{"GivenNumber":"1","SupplierName":"Lev","Currency":"SEK","Total":"1.00","Balance":"1.00"}]}`))
 	}))
 	defer srv.Close()
 

@@ -5,11 +5,35 @@ import "fmt"
 // SupplierInvoice is the ERP-agnostic domain model for a supplier invoice.
 // Amount carries the currency; there is no separate Currency field.
 type SupplierInvoice struct {
+	// InvoiceNumber is Fortnox's GivenNumber — the document identifier its own
+	// URLs take (/3/supplierinvoices/{GivenNumber}). NOT the supplier's own
+	// invoice number, which is SupplierReference below.
 	InvoiceNumber  int
 	SupplierNumber int
 	SupplierName   string
-	Amount         Money
-	DueDate        string // YYYY-MM-DD; lexicographic comparison is valid for same-timezone dates
+
+	// SupplierReference is the supplier's own invoice number, as printed on
+	// their document. A string because it need not be numeric: "2026/A-114" is
+	// an ordinary value, and parsing it as an int only worked while it happened
+	// to look like a number.
+	SupplierReference string
+
+	// Amount is the invoice total. Balance is what remains owing — the figure
+	// a payment should instruct and the one an ageing report should sum.
+	//
+	// Both were previously read from TotalInvoiceCurrency, a field Fortnox
+	// does not send (verified live 2026-09-14, cmd/fortnox-shape), so every
+	// supplier invoice amount in this system was SEK 0.00.
+	Amount  Money
+	Balance Money
+
+	DueDate string // YYYY-MM-DD; lexicographic comparison is valid for same-timezone dates
+
+	// Booked and Cancelled are sent by Fortnox and were previously ignored.
+	// An unbooked invoice is an obligation that has not reached the general
+	// ledger (#91); a cancelled one is not an obligation at all.
+	Booked    bool
+	Cancelled bool
 }
 
 // IsForeignCurrency reports whether the invoice is denominated in a non-SEK currency.
