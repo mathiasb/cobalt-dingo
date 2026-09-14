@@ -184,6 +184,10 @@ func main() {
 			// appear and a user wondering why.
 			log.Warn("fortnox mode not offered", "reason", reason)
 		}
+		// Printed because "no warning" does not mean "production is available":
+		// a mode with no credential is skipped silently and correctly.
+		log.Info("fortnox modes offered", "modes", config.OfferedModes(modes))
+
 		// Per-owner Fortnox integrations (ADR-0005). The cipher is already
 		// built and required above, so reaching here means it exists.
 		integrationStore := domain.IntegrationStore(postgres.NewIntegrationRepo(pgStore))

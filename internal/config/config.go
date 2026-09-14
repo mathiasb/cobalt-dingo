@@ -407,3 +407,23 @@ func (f Fortnox) CompanyAllowed(name string) bool {
 	}
 	return false
 }
+
+// OfferedModes names the modes that are fully configured, in a stable order.
+//
+// LoadAllModes reports modes that are configured-but-broken; a mode with no
+// credential at all is skipped silently, which is right — production is
+// normally absent — but it means the absence of a warning says nothing about
+// what IS available. This is what the startup log needs to print so the
+// question can be answered without reading the deployment manifest.
+//
+// Ordered sandbox then production rather than by map iteration, so two startup
+// logs can be compared.
+func OfferedModes(modes map[Mode]Fortnox) []string {
+	out := []string{}
+	for _, m := range []Mode{ModeSandbox, ModeProduction} {
+		if _, ok := modes[m]; ok {
+			out = append(out, string(m))
+		}
+	}
+	return out
+}

@@ -398,3 +398,19 @@ func TestLoadAllModes_sharedIdWithoutSharedSecretIsIncompleteNotOffered(t *testi
 	assert.False(t, ok, "a mode missing the secret must not be offered")
 	assert.NotEmpty(t, incomplete, "and it must say why")
 }
+
+// A mode with no client id at all is skipped silently — neither offered nor
+// reported incomplete — which is correct but leaves the startup log unable to
+// answer "is production available?". Absence of a warning is not evidence of
+// presence.
+func TestOfferedModes_isDeterministicAndNamesWhatIsAvailable(t *testing.T) {
+	got := OfferedModes(map[Mode]Fortnox{
+		ModeProduction: {Mode: ModeProduction},
+		ModeSandbox:    {Mode: ModeSandbox},
+	})
+	assert.Equal(t, []string{"sandbox", "production"}, got,
+		"sandbox first, production second — a stable order so two startup logs can be diffed")
+
+	assert.Empty(t, OfferedModes(nil), "no modes is an empty list, not a nil surprise")
+	assert.Equal(t, []string{"production"}, OfferedModes(map[Mode]Fortnox{ModeProduction: {}}))
+}
