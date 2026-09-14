@@ -46,7 +46,18 @@ func Render(ov domain.FinancialOverview) string {
 	if len(ov.UnbalancedVouchers) > 0 {
 		fmt.Fprintf(&b, "  !! %d voucher(s) do not balance internally:\n", len(ov.UnbalancedVouchers))
 		for _, u := range ov.UnbalancedVouchers {
-			fmt.Fprintf(&b, "     %s/%d out by %s\n", u.Series, u.Number, u.Difference.String())
+			fmt.Fprintf(&b, "     %s/%d out by %s — %s\n", u.Series, u.Number, u.Difference.String(), u.Description)
+			// The rows as read. Fortnox will not accept an unbalanced voucher
+			// through its own UI, so the difference means either the API
+			// returned an incomplete set or this code dropped some — and the
+			// only way to tell is to see them.
+			if len(u.Rows) == 0 {
+				b.WriteString("        (no rows returned at all)\n")
+			}
+			for _, r := range u.Rows {
+				fmt.Fprintf(&b, "        %-6d debit %16s  credit %16s  %s\n",
+					r.Account, r.Debit.String(), r.Credit.String(), r.Description)
+			}
 		}
 	}
 

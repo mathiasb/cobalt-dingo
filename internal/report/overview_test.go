@@ -110,3 +110,34 @@ func TestRender_accountLinesAreOnePerLine(t *testing.T) {
 	}
 	assert.Equal(t, 2, found)
 }
+
+// An unbalanced voucher prints the rows that were read. Without them the
+// finding is a dead end: Fortnox will not accept an unbalanced voucher through
+// its own UI, so the difference means either the API returned an incomplete
+// set or this code dropped some, and only the rows distinguish those.
+func TestRender_printsTheRowsOfAnUnbalancedVoucher(t *testing.T) {
+	ov := overview()
+	ov.UnbalancedVouchers = []domain.UnbalancedVoucher{{
+		Series: "M", Number: 2, Description: "Lön september", Difference: sek(-110938),
+		Rows: []domain.VoucherRow{
+			{Account: 7220, Debit: sek(683428), Description: "Lön"},
+			{Account: 2710, Credit: sek(185799)},
+		},
+	}}
+
+	out := report.Render(ov)
+	assert.Contains(t, out, "Lön september")
+	assert.Contains(t, out, "7220")
+	assert.Contains(t, out, "683,428.00")
+	assert.Contains(t, out, "2710")
+}
+
+// A voucher for which no rows came back at all is a different diagnosis from
+// one whose rows are merely incomplete, and the report must not render it as
+// an empty list that looks like a formatting glitch.
+func TestRender_saysWhenNoRowsCameBackAtAll(t *testing.T) {
+	ov := overview()
+	ov.UnbalancedVouchers = []domain.UnbalancedVoucher{{Series: "A", Number: 144, Difference: sek(-694.30)}}
+
+	assert.Contains(t, report.Render(ov), "no rows returned at all")
+}

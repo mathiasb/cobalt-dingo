@@ -23,10 +23,19 @@ type AccountPosition struct {
 }
 
 // UnbalancedVoucher is a journal entry whose own rows do not sum to zero.
+//
+// It carries the rows that were actually read. "Voucher A/144 does not
+// balance" is not actionable — the next question is always "what did you
+// read?", and answering it requires re-fetching the voucher by hand. Fortnox
+// will not accept an unbalanced voucher through its own UI, so a difference
+// here means either the API returned an incomplete set of rows or this code
+// dropped some; both are diagnosed by looking at the rows.
 type UnbalancedVoucher struct {
-	Series     string
-	Number     int
-	Difference Money // debit minus credit
+	Series      string
+	Number      int
+	Description string
+	Difference  Money // debit minus credit
+	Rows        []VoucherRow
 }
 
 // FinancialOverview is the company's position for one financial year.
@@ -134,9 +143,11 @@ func BuildFinancialOverview(
 		}
 		if voucherDiff != 0 {
 			unbalanced = append(unbalanced, UnbalancedVoucher{
-				Series:     v.Series,
-				Number:     v.Number,
-				Difference: Money{MinorUnits: voucherDiff, Currency: currency},
+				Series:      v.Series,
+				Number:      v.Number,
+				Description: v.Description,
+				Difference:  Money{MinorUnits: voucherDiff, Currency: currency},
+				Rows:        v.Rows,
 			})
 		}
 	}
