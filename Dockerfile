@@ -17,11 +17,18 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /bin/migrate
 # it is the only way to inspect a connection made through the web UI, whose
 # token never touches a file.
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /bin/fortnox-check ./cmd/fortnox-check
+# overview ships for the same reason again, plus one of its own: the voucher
+# cache it reads and fills lives in the cluster's postgres, so running it
+# anywhere else would either fill a throwaway cache or need the production DSN
+# on a laptop. Read-only — every client is read-only and the voucher source
+# takes no readOnly flag to get wrong.
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /bin/overview ./cmd/overview
 
 FROM gcr.io/distroless/static-debian12 AS runtime
 COPY --from=builder /bin/cobalt-dingo /cobalt-dingo
 COPY --from=builder /bin/migrate /migrate
 COPY --from=builder /bin/fortnox-check /fortnox-check
+COPY --from=builder /bin/overview /overview
 # golang-migrate reads the .sql files at runtime, so they have to be in the
 # image. MIGRATIONS_DIR points the runner at this path.
 COPY --from=builder /src/migrations /migrations
