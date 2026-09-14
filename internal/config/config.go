@@ -236,6 +236,25 @@ func LoadLLM() LLM {
 	}
 }
 
+// credential resolves a Fortnox credential for a mode.
+//
+// The Fortnox Developer Portal has ONE integration per app: the same client id
+// and secret authorize against a test company and a real one, and which company
+// was picked on the consent screen is the only difference between them
+// (docs/fortnox-integration-model.md). So the shared FORTNOX_CLIENT_ID and
+// FORTNOX_CLIENT_SECRET are the normal case.
+//
+// A per-mode value still wins, for the case where someone genuinely registers
+// two integrations. Requiring one was the mistake: it meant two stored copies
+// of a single secret, and rotating one silently left the other mode on the old
+// value until it failed at token exchange, three steps away from the cause.
+func credential(prefix, suffix string) string {
+	if v := os.Getenv(prefix + suffix); v != "" {
+		return v
+	}
+	return os.Getenv("FORTNOX_" + suffix)
+}
+
 // LoadAllModes returns a config for each FULLY configured mode, plus a
 // human-readable reason for each mode that is configured but unusable.
 //
@@ -254,7 +273,7 @@ func LoadAllModes() (map[Mode]Fortnox, []string) {
 	var incomplete []string
 	for _, m := range []Mode{ModeSandbox, ModeProduction} {
 		p := m.EnvPrefix()
-		if id := os.Getenv(p + "CLIENT_ID"); id != "" {
+		if id := credential(p, "CLIENT_ID"); id != "" {
 			// "service" is the only value Fortnox documents. A typo would
 			// otherwise travel to the authorize endpoint and either be
 			// rejected there or ignored — the second producing a user-bound
@@ -269,8 +288,8 @@ func LoadAllModes() (map[Mode]Fortnox, []string) {
 			}
 
 			var missing []string
-			if os.Getenv(p+"CLIENT_SECRET") == "" {
-				missing = append(missing, p+"CLIENT_SECRET")
+			if credential(p, "CLIENT_SECRET") == "" {
+				missing = append(missing, p+"CLIENT_SECRET or FORTNOX_CLIENT_SECRET")
 			}
 			if os.Getenv(p+"REDIRECT_URI") == "" {
 				missing = append(missing, p+"REDIRECT_URI")
@@ -283,7 +302,7 @@ func LoadAllModes() (map[Mode]Fortnox, []string) {
 			f := Fortnox{
 				Mode:             m,
 				ClientID:         id,
-				ClientSecret:     os.Getenv(p + "CLIENT_SECRET"),
+				ClientSecret:     credential(p, "CLIENT_SECRET"),
 				RedirectURI:      os.Getenv(p + "REDIRECT_URI"),
 				Scopes:           os.Getenv(p + "SCOPES"),
 				InvoiceInbox:     os.Getenv(p + "INVOICE_INBOX"),
@@ -315,8 +334,8 @@ func Load() (Fortnox, error) {
 	p := mode.EnvPrefix()
 	cfg := Fortnox{
 		Mode:             mode,
-		ClientID:         os.Getenv(p + "CLIENT_ID"),
-		ClientSecret:     os.Getenv(p + "CLIENT_SECRET"),
+		ClientID:         credential(p, "CLIENT_ID"),
+		ClientSecret:     credential(p, "CLIENT_SECRET"),
 		RedirectURI:      os.Getenv(p + "REDIRECT_URI"),
 		Scopes:           os.Getenv(p + "SCOPES"),
 		InvoiceInbox:     os.Getenv(p + "INVOICE_INBOX"),
@@ -337,10 +356,10 @@ func Load() (Fortnox, error) {
 	// wrong.
 	cfg.AllowsWrites = os.Getenv(p+"ALLOW_WRITES") == "true"
 	if cfg.ClientID == "" {
-		return Fortnox{}, fmt.Errorf("%sCLIENT_ID is not set (required for FORTNOX_MODE=%s)", p, mode)
+		return Fortnox{}, fmt.Errorf("neither %sCLIENT_ID nor FORTNOX_CLIENT_ID is set (required for FORTNOX_MODE=%s)", p, mode)
 	}
 	if cfg.ClientSecret == "" {
-		return Fortnox{}, fmt.Errorf("%sCLIENT_SECRET is not set (required for FORTNOX_MODE=%s)", p, mode)
+		return Fortnox{}, fmt.Errorf("neither %sCLIENT_SECRET nor FORTNOX_CLIENT_SECRET is set (required for FORTNOX_MODE=%s)", p, mode)
 	}
 	if cfg.RedirectURI == "" {
 		return Fortnox{}, fmt.Errorf("%sREDIRECT_URI is not set (required for FORTNOX_MODE=%s)", p, mode)

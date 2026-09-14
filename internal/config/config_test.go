@@ -76,7 +76,7 @@ func TestLoad_RejectsMissingCredentials(t *testing.T) {
 				t.Setenv("FORTNOX_SANDBOX_CLIENT_SECRET", "s")
 				t.Setenv("FORTNOX_SANDBOX_REDIRECT_URI", "http://localhost/cb")
 			},
-			wantSubstr: "FORTNOX_SANDBOX_CLIENT_ID is not set",
+			wantSubstr: "neither FORTNOX_SANDBOX_CLIENT_ID nor FORTNOX_CLIENT_ID is set",
 		},
 		{
 			name: "production missing CLIENT_SECRET",
@@ -86,7 +86,7 @@ func TestLoad_RejectsMissingCredentials(t *testing.T) {
 				t.Setenv("FORTNOX_PRODUCTION_CLIENT_ID", "id")
 				t.Setenv("FORTNOX_PRODUCTION_REDIRECT_URI", "http://localhost/cb")
 			},
-			wantSubstr: "FORTNOX_PRODUCTION_CLIENT_SECRET is not set",
+			wantSubstr: "neither FORTNOX_PRODUCTION_CLIENT_SECRET nor FORTNOX_CLIENT_SECRET is set",
 		},
 		{
 			name: "sandbox missing REDIRECT_URI",
@@ -157,6 +157,7 @@ func clearFortnoxEnv(t *testing.T) {
 	t.Helper()
 	keys := []string{
 		"FORTNOX_MODE",
+		"FORTNOX_CLIENT_ID", "FORTNOX_CLIENT_SECRET",
 		"FORTNOX_SANDBOX_CLIENT_ID", "FORTNOX_SANDBOX_CLIENT_SECRET",
 		"FORTNOX_SANDBOX_REDIRECT_URI", "FORTNOX_SANDBOX_SCOPES",
 		"FORTNOX_SANDBOX_INVOICE_INBOX",
@@ -323,4 +324,77 @@ func TestLoadAllModes_sandboxIsReadOnlyByDefault(t *testing.T) {
 	require.True(t, ok)
 	assert.False(t, sandbox.AllowsWrites,
 		"the deployed server must not be writable merely because its mode is called sandbox")
+}
+
+// The Fortnox Developer Portal has ONE integration per app — the same client id
+// and secret authorize against a test company and a real one, and which company
+// was picked on the consent screen is the only difference. Mathias, 2026-09-14:
+// "its THE SAME client id and secret for the app, irrespective of if I choose to
+// use it with a test/sandbox company or my prod company."
+//
+// Requiring a per-mode pair meant two stored copies of one secret, which is a
+// rotation hazard: rotate one, and the other mode silently keeps the old value
+// until it fails at token exchange.
+func TestLoadAllModes_sharedCredentialConfiguresBothModes(t *testing.T) {
+	clearFortnoxEnv(t)
+	t.Setenv("FORTNOX_CLIENT_ID", "shared-id")
+	t.Setenv("FORTNOX_CLIENT_SECRET", "shared-secret")
+	t.Setenv("FORTNOX_SANDBOX_REDIRECT_URI", "https://books.example/callback")
+	t.Setenv("FORTNOX_PRODUCTION_REDIRECT_URI", "https://books.example/callback")
+
+	modes, incomplete := LoadAllModes()
+	assert.Empty(t, incomplete)
+
+	for _, m := range []Mode{ModeSandbox, ModeProduction} {
+		cfg, ok := modes[m]
+		require.Truef(t, ok, "%s must be configured from the shared credential", m)
+		assert.Equal(t, "shared-id", cfg.ClientID)
+		assert.Equal(t, "shared-secret", cfg.ClientSecret)
+	}
+}
+
+// A per-mode value still wins, for the case where someone genuinely registers
+// two integrations. The shared credential is the default, not the only option.
+func TestLoadAllModes_perModeCredentialOverridesTheSharedOne(t *testing.T) {
+	clearFortnoxEnv(t)
+	t.Setenv("FORTNOX_CLIENT_ID", "shared-id")
+	t.Setenv("FORTNOX_CLIENT_SECRET", "shared-secret")
+	t.Setenv("FORTNOX_SANDBOX_REDIRECT_URI", "https://books.example/callback")
+	t.Setenv("FORTNOX_PRODUCTION_REDIRECT_URI", "https://books.example/callback")
+	t.Setenv("FORTNOX_PRODUCTION_CLIENT_ID", "own-prod-id")
+	t.Setenv("FORTNOX_PRODUCTION_CLIENT_SECRET", "own-prod-secret")
+
+	modes, _ := LoadAllModes()
+	assert.Equal(t, "shared-id", modes[ModeSandbox].ClientID)
+	assert.Equal(t, "own-prod-id", modes[ModeProduction].ClientID,
+		"a mode with its own integration must not be overridden by the shared one")
+	assert.Equal(t, "own-prod-secret", modes[ModeProduction].ClientSecret)
+}
+
+// Load() feeds the CLI tools, which must resolve the same way as the server.
+func TestLoad_usesTheSharedCredentialWhenNoPerModeOneIsSet(t *testing.T) {
+	clearFortnoxEnv(t)
+	t.Setenv("FORTNOX_MODE", "production")
+	t.Setenv("FORTNOX_CLIENT_ID", "shared-id")
+	t.Setenv("FORTNOX_CLIENT_SECRET", "shared-secret")
+	t.Setenv("FORTNOX_PRODUCTION_REDIRECT_URI", "https://books.example/callback")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	assert.Equal(t, "shared-id", cfg.ClientID)
+	assert.Equal(t, "shared-secret", cfg.ClientSecret)
+}
+
+// Half a shared credential is still half a credential. The existing rule — a
+// mode is not offered unless it has id, secret and redirect — must not be
+// weakened by the fallback.
+func TestLoadAllModes_sharedIdWithoutSharedSecretIsIncompleteNotOffered(t *testing.T) {
+	clearFortnoxEnv(t)
+	t.Setenv("FORTNOX_CLIENT_ID", "shared-id")
+	t.Setenv("FORTNOX_SANDBOX_REDIRECT_URI", "https://books.example/callback")
+
+	modes, incomplete := LoadAllModes()
+	_, ok := modes[ModeSandbox]
+	assert.False(t, ok, "a mode missing the secret must not be offered")
+	assert.NotEmpty(t, incomplete, "and it must say why")
 }
