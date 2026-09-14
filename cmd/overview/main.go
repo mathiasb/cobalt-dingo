@@ -50,6 +50,27 @@ func main() {
 	}
 }
 
+// resolveYear returns the financial year to report on: FORTNOX_YEAR when set
+// explicitly, otherwise the year containing today.
+func resolveYear(ctx context.Context, gl *adapterfortnox.GeneralLedgerAdapter, tenantID domain.TenantID) (int, error) {
+	if raw := os.Getenv("FORTNOX_YEAR"); raw != "" {
+		id, err := strconv.Atoi(raw)
+		if err != nil {
+			return 0, fmt.Errorf("FORTNOX_YEAR must be a financial year ID: %w", err)
+		}
+		return id, nil
+	}
+	years, err := gl.FinancialYears(ctx, tenantID)
+	if err != nil {
+		return 0, fmt.Errorf("list financial years: %w", err)
+	}
+	year, err := clitoken.SelectFinancialYear(years, time.Now())
+	if err != nil {
+		return 0, err
+	}
+	return year.ID, nil
+}
+
 func run(log *slog.Logger) error {
 	ctx := context.Background()
 
@@ -65,10 +86,6 @@ func run(log *slog.Logger) error {
 	key := os.Getenv("FORTNOX_INTEGRATION_KEY")
 	if key == "" {
 		return errors.New("FORTNOX_INTEGRATION_KEY is required: stored tokens are encrypted at rest")
-	}
-	yearID, err := strconv.Atoi(os.Getenv("FORTNOX_YEAR"))
-	if err != nil {
-		return fmt.Errorf("FORTNOX_YEAR must be a financial year ID (see fortnox-check): %w", err)
 	}
 
 	cipher, err := crypto.NewCipher(key)
@@ -91,7 +108,7 @@ func run(log *slog.Logger) error {
 	}
 	// Named in the log, because "which company did this report describe" must
 	// be answerable from the output alone (#87).
-	log.Info("reading", "tenant", tenant.ID, "company", tenant.Name, "mode", cfg.Mode, "year", yearID)
+	log.Info("reading", "tenant", tenant.ID, "company", tenant.Name, "mode", cfg.Mode)
 
 	tokens := postgres.NewTokenStore(store, cipher)
 	tok, err := tokens.Load(ctx, tenant.ID)
@@ -110,6 +127,17 @@ func run(log *slog.Logger) error {
 	fmt.Printf("Company: %s (confirmed with Fortnox)\n", tenant.Name)
 
 	gl := adapterfortnox.NewGeneralLedgerAdapter(cfg.BaseURL(), tokens, true)
+
+	// Resolve the year rather than taking an ID. Fortnox's financial-year IDs
+	// are opaque and not in date order, so a hand-supplied number is a guess
+	// with a plausible wrong answer — and a report against the wrong year looks
+	// entirely reasonable.
+	yearID, err := resolveYear(ctx, gl, tenant.ID)
+	if err != nil {
+		return err
+	}
+	log.Info("financial year", "id", yearID)
+
 	accounts, err := gl.ChartOfAccounts(ctx, tenant.ID, yearID)
 	if err != nil {
 		return fmt.Errorf("chart of accounts: %w", err)
