@@ -276,13 +276,27 @@ alongside the other sandbox values.
 
 ## Three corrections to what this document said before
 
-1. **The licence is a step, not a possible prompt.** This file called it an
-   open question and said to treat a licence prompt as "expected rather than a
-   fault". The FAQ is direct: *"The customer must log in to Fortnox and order
-   an integration licence"*, via **Tilläggsbeställning** / Manage users. And
-   for a hidden integration, *"customers can use your Client ID to find it in
-   Fortnox"*. So the real order is: find by Client ID → order the licence →
-   authorize.
+1. **The licence is an error to react to, not a step to do first.**
+   ~~The licence is a step, not a possible prompt.~~ **Corrected again
+   2026-09-14**, after vendoring the FAQ (`docs/vendor/fortnox-guides/`). The
+   sentence quoted here sits under a heading listing **error messages**:
+
+   > **Error message: Missing license** — The customer must log in to Fortnox
+   > and order an integration license. They can do this at
+   > "Tillägsbeställning" or "Manage users" sections.
+
+   So it describes what to do *when Fortnox refuses*, not a prerequisite. The
+   docs nowhere say a licence must exist before authorizing. **Connect first;
+   if "Missing license" comes back, order one then.** Ordering speculatively
+   costs money for a requirement that may not apply.
+
+   Still true from the earlier correction: a hidden integration is found by
+   Client ID, and Tilläggsbeställning / Manage users is where a licence is
+   ordered when one IS required.
+
+   This fact has now been stated wrongly twice in opposite directions. The
+   reason both times was reading a page's prose without its surrounding
+   structure — which is precisely what the vendored corpus fixes.
 
 2. **One redirect URI, not several.** The docs say `redirect_uri` *"Must match
    the Redirect URI for the app set in the Developer Portal. If omitted, it
@@ -312,6 +326,40 @@ alongside the other sandbox values.
 - **#43** (refresh-conflict testability) is upgraded by #57 landing on option C.
 - Scope changes require re-authorization, so the grant decision is made once,
   before connecting — not iterated.
+
+## The vendored developer-portal guides
+
+`docs/vendor/fortnox-guides/` — 16 pages from `fortnox.se/developer`, fetched by
+`scripts/fetch-fortnox-guides.py`.
+
+**Why this corpus and not the API reference.** Five of the six Fortnox mistakes
+in this repo's history came from the developer portal, not from the endpoint
+documentation:
+
+| Mistake | Where the answer was |
+|---|---|
+| Service accounts omitted | FAQ |
+| Licence treated as a prerequisite | FAQ, under *error messages* |
+| Two redirect URIs advised | Developer Portal guide |
+| Integrationer confused with Testmiljöer | Developer Portal guide |
+| Per-mode client id assumed | Developer Portal guide |
+| `/3/inbox` field shapes | the OpenAPI spec — the one exception |
+
+The API reference could not have prevented any of the first five. They are
+facts about how the *portal* works, and they are written down — just not where
+an endpoint lookup would find them.
+
+**Why not a crawler.** Measured 2026-09-14: these pages are server-rendered, so
+a plain GET returns the full text, including the scopes table. crawl4ai
+(infra#187) remains worth building for genuinely JS-rendered sources —
+`apps.fortnox.se/apidocs` is one, which is why its spec download link cannot be
+reached this way — but it is not needed here, and using it as the justification
+would have meant making an egress-policy decision in a hurry.
+
+**Refresh** with `scripts/fetch-fortnox-guides.py`. The pages are enumerated
+rather than crawled, one request every two seconds. Vendor docs have no
+changelog, so a `git diff` after a refresh is the only change detection
+available.
 
 ## The vendored OpenAPI spec, and why a lookup tool rather than a RAG
 
