@@ -64,6 +64,12 @@ func main() {
 	fmt.Printf("  Writes allowed       : %v\n", cfg.AllowsWrites)
 	fmt.Printf("  Unpaid invoices      : %d\n", count)
 	fmt.Printf("  Inbox (Arkivplats)   : %s\n", inboxStatus(cfg.BaseURL(), token.AccessToken, cfg.InvoiceInbox))
+	// Which company is this, really? Two companies on this account are both
+	// named "Definitely Mabe AB" and share organisation number 556836-0688, so
+	// the name proves nothing (#87). The financial-year list is the cheapest
+	// discriminator available: a company that has traded for years has several,
+	// a freshly created one has one.
+	fmt.Printf("  Financial years      : %s\n", financialYearSummary(cfg, token.AccessToken))
 	if acct := os.Getenv("FORTNOX_CHECK_ACCOUNT"); acct != "" {
 		fmt.Printf("  Account %-13s: %s\n", acct, accountStatus(cfg, token.AccessToken, acct))
 	}
@@ -302,4 +308,27 @@ func tokenFromPostgres(dsn string, cfg config.Fortnox, log *slog.Logger) (fortno
 		return fortnox.Token{AccessToken: tok.AccessToken, RefreshToken: tok.RefreshToken, ExpiresAt: tok.ExpiresAt}, nil
 	}
 	return fortnox.Token{}, fmt.Errorf("no stored token for mode %s — connect the company in the web UI first", cfg.Mode)
+}
+
+// financialYearSummary lists the financial years the connected company has.
+//
+// Printed because "which company am I actually talking to" is not answerable
+// from the company name here, and the year list distinguishes a company with
+// history from one created last week without revealing anything sensitive.
+func financialYearSummary(cfg config.Fortnox, token string) string {
+	store := staticTokenStore{token: domain.OAuthToken{AccessToken: token, ExpiresAt: time.Now().Add(time.Hour)}}
+	gl := adapterfortnox.NewGeneralLedgerAdapter(cfg.BaseURL(), store, true)
+
+	years, err := gl.FinancialYears(context.Background(), domain.TenantID("check"))
+	if err != nil {
+		return "unreadable: " + err.Error()
+	}
+	if len(years) == 0 {
+		return "none — this company has no financial years at all"
+	}
+	parts := make([]string, 0, len(years))
+	for _, y := range years {
+		parts = append(parts, fmt.Sprintf("id=%d %s→%s", y.ID, y.From.Format("2006-01-02"), y.To.Format("2006-01-02")))
+	}
+	return fmt.Sprintf("%d: %s", len(years), strings.Join(parts, ", "))
 }
