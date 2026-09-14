@@ -419,9 +419,18 @@ func accountBalanceLine(gl *adapterfortnox.GeneralLedgerAdapter, ctx context.Con
 		if a.Number != num {
 			continue
 		}
-		moved := a.BalanceBF.MinorUnits != a.BalanceCF.MinorUnits
-		verdict := "NO movement this year"
-		if moved {
+		// BalanceCarriedForward is written when a financial year is CLOSED. For
+		// an open year it is zero, which means "not set yet" and not "the
+		// account is empty" — so comparing it against the opening balance
+		// cannot show movement. Claiming it did was this check's fourth wrong
+		// answer about account 1930 in one session, all four from measuring
+		// something other than the question.
+		if a.BalanceCF.MinorUnits == 0 {
+			return fmt.Sprintf("opening %s; carried-forward not set — the year is open, so this cannot show movement either way",
+				a.BalanceBF.String())
+		}
+		verdict := "NO movement"
+		if a.BalanceBF.MinorUnits != a.BalanceCF.MinorUnits {
 			verdict = "MOVED during the year"
 		}
 		return fmt.Sprintf("opening %s → closing %s — %s", a.BalanceBF.String(), a.BalanceCF.String(), verdict)
