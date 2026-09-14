@@ -8,10 +8,12 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/mathiasb/cobalt-dingo/internal/config"
 	"github.com/mathiasb/cobalt-dingo/internal/fortnox"
@@ -44,6 +46,7 @@ func main() {
 	fmt.Printf("  Base URL             : %s\n", cfg.BaseURL())
 	fmt.Printf("  Writes allowed       : %v\n", cfg.AllowsWrites)
 	fmt.Printf("  Unpaid invoices      : %d\n", count)
+	fmt.Printf("  Inbox (Arkivplats)   : %s\n", inboxStatus(cfg.BaseURL(), token.AccessToken, cfg.InvoiceInbox))
 	fmt.Println("─────────────────────────────────────")
 
 	switch cfg.Mode {
@@ -105,4 +108,45 @@ func unpaidSupplierInvoiceCount(baseURL, token string) (int, error) {
 		return 0, fmt.Errorf("decode: %w", err)
 	}
 	return envelope.MetaInformation.TotalResources, nil
+}
+
+// inboxStatus probes /3/inbox and reports in one line.
+//
+// It exists to answer a question that is otherwise only answerable by trying:
+// was the `inbox` scope actually granted? Scopes belong to the integration, so
+// adding one means re-authorizing every connected company — an expensive thing
+// to discover late, and the reason this is checked rather than assumed.
+//
+// The arkivplats address is compared, never printed: it embeds the
+// organisation number, and this output reaches CI logs (#80 keeps org numbers
+// out of the repo for the same reason). Whether it MATCHES is the useful half
+// anyway — a mismatch is the stale-address bug that silently swallowed ten
+// forwards.
+func inboxStatus(baseURL, token, configured string) string {
+	folder, err := fortnox.NewClient(baseURL, token, true).GetInbox()
+	if err != nil {
+		if errors.Is(err, fortnox.ErrInboxScopeMissing) {
+			return "SCOPE MISSING — add `inbox` to the integration and re-authorize"
+		}
+		return "unreachable: " + err.Error()
+	}
+
+	files := len(folder.Files)
+	for _, sub := range folder.Folders {
+		files += len(sub.Files)
+	}
+
+	match := "not configured"
+	if configured != "" {
+		match = "does NOT match INVOICE_INBOX — see #80"
+		if strings.EqualFold(strings.TrimSpace(configured), strings.TrimSpace(folder.Email)) {
+			match = "matches INVOICE_INBOX"
+		}
+		for _, sub := range folder.Folders {
+			if strings.EqualFold(strings.TrimSpace(configured), strings.TrimSpace(sub.Email)) {
+				match = "matches INVOICE_INBOX"
+			}
+		}
+	}
+	return fmt.Sprintf("reachable, %d file(s), address %s", files, match)
 }
