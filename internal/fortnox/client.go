@@ -70,26 +70,40 @@ type SupplierInvoicesResponse struct {
 
 // UnpaidSupplierInvoices fetches all unpaid supplier invoices from Fortnox.
 //
-// Every page, via GetAllPages. This read page one only, and Fortnox paginates
-// at 100 — so a company with more than 100 open invoices would have
-// under-reported what it owes, with nothing about the result to notice (#90).
-// It was invisible because both ledgers are currently empty (#91), which is
-// the argument for fixing it now rather than when it bites.
-//
 // Note that `unpaid` is one of seven documented filters and does NOT include
-// unbooked invoices — see SupplierInvoiceFilters. This function answers
-// "what is unpaid", not "what does the company owe".
+// unbooked invoices — see SupplierInvoiceFilters. This answers "what is
+// unpaid", not "what does the company owe".
 func (c *Client) UnpaidSupplierInvoices() ([]domain.SupplierInvoice, error) {
-	pages, err := c.GetAllPages(c.baseURL + "/3/supplierinvoices?filter=unpaid")
+	return c.supplierInvoicesByFilter("unpaid")
+}
+
+// UnbookedSupplierInvoices fetches supplier invoices registered in Fortnox but
+// not yet booked.
+//
+// They are obligations that reach neither the paid/unpaid view nor the general
+// ledger, so without this they are invisible in every figure the overview
+// reports (#91). Found live 2026-09-14: one supplier and one customer invoice
+// sitting unbooked while both ledger balances read zero.
+func (c *Client) UnbookedSupplierInvoices() ([]domain.SupplierInvoice, error) {
+	return c.supplierInvoicesByFilter("unbooked")
+}
+
+// supplierInvoicesByFilter reads every page for one status filter.
+//
+// One implementation per endpoint, parameterised by filter: the unpaid fetch
+// previously read page one only, and a second hand-written copy for `unbooked`
+// is how that comes back in one of them.
+func (c *Client) supplierInvoicesByFilter(filter string) ([]domain.SupplierInvoice, error) {
+	pages, err := c.GetAllPages(fmt.Sprintf("%s/3/supplierinvoices?filter=%s", c.baseURL, url.QueryEscape(filter)))
 	if err != nil {
-		return nil, fmt.Errorf("unpaid supplier invoices: %w", err)
+		return nil, fmt.Errorf("%s supplier invoices: %w", filter, err)
 	}
 
 	var invoices []domain.SupplierInvoice
 	for i, raw := range pages {
 		var envelope SupplierInvoicesResponse
 		if err := json.Unmarshal(raw, &envelope); err != nil {
-			return nil, fmt.Errorf("decode supplierinvoices page %d: %w", i+1, err)
+			return nil, fmt.Errorf("decode %s supplierinvoices page %d: %w", filter, i+1, err)
 		}
 		for _, row := range envelope.SupplierInvoices {
 			invoices = append(invoices, domain.SupplierInvoice{
@@ -340,20 +354,29 @@ type customerInvoicesResponse struct {
 }
 
 // UnpaidCustomerInvoices fetches all unpaid customer invoices.
-// Calls GET /3/invoices?filter=unpaid, every page.
 //
 // `unpaid` excludes unbooked invoices, which are a separate filter value —
 // see CustomerInvoiceFilters.
 func (c *Client) UnpaidCustomerInvoices() ([]CustomerInvoiceRow, error) {
-	pages, err := c.GetAllPages(c.baseURL + "/3/invoices?filter=unpaid")
+	return c.customerInvoicesByFilter("unpaid")
+}
+
+// UnbookedCustomerInvoices fetches customer invoices not yet booked — money
+// owed TO the company that no ledger balance reflects (#91).
+func (c *Client) UnbookedCustomerInvoices() ([]CustomerInvoiceRow, error) {
+	return c.customerInvoicesByFilter("unbooked")
+}
+
+func (c *Client) customerInvoicesByFilter(filter string) ([]CustomerInvoiceRow, error) {
+	pages, err := c.GetAllPages(fmt.Sprintf("%s/3/invoices?filter=%s", c.baseURL, url.QueryEscape(filter)))
 	if err != nil {
-		return nil, fmt.Errorf("unpaid customer invoices: %w", err)
+		return nil, fmt.Errorf("%s customer invoices: %w", filter, err)
 	}
 	var out []CustomerInvoiceRow
 	for i, raw := range pages {
 		var envelope customerInvoicesResponse
 		if err := json.Unmarshal(raw, &envelope); err != nil {
-			return nil, fmt.Errorf("decode customer invoices page %d: %w", i+1, err)
+			return nil, fmt.Errorf("decode %s customer invoices page %d: %w", filter, i+1, err)
 		}
 		out = append(out, envelope.Invoices...)
 	}

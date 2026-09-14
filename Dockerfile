@@ -23,12 +23,17 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /bin/fortnox
 # on a laptop. Read-only — every client is read-only and the voucher source
 # takes no readOnly flag to get wrong.
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /bin/overview ./cmd/overview
+# fortnox-shape reports what the live API actually returns versus what our
+# structs read (#92). It needs the stored token, so it ships with the rest.
+# Read-only, and prints field names and types only — never values.
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /bin/fortnox-shape ./cmd/fortnox-shape
 
 FROM gcr.io/distroless/static-debian12 AS runtime
 COPY --from=builder /bin/cobalt-dingo /cobalt-dingo
 COPY --from=builder /bin/migrate /migrate
 COPY --from=builder /bin/fortnox-check /fortnox-check
 COPY --from=builder /bin/overview /overview
+COPY --from=builder /bin/fortnox-shape /fortnox-shape
 # golang-migrate reads the .sql files at runtime, so they have to be in the
 # image. MIGRATIONS_DIR points the runner at this path.
 COPY --from=builder /src/migrations /migrations
