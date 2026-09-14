@@ -11,10 +11,17 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /bin/cobalt-
 # the production DSN onto a laptop to run them by hand, which is both a
 # credential-handling step and unrepeatable.
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /bin/migrate ./cmd/migrate
+# fortnox-check ships for the same reason as migrate: it reads the token the
+# cluster already holds, so checking a live connection needs no credential on a
+# laptop. It is read-only — every client it builds passes readOnly=true — and
+# it is the only way to inspect a connection made through the web UI, whose
+# token never touches a file.
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /bin/fortnox-check ./cmd/fortnox-check
 
 FROM gcr.io/distroless/static-debian12 AS runtime
 COPY --from=builder /bin/cobalt-dingo /cobalt-dingo
 COPY --from=builder /bin/migrate /migrate
+COPY --from=builder /bin/fortnox-check /fortnox-check
 # golang-migrate reads the .sql files at runtime, so they have to be in the
 # image. MIGRATIONS_DIR points the runner at this path.
 COPY --from=builder /src/migrations /migrations
