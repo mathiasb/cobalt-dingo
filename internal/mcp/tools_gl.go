@@ -68,7 +68,11 @@ func registerGLTools(s *server.MCPServer, deps Deps) {
 	), glVouchersHandler(deps))
 
 	s.AddTool(mcp.NewTool("gl_voucher_detail",
-		mcp.WithDescription("Full detail for a single voucher identified by series and number."),
+		mcp.WithDescription("Full detail for a single voucher identified by financial year, series and number."),
+		mcp.WithNumber("year_id",
+			mcp.Description("Fortnox financial year ID. Required: voucher numbers restart per series each year, so series and number alone identify one voucher per year."),
+			mcp.Required(),
+		),
 		mcp.WithString("series",
 			mcp.Description("Voucher series (e.g. A, B, SIE)."),
 			mcp.Required(),
@@ -255,7 +259,15 @@ func glVoucherDetailHandler(deps Deps) server.ToolHandlerFunc {
 			return mcp.NewToolResultError(fmt.Sprintf("number required: %v", err)), nil
 		}
 
-		voucher, err := deps.GeneralLdg.VoucherDetail(ctx, deps.TenantID, series, number)
+		// Required rather than defaulted. A default year would answer about a
+		// different voucher than the caller named, and the answer would look
+		// entirely reasonable.
+		yearID, err := req.RequireInt("year_id")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("year_id required: %v", err)), nil
+		}
+
+		voucher, err := deps.GeneralLdg.VoucherDetail(ctx, deps.TenantID, yearID, series, number)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("fetch voucher detail: %v", err)), nil
 		}

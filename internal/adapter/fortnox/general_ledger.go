@@ -133,12 +133,12 @@ func (a *GeneralLedgerAdapter) Vouchers(ctx context.Context, tenantID domain.Ten
 }
 
 // VoucherDetail implements domain.GeneralLedger.
-func (a *GeneralLedgerAdapter) VoucherDetail(ctx context.Context, tenantID domain.TenantID, series string, number int) (domain.Voucher, error) {
+func (a *GeneralLedgerAdapter) VoucherDetail(ctx context.Context, tenantID domain.TenantID, yearID int, series string, number int) (domain.Voucher, error) {
 	c, err := a.client(ctx, tenantID)
 	if err != nil {
 		return domain.Voucher{}, fmt.Errorf("general ledger voucher detail: %w", err)
 	}
-	rv, err := c.GetVoucher(series, number)
+	rv, err := c.GetVoucher(yearID, series, number)
 	if err != nil {
 		return domain.Voucher{}, fmt.Errorf("general ledger voucher detail: %w", err)
 	}

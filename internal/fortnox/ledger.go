@@ -86,7 +86,7 @@ func (c *Client) ListVouchersWithRows(yearID int) ([]VoucherJSON, error) {
 	}
 	out := make([]VoucherJSON, 0, len(heads))
 	for _, h := range heads {
-		full, err := c.GetVoucher(h.VoucherSeries, int(h.VoucherNumber))
+		full, err := c.GetVoucher(yearID, h.VoucherSeries, int(h.VoucherNumber))
 		if err != nil {
 			return nil, fmt.Errorf("voucher %s/%d: %w", h.VoucherSeries, int(h.VoucherNumber), err)
 		}
@@ -99,10 +99,23 @@ func (c *Client) ListVouchersWithRows(yearID int) ([]VoucherJSON, error) {
 	return out, nil
 }
 
-// GetVoucher fetches a single journal entry by series and number.
-// Calls GET /3/vouchers/{series}/{number}.
-func (c *Client) GetVoucher(series string, number int) (VoucherJSON, error) {
-	u := fmt.Sprintf("%s/3/vouchers/%s/%d", c.baseURL, series, number)
+// GetVoucher fetches a single journal entry.
+// Calls GET /3/vouchers/{series}/{number}?financialyear={yearID}.
+//
+// yearID is required, not optional. A voucher is identified by (financial
+// year, series, number) because numbers restart per series each year, so
+// "A/144" names one voucher per year the company has traded. Omitting the
+// parameter lets Fortnox answer about a voucher nobody asked for.
+//
+// Measured on live production 2026-09-14, before this parameter was sent:
+// four of 405 vouchers came back carrying rows that were not theirs — a
+// complete balanced voucher followed by a partial second one. M/2 balanced
+// across its first six rows and then credited account 2650 again, and the
+// company's trial balance was SEK 122,881.80 out as a result. Same failure
+// shape as reading page one of a paginated list: a plausible answer with
+// nothing about it to notice.
+func (c *Client) GetVoucher(yearID int, series string, number int) (VoucherJSON, error) {
+	u := fmt.Sprintf("%s/3/vouchers/%s/%d?financialyear=%d", c.baseURL, series, number, yearID)
 	raw, err := c.Get(u)
 	if err != nil {
 		return VoucherJSON{}, fmt.Errorf("get voucher %s/%d: %w", series, number, err)

@@ -25,7 +25,11 @@ type GeneralLedger interface {
 	AccountBalances(ctx context.Context, tenantID TenantID, yearID int, fromAcct, toAcct int) ([]AccountBalance, error)
 	AccountActivity(ctx context.Context, tenantID TenantID, yearID int, acctNum int, from, to time.Time) ([]VoucherRow, error)
 	Vouchers(ctx context.Context, tenantID TenantID, yearID int, from, to time.Time) ([]Voucher, error)
-	VoucherDetail(ctx context.Context, tenantID TenantID, series string, number int) (Voucher, error)
+	// VoucherDetail requires yearID: voucher numbers restart per series each
+	// financial year, so (series, number) alone names one voucher per year the
+	// company has traded. The ambiguity was not theoretical — see
+	// fortnox.Client.GetVoucher.
+	VoucherDetail(ctx context.Context, tenantID TenantID, yearID int, series string, number int) (Voucher, error)
 	FinancialYears(ctx context.Context, tenantID TenantID) ([]FinancialYear, error)
 	PredefinedAccounts(ctx context.Context, tenantID TenantID) ([]PredefinedAccount, error)
 }
