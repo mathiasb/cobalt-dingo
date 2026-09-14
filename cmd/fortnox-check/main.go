@@ -30,6 +30,7 @@ import (
 
 	adapterfortnox "github.com/mathiasb/cobalt-dingo/internal/adapter/fortnox"
 	"github.com/mathiasb/cobalt-dingo/internal/adapter/postgres"
+	"github.com/mathiasb/cobalt-dingo/internal/clitoken"
 	"github.com/mathiasb/cobalt-dingo/internal/config"
 	"github.com/mathiasb/cobalt-dingo/internal/crypto"
 	"github.com/mathiasb/cobalt-dingo/internal/domain"
@@ -319,23 +320,23 @@ func tokenFromPostgres(dsn string, cfg config.Fortnox, log *slog.Logger) (fortno
 		return fortnox.Token{}, fmt.Errorf("list tenants: %w", err)
 	}
 
-	tokens := postgres.NewTokenStore(store, cipher)
-	suffix := ":" + string(cfg.Mode) + ":"
-	for _, t := range tenants {
-		if !strings.Contains(string(t.ID), suffix) {
-			continue
-		}
-		tok, err := tokens.Load(context.Background(), t.ID)
-		if err != nil {
-			continue
-		}
-		// Named, so the operator can see WHICH company was checked. Getting
-		// this wrong silently is the whole hazard with two companies sharing an
-		// organisation number.
-		log.Info("using stored token", "tenant", t.ID, "company", t.Name)
-		return fortnox.Token{AccessToken: tok.AccessToken, RefreshToken: tok.RefreshToken, ExpiresAt: tok.ExpiresAt}, nil
+	// Shared with cmd/overview. This used to take the first tenant whose ID
+	// contained the mode, which silently picked one of several connected
+	// companies — and two companies on this account share organisation number
+	// 556836-0688 (#87), so the pick looked like a choice.
+	tenant, err := clitoken.SelectTenant(tenants, string(cfg.Mode), os.Getenv("FORTNOX_COMPANY"))
+	if err != nil {
+		return fortnox.Token{}, err
 	}
-	return fortnox.Token{}, fmt.Errorf("no stored token for mode %s — connect the company in the web UI first", cfg.Mode)
+
+	tokens := postgres.NewTokenStore(store, cipher)
+	tok, err := tokens.Load(context.Background(), tenant.ID)
+	if err != nil {
+		return fortnox.Token{}, fmt.Errorf("load token for %s: %w", tenant.ID, err)
+	}
+	// Named, so the operator can see WHICH company was checked.
+	log.Info("using stored token", "tenant", tenant.ID, "company", tenant.Name)
+	return fortnox.Token{AccessToken: tok.AccessToken, RefreshToken: tok.RefreshToken, ExpiresAt: tok.ExpiresAt}, nil
 }
 
 // financialYearSummary lists the financial years the connected company has.
