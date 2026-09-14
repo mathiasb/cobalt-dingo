@@ -72,6 +72,35 @@ type TokenStore interface {
 	Delete(ctx context.Context, tenantID TenantID) error
 }
 
+// VoucherCache stores voucher rows so row-level analysis does not cost one
+// Fortnox request per voucher (ADR-0006, #89).
+//
+// Implementations: internal/adapter/postgres
+//
+// Deliberately NOT a general cache interface. It holds vouchers for a
+// (tenant, financial year) because that is the unit Fortnox reports a total
+// for — and the count comparison against that total is the only thing making
+// a cache of financial data safe here.
+type VoucherCache interface {
+	// LoadYear returns the cached vouchers for a year and when the cache was
+	// last verified complete. A zero time means never verified, which
+	// VoucherCacheState.Assess treats as stale however many rows are present.
+	//
+	// It deliberately does NOT report freshness: that needs Fortnox's live
+	// total, which is a network call and not this port's business. The caller
+	// builds a VoucherCacheState and asks it.
+	LoadYear(ctx context.Context, tenantID TenantID, yearID int) ([]Voucher, time.Time, error)
+
+	// SaveYear replaces the cached set for a year and records the remote total
+	// it was verified against.
+	//
+	// Replaces rather than merges: a merge cannot remove a voucher, and while
+	// posted vouchers are immutable, a cache that can only grow could never
+	// recover from a bad write. remoteTotal is stored so a later read can tell
+	// a cache that was verified complete from one that was merely written.
+	SaveYear(ctx context.Context, tenantID TenantID, yearID int, vouchers []Voucher, remoteTotal int, syncedAt time.Time) error
+}
+
 // PaymentSubmitter initiates a payment batch via PSD2 PISP.
 // Implementations: internal/adapter/tink (future), internal/adapter/nets (future)
 type PaymentSubmitter interface {

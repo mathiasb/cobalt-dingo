@@ -6,6 +6,7 @@ package pgstore
 
 import (
 	"database/sql"
+	"encoding/json"
 	"time"
 )
 
@@ -49,6 +50,23 @@ type FortnoxToken struct {
 	AccessTokenSealed  string
 	RefreshTokenSealed string
 	RefreshTokenFp     string
+}
+
+type FortnoxVoucherCache struct {
+	TenantID        string
+	YearID          int32
+	Series          string
+	Number          int32
+	TransactionDate time.Time
+	Description     string
+	Rows            json.RawMessage
+}
+
+type FortnoxVoucherSync struct {
+	TenantID    string
+	YearID      int32
+	SyncedAt    time.Time
+	RemoteTotal int32
 }
 
 type PaymentBatch struct {
