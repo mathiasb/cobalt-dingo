@@ -42,6 +42,12 @@ import (
 // total unchanged. Rare enough to measure in hours, not minutes.
 const cacheMaxAge = 12 * time.Hour
 
+// tokenHeadroom is how much access-token life this command insists on before
+// it starts reading. A Fortnox access token lasts an hour, so asking for 15
+// minutes costs an occasional early refresh and removes the case where a
+// two-minute fetch expires partway through.
+const tokenHeadroom = 15 * time.Minute
+
 func main() {
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	if err := run(log); err != nil {
@@ -110,7 +116,13 @@ func run(log *slog.Logger) error {
 	// be answerable from the output alone (#87).
 	log.Info("reading", "tenant", tenant.ID, "company", tenant.Name, "mode", cfg.Mode)
 
-	tokens := postgres.NewTokenStore(store, cipher)
+	// Refresh on load, with enough headroom to outlast the read. The first run
+	// for a year makes one request per voucher — about two minutes for 405 —
+	// and OAuthToken.Valid()'s 30-second margin would let the token die
+	// mid-fetch after several hundred requests.
+	tokens := adapterfortnox.NewFortnoxRefreshingTokenStore(
+		postgres.NewTokenStore(store, cipher), cfg, tokenHeadroom, log)
+
 	tok, err := tokens.Load(ctx, tenant.ID)
 	if err != nil {
 		return fmt.Errorf("load token for %s: %w", tenant.ID, err)
