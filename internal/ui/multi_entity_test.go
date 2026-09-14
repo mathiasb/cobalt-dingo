@@ -82,3 +82,78 @@ func TestCallback_allowsReconnectingTheSameCompany(t *testing.T) {
 		require.Equal(t, http.StatusSeeOther, w.Code, "re-authorizing the same company must succeed; body: %s", w.Body.String())
 	}
 }
+
+// Raised by Mathias 2026-09-14: "I could just as easily 'by mistake' choose
+// another real company."
+//
+// True, and nothing stopped it. #88's guards cover the TOOLING — AssertCompany
+// gates e2e-seed and e2e-teardown — and sandbox is read-only since v0.33.0. The
+// connect flow had no guard, so a mis-click stored a real refresh token and
+// rendered real books under a badge reading "Safe to experiment".
+func TestCallback_sandboxRefusesACompanyOutsideTheAllowlist(t *testing.T) {
+	store := newConnectorTokenStore()
+	c := newTestConnector(store)
+	cfg := c.configs[config.ModeSandbox]
+	cfg.AllowedCompanies = []string{"TEST Cobalt Dingo"}
+	c.configs[config.ModeSandbox] = cfg
+
+	stubbedExchangeAndDiscovery(t, domain.Company{Name: "Definitely Mabe AB", OrgNumber: "556836-0688"}, nil)
+	w := httptest.NewRecorder()
+	c.callbackHandler(w, requestWithSession("GET", "/fortnox/callback?code=abc&state=test-oauth-nonce:sandbox", "user-1"))
+
+	assert.Equal(t, http.StatusForbidden, w.Code,
+		"a real company must not be connectable in the mode labelled safe to experiment")
+	assert.Contains(t, w.Body.String(), "TEST Cobalt Dingo",
+		"the refusal must name what IS allowed, or it cannot be acted on")
+	assert.Empty(t, store.tokens, "no token may be stored for a refused company")
+}
+
+func TestCallback_sandboxAcceptsAnAllowlistedCompany(t *testing.T) {
+	store := newConnectorTokenStore()
+	c := newTestConnector(store)
+	cfg := c.configs[config.ModeSandbox]
+	cfg.AllowedCompanies = []string{"TEST Cobalt Dingo"}
+	c.configs[config.ModeSandbox] = cfg
+
+	stubbedExchangeAndDiscovery(t, domain.Company{Name: "TEST Cobalt Dingo", OrgNumber: "556836-0688"}, nil)
+	w := httptest.NewRecorder()
+	c.callbackHandler(w, requestWithSession("GET", "/fortnox/callback?code=abc&state=test-oauth-nonce:sandbox", "user-1"))
+
+	require.Equal(t, http.StatusSeeOther, w.Code, "body: %s", w.Body.String())
+	assert.Len(t, store.tokens, 1)
+}
+
+// No allowlist means no opinion, not "refuse everything". A multi-tenant
+// deployment cannot know its tenants' company names, and a guard that blocks
+// every connection by default would simply be turned off.
+func TestCallback_anUnconfiguredAllowlistPermitsAnyCompany(t *testing.T) {
+	store := newConnectorTokenStore()
+	c := newTestConnector(store)
+
+	stubbedExchangeAndDiscovery(t, domain.Company{Name: "Some Other AB", OrgNumber: "111111-1111"}, nil)
+	w := httptest.NewRecorder()
+	c.callbackHandler(w, requestWithSession("GET", "/fortnox/callback?code=abc&state=test-oauth-nonce:sandbox", "user-1"))
+
+	require.Equal(t, http.StatusSeeOther, w.Code, "body: %s", w.Body.String())
+	assert.Len(t, store.tokens, 1)
+}
+
+// Exact match, not prefix or substring. This account already holds two
+// companies named "Definitely Mabe AB" and one "TEST Cobalt Dingo"; a
+// containment check would let a similarly-named real company through while
+// looking like it worked.
+func TestCallback_allowlistMatchesTheWholeNameOnly(t *testing.T) {
+	store := newConnectorTokenStore()
+	c := newTestConnector(store)
+	cfg := c.configs[config.ModeSandbox]
+	cfg.AllowedCompanies = []string{"TEST Cobalt Dingo"}
+	c.configs[config.ModeSandbox] = cfg
+
+	stubbedExchangeAndDiscovery(t, domain.Company{Name: "TEST Cobalt Dingo 2", OrgNumber: "556836-0688"}, nil)
+	w := httptest.NewRecorder()
+	c.callbackHandler(w, requestWithSession("GET", "/fortnox/callback?code=abc&state=test-oauth-nonce:sandbox", "user-1"))
+
+	assert.Equal(t, http.StatusForbidden, w.Code,
+		"a longer name that merely starts the same is a different company")
+	assert.Empty(t, store.tokens)
+}

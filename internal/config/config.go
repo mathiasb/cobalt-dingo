@@ -106,6 +106,20 @@ type Fortnox struct {
 	// re-authorization for no benefit.
 	AccountType string
 
+	// AllowedCompanies restricts which companies may be connected in this mode,
+	// by the exact name Fortnox reports.
+	//
+	// The Fortnox consent screen lists every company the authorizing user can
+	// reach, real ones beside test ones, and nothing there distinguishes them.
+	// So the mode labelled "Safe to experiment" was one mis-click away from
+	// holding a real refresh token and rendering real books under that badge.
+	//
+	// Empty means no opinion, NOT "refuse everything": a multi-tenant
+	// deployment cannot know its tenants' company names, and a guard that
+	// blocked every connection by default would simply be turned off. It is
+	// set for sandbox in this estate's deployment, where the answer IS known.
+	AllowedCompanies []string
+
 	// BaseURLOverride redirects API calls away from the live Fortnox host.
 	// It is a test-only seam (see adapter/fortnox connector integration
 	// tests) and is deliberately never populated from the environment by
@@ -267,13 +281,14 @@ func LoadAllModes() (map[Mode]Fortnox, []string) {
 				continue
 			}
 			f := Fortnox{
-				Mode:         m,
-				ClientID:     id,
-				ClientSecret: os.Getenv(p + "CLIENT_SECRET"),
-				RedirectURI:  os.Getenv(p + "REDIRECT_URI"),
-				Scopes:       os.Getenv(p + "SCOPES"),
-				InvoiceInbox: os.Getenv(p + "INVOICE_INBOX"),
-				AccountType:  accountType,
+				Mode:             m,
+				ClientID:         id,
+				ClientSecret:     os.Getenv(p + "CLIENT_SECRET"),
+				RedirectURI:      os.Getenv(p + "REDIRECT_URI"),
+				Scopes:           os.Getenv(p + "SCOPES"),
+				InvoiceInbox:     os.Getenv(p + "INVOICE_INBOX"),
+				AccountType:      accountType,
+				AllowedCompanies: splitCompanies(os.Getenv(p + "ALLOWED_COMPANIES")),
 			}
 			f.AllowsWrites = os.Getenv(p+"ALLOW_WRITES") == "true"
 			modes[m] = f
@@ -299,12 +314,13 @@ func Load() (Fortnox, error) {
 	}
 	p := mode.EnvPrefix()
 	cfg := Fortnox{
-		Mode:         mode,
-		ClientID:     os.Getenv(p + "CLIENT_ID"),
-		ClientSecret: os.Getenv(p + "CLIENT_SECRET"),
-		RedirectURI:  os.Getenv(p + "REDIRECT_URI"),
-		Scopes:       os.Getenv(p + "SCOPES"),
-		InvoiceInbox: os.Getenv(p + "INVOICE_INBOX"),
+		Mode:             mode,
+		ClientID:         os.Getenv(p + "CLIENT_ID"),
+		ClientSecret:     os.Getenv(p + "CLIENT_SECRET"),
+		RedirectURI:      os.Getenv(p + "REDIRECT_URI"),
+		Scopes:           os.Getenv(p + "SCOPES"),
+		InvoiceInbox:     os.Getenv(p + "INVOICE_INBOX"),
+		AllowedCompanies: splitCompanies(os.Getenv(p + "ALLOWED_COMPANIES")),
 	}
 	// Writes are opt-in per mode, and "sandbox" does not imply one.
 	//
@@ -338,4 +354,37 @@ func Load() (Fortnox, error) {
 // initialise. See cmd/server/wiring.go.
 func AllowUnauthenticated() bool {
 	return os.Getenv("COBALT_ALLOW_UNAUTHENTICATED") == "true"
+}
+
+// splitCompanies parses a comma-separated company allowlist.
+//
+// Company names contain spaces and non-ASCII characters, so they are split on
+// commas only and trimmed — never on whitespace, which would turn
+// "TEST Cobalt Dingo" into three names that match nothing.
+func splitCompanies(raw string) []string {
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if name := strings.TrimSpace(p); name != "" {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
+// CompanyAllowed reports whether a company may be connected in this mode.
+// An empty allowlist permits everything — see AllowedCompanies.
+func (f Fortnox) CompanyAllowed(name string) bool {
+	if len(f.AllowedCompanies) == 0 {
+		return true
+	}
+	for _, allowed := range f.AllowedCompanies {
+		if strings.EqualFold(strings.TrimSpace(allowed), strings.TrimSpace(name)) {
+			return true
+		}
+	}
+	return false
 }

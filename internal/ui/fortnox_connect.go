@@ -303,6 +303,24 @@ func (c *FortnoxConnector) callbackHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// The consent screen lists every company the authorizing user can reach —
+	// real ones beside test ones, with nothing distinguishing them. So the mode
+	// labelled "Safe to experiment" was one mis-click away from holding a real
+	// refresh token and rendering real books under that badge.
+	//
+	// Checked here rather than in the tooling, because #88's AssertCompany
+	// guards only e2e-seed and e2e-teardown. The connect flow itself had no
+	// guard at all, and it is where the mistake is actually made.
+	if !cfg.CompanyAllowed(company.Name) {
+		c.log.Error("fortnox connect refused: company not allowed in this mode",
+			"owner", sess.Owner, "mode", mode, "company", company.Name)
+		http.Error(w, fmt.Sprintf(
+			"%q cannot be connected in %s mode. Allowed here: %s. Nothing was stored — "+
+				"if you meant to connect a live company, use production.",
+			company.Name, mode, strings.Join(cfg.AllowedCompanies, ", ")), http.StatusForbidden)
+		return
+	}
+
 	tenantID := auth.TenantKey(sess.Owner, mode, companyKey)
 
 	// An organisation number does not identify a Fortnox company. One Fortnox
