@@ -243,3 +243,30 @@ func TestRender_namesTheUnbookedInvoices(t *testing.T) {
 func TestRender_noUnbookedSectionWhenThereAreNone(t *testing.T) {
 	assert.NotContains(t, report.Render(overview()), "UNBOOKED INVOICES")
 }
+
+// A closed year must say so. Before this, both closed production years
+// reported "Result SEK 0.00", which reads as a year that made nothing.
+func TestRender_closedYearStatesTheTransfer(t *testing.T) {
+	ov := overview()
+	ov.Result = sek(665344.17)
+	ov.ResultTransferred = sek(665344.17)
+
+	out := report.Render(ov)
+	assert.Contains(t, out, "Year CLOSED")
+	assert.Contains(t, out, "665,344.17")
+	assert.NotContains(t, out, "does not match")
+}
+
+// If the transfer and the computed result disagree, the two were derived from
+// different things and one is wrong. Saying so beats picking a winner.
+func TestRender_transferDisagreeingWithResultIsFlagged(t *testing.T) {
+	ov := overview()
+	ov.Result = sek(600000)
+	ov.ResultTransferred = sek(665344.17)
+
+	assert.Contains(t, report.Render(ov), "does not match")
+}
+
+func TestRender_openYearSaysNothingAboutClosing(t *testing.T) {
+	assert.NotContains(t, report.Render(overview()), "Year CLOSED")
+}

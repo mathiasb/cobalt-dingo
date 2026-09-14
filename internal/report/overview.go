@@ -105,6 +105,16 @@ func render(ov domain.FinancialOverview, show names) string {
 	fmt.Fprintf(&b, "  Revenue                    %20s\n", ov.Revenue.String())
 	fmt.Fprintf(&b, "  Costs                      %20s\n", ov.Costs.String())
 	fmt.Fprintf(&b, "  Result                     %20s\n", ov.Result.String())
+	if ov.YearClosed() {
+		// Without this line a closed year looks like a year with no result.
+		// The transfer is the evidence that the reported Result is the final
+		// one rather than a running total.
+		fmt.Fprintf(&b, "  Year CLOSED — result transferred to equity: %s\n", ov.ResultTransferred.String())
+		if ov.ResultTransferred.MinorUnits != ov.Result.MinorUnits {
+			fmt.Fprintf(&b, "  !! the transfer (%s) does not match the computed result (%s) — one of them is wrong\n",
+				ov.ResultTransferred.String(), ov.Result.String())
+		}
+	}
 
 	b.WriteString("\nWORKING CAPITAL\n")
 	// The verdict comes FIRST, before the figures it qualifies. A reader who

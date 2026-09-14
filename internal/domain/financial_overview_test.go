@@ -268,3 +268,105 @@ func TestFinancialOverview_cancelledPayablesAreExcluded(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, sek(4000), ov.Payables)
 }
+
+// closedYear reproduces what a CLOSED Swedish financial year looks like in
+// Fortnox: the profit has been transferred out of the profit-and-loss accounts
+// into equity via account 8999 (Årets resultat) against 2099.
+//
+// Measured on live production 2026-09-14 for financial years 1 and 2.
+func closedYear() ([]domain.Account, domain.VoucherSet) {
+	accounts := []domain.Account{
+		{Number: 1930, Description: "Företagskonto"},
+		{Number: 2099, Description: "Årets resultat"},
+		{Number: 3001, Description: "Försäljning"},
+		{Number: 6570, Description: "Bankkostnader"},
+		{Number: 8999, Description: "Årets resultat"},
+	}
+	set := domain.VoucherSet{
+		Freshness: domain.CacheFresh,
+		AsOf:      time.Date(2026, 9, 14, 22, 0, 0, 0, time.UTC),
+		Vouchers: []domain.Voucher{
+			// Trading: 100,000 revenue, 25,000 of cost.
+			{Series: "A", Number: 1, TransactionDate: "2025-06-01", Rows: []domain.VoucherRow{
+				row(1930, 100000, 0), row(3001, 0, 100000),
+			}},
+			{Series: "A", Number: 2, TransactionDate: "2025-06-02", Rows: []domain.VoucherRow{
+				row(6570, 25000, 0), row(1930, 0, 25000),
+			}},
+			// The closing entry: 75,000 profit moved to equity.
+			{Series: "B", Number: 1, TransactionDate: "2025-12-31", Rows: []domain.VoucherRow{
+				row(8999, 75000, 0), row(2099, 0, 75000),
+			}},
+		},
+	}
+	return accounts, set
+}
+
+// Account 8999 is a result DISPOSITION, not a cost. Bucketing it with 4xxx–8xxx
+// counted a closed year's profit as an expense, inflating Costs by exactly the
+// profit and driving the reported Result to 0.00 — which is what production
+// showed for both closed years.
+func TestFinancialOverview_closedYearReportsItsActualResult(t *testing.T) {
+	accounts, set := closedYear()
+
+	ov, err := domain.BuildFinancialOverview(1, accounts, set, nil, nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, sek(100000), ov.Revenue)
+	assert.Equal(t, sek(25000), ov.Costs, "the result transfer is not a cost")
+	assert.Equal(t, sek(75000), ov.Result)
+	assert.Equal(t, sek(75000), ov.ResultTransferred)
+	assert.True(t, ov.YearClosed())
+}
+
+// Excluding 8999 from the cost bucket must not break the accounting identity:
+// its closing balance still belongs in the sum over all accounts.
+func TestFinancialOverview_closedYearStillBalances(t *testing.T) {
+	accounts, set := closedYear()
+
+	ov, err := domain.BuildFinancialOverview(1, accounts, set, nil, nil)
+	require.NoError(t, err)
+
+	assert.Zero(t, ov.Discrepancy.MinorUnits)
+	assert.True(t, ov.Balances())
+}
+
+// An open year has no transfer, so nothing changes for it.
+func TestFinancialOverview_openYearIsNotReportedAsClosed(t *testing.T) {
+	accounts, set := balancedYear()
+
+	ov, err := domain.BuildFinancialOverview(2, accounts, set, nil, nil)
+	require.NoError(t, err)
+
+	assert.False(t, ov.YearClosed())
+	assert.Zero(t, ov.ResultTransferred.MinorUnits)
+	assert.Equal(t, sek(99925), ov.Result)
+}
+
+// A closed year's result must equal what was transferred. If those disagree,
+// the two figures were computed from different things and one of them is
+// wrong — worth asserting rather than assuming.
+func TestFinancialOverview_closedYearResultMatchesTheTransfer(t *testing.T) {
+	accounts, set := closedYear()
+
+	ov, err := domain.BuildFinancialOverview(1, accounts, set, nil, nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, ov.ResultTransferred.MinorUnits, ov.Result.MinorUnits)
+}
+
+// Tax on the year's result (BAS 8910) IS a real cost and must stay in Costs.
+// Excluding the whole 89xx range would have quietly removed it.
+func TestFinancialOverview_taxOnResultRemainsACost(t *testing.T) {
+	accounts, set := closedYear()
+	accounts = append(accounts, domain.Account{Number: 8910, Description: "Skatt på årets resultat"})
+	set.Vouchers = append(set.Vouchers, domain.Voucher{
+		Series: "B", Number: 2, TransactionDate: "2025-12-31",
+		Rows: []domain.VoucherRow{row(8910, 5000, 0), row(2510, 0, 5000)},
+	})
+
+	ov, err := domain.BuildFinancialOverview(1, accounts, set, nil, nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, sek(30000), ov.Costs, "25,000 bank cost + 5,000 tax")
+}

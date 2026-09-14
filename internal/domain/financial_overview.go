@@ -64,6 +64,18 @@ type FinancialOverview struct {
 	Costs   Money
 	Result  Money
 
+	// ResultTransferred is the closing balance of account 8999 (Årets
+	// resultat) — the profit or loss moved out of the profit-and-loss accounts
+	// into equity when a Swedish financial year is closed.
+	//
+	// It is reported separately because it is a DISPOSITION of the result, not
+	// a component of it. Bucketed with 4xxx–8xxx costs it counted a closed
+	// year's profit as an expense, inflating Costs by exactly the profit and
+	// driving the reported Result to 0.00 — which is what production showed
+	// for both closed years on 2026-09-14, alongside Revenue and Costs equal
+	// to the öre.
+	ResultTransferred Money
+
 	// Discrepancy is the sum of every account's closing balance. Double entry
 	// makes it zero; anything else means the brought-forward figures or the
 	// voucher set are incomplete. Reported rather than absorbed — a balance
@@ -103,6 +115,18 @@ type FinancialOverview struct {
 	receivableInvoices []CustomerInvoice
 	payableInvoices    []SupplierInvoice
 }
+
+// resultTransferAccount is BAS 8999, "Årets resultat" — where a closed year's
+// result leaves the profit-and-loss accounts.
+//
+// Exactly this account, not the 89xx range: 8910 is tax on the year's result,
+// which is a real cost, and excluding the range would have quietly removed it
+// from the cost total.
+const resultTransferAccount = 8999
+
+// YearClosed reports whether the year's result has been transferred to equity,
+// which is what distinguishes a closed financial year from an open one.
+func (ov FinancialOverview) YearClosed() bool { return ov.ResultTransferred.MinorUnits != 0 }
 
 // Balances reports whether the accounting identity holds.
 func (ov FinancialOverview) Balances() bool { return ov.Discrepancy.MinorUnits == 0 }
@@ -181,7 +205,7 @@ func BuildFinancialOverview(
 		payableInvoices:    payables,
 	}
 
-	var assets, eqLiab, revenue, costs, total int64
+	var assets, eqLiab, revenue, costs, resultTransferred, total int64
 	for number, a := range byNumber {
 		if !a.seen {
 			// No opening balance and no movement. Listing every unused account
@@ -209,6 +233,10 @@ func BuildFinancialOverview(
 			eqLiab += closing
 		case number < 4000:
 			revenue += closing
+		case number == resultTransferAccount:
+			// Counted in `total` above, so the accounting identity still
+			// holds, but kept out of both Revenue and Costs.
+			resultTransferred += closing
 		default:
 			costs += closing
 		}
@@ -226,6 +254,7 @@ func BuildFinancialOverview(
 	ov.Revenue = Money{MinorUnits: -revenue, Currency: currency}
 	ov.Costs = Money{MinorUnits: costs, Currency: currency}
 	ov.Result = Money{MinorUnits: -revenue - costs, Currency: currency}
+	ov.ResultTransferred = Money{MinorUnits: resultTransferred, Currency: currency}
 	ov.Discrepancy = Money{MinorUnits: total, Currency: currency}
 
 	for _, inv := range receivables {
