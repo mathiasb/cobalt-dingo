@@ -186,6 +186,44 @@ differently-named company, rather than replacing its token. Renaming a company
 in Fortnox trips the same guard, and the message says to disconnect and
 reconnect. A real discriminator is #87.
 
+## Integrations and test environments are different axes
+
+Got this wrong on 2026-09-14 and it is worth stating plainly, because the
+Developer Portal's two tabs look like variations of one thing and are not.
+
+- **Integrationer** — the *app*. One client id, one secret, one scope list, one
+  redirect URI. `cobalt-dingo` / `BjsbPuVeSOAi`.
+- **Testmiljöer** — free test *companies* you create for development.
+  `TEST Cobalt Dingo` (subscription 1818895), `TEST - Definitely Mabe AB`
+  (1552039).
+
+**The same integration authorizes against both test companies and real ones.**
+There is no sandbox-specific app, and no sandbox-specific credential. Creating a
+second integration for "production" is fighting the platform for a separation it
+does not model.
+
+Which means the `FORTNOX_SANDBOX_*` and `FORTNOX_PRODUCTION_*` credential pairs
+in this repo hold **the same client id and secret**. They are not duplicated by
+mistake, and collapsing them into one variable would be the mistake — the two
+modes still differ in `account_type`, in which company is connected, and in the
+tenant key those connections are stored under.
+
+It also confirms rather than contradicts the section below: if one app serves
+both, then the only thing separating test data from real data is **which company
+was picked on the consent screen.**
+
+### The consequence that costs something
+
+A scope list belongs to the app, not to a connection. So adding a scope — such
+as `inbox` — changes it for every company already connected through it, and
+those tokens are **not** upgraded: each needs re-authorizing.
+
+Practical ordering, so a mistake lands on a test company:
+
+1. Edit the integration's scopes
+2. Reconnect a **test** company and let E2E prove it end to end
+3. Only then connect the real one
+
 ## Which books am I actually touching?
 
 **There is no Fortnox sandbox.** `FORTNOX_MODE` selects which OAuth credentials
