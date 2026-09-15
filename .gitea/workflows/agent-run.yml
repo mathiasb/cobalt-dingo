@@ -195,18 +195,29 @@ jobs:
             exit 1
           fi
           branch="agent/issue-${{ github.event.issue.number }}"
-          # persist-credentials: false leaves this checkout with no auth of its
-          # own. The job supplies one HERE, after the agent has finished, from
-          # the write-capable secrets.GITEA_TOKEN bound to this step -- and
-          # --local, so it is not left on the runner for a later job to inherit.
-          # The value never reaches argv: the helper reads it at push time.
-          git config --local credential.helper '!f() { echo username=ci; echo password=$GITEA_TOKEN; }; f'
           git config user.name  "agent-ci"
           git config user.email "agent-ci@d-ma.be"
           git checkout -b "$branch"
           git add -A
           git commit -m "agent: address #${{ github.event.issue.number }}" -m "Opened by the agent-run workflow. Closes nothing automatically — a human reviews, merges and closes."
-          git push origin "$branch"
+          # Push over SSH, not HTTPS. persist-credentials: false left this
+          # checkout with no auth, and the obvious replacement -- a credential
+          # helper feeding secrets.GITEA_TOKEN -- gets 403: the Actions token
+          # is not push-capable on this instance (run 7157 committed
+          # agent/issue-15 fine, then "fatal: ... The requested URL returned
+          # error: 403").
+          #
+          # SSH from the runner is the pattern the rest of the estate already
+          # uses for exactly this: dispatch's own CD pins the infra manifest
+          # via ssh://git@10.0.1.20:30022 and notes "every repo's self-hosted
+          # runner -- no new credential needed here". Port 30022 is the
+          # NodePort gitea actually serves SSH on; the advertised port 22 is
+          # refused.
+          #
+          # This does not hand the agent a push path: `git push` and `git
+          # remote` are both outside CIPolicy's git verbs (dispatch#72), and
+          # this step runs after the agent has finished.
+          git push "ssh://git@10.0.1.20:30022/${{ github.repository }}.git" "$branch"
           curl -sS -X POST \
             -H "Authorization: token $GITEA_TOKEN" \
             -H "Content-Type: application/json" \
