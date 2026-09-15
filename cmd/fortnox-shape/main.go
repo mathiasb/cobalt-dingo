@@ -110,7 +110,8 @@ func run(log *slog.Logger) error {
 		return err
 	}
 	tokens := adapterfortnox.NewFortnoxRefreshingTokenStore(
-		postgres.NewTokenStore(store, cipher), cfg, 5*time.Minute, log)
+		postgres.NewTokenStore(store, cipher), cfg, 5*time.Minute, log).
+		WithRefreshLock(postgres.NewRefreshLock(store, log))
 	tok, err := tokens.Load(ctx, tenant.ID)
 	if err != nil {
 		return fmt.Errorf("load token: %w", err)

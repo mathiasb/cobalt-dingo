@@ -23,6 +23,12 @@ import (
 // supplierCacheTTL is how long IBAN/BIC lookups are cached per supplier.
 const supplierCacheTTL = 5 * time.Minute
 
+// serverTokenHeadroom is how much access-token life the web app insists on.
+// Shorter than the overview's 15 minutes: a page render is a handful of
+// requests, not a two-minute voucher sweep, so the only thing to avoid is
+// expiry mid-request.
+const serverTokenHeadroom = 2 * time.Minute
+
 func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
@@ -119,6 +125,24 @@ func main() {
 		if tokenStore == nil {
 			tokenStore = file.NewTokenStore(cfg.Mode.TokenFile())
 		}
+		// Refresh lives in ONE place, and it is serialised. Connector used to
+		// refresh inline with its own copy of the logic; two refresh paths is
+		// what let three processes present the same rotating refresh token to
+		// Fortnox on 2026-09-14, which invalidated the family and forced a
+		// manual re-authorization.
+		//
+		// The lock needs postgres. Without it (file-backed token, local dev)
+		// the store still refreshes, just unserialised — acceptable only
+		// because a single local process is the one case where there is
+		// nothing to race against.
+		refreshing := adapterfortnox.NewFortnoxRefreshingTokenStore(tokenStore, cfg, serverTokenHeadroom, log)
+		if pgStore != nil {
+			refreshing = refreshing.WithRefreshLock(postgres.NewRefreshLock(pgStore, log))
+		} else {
+			log.Warn("no postgres: token refresh is NOT serialised across processes")
+		}
+		tokenStore = refreshing
+
 		connector := adapterfortnox.NewConnector(cfg, tokenStore, log)
 		invoiceSource = connector
 		enricher = adapterfortnox.NewCachingEnricher(connector, supplierCacheTTL)

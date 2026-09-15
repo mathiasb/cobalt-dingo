@@ -122,7 +122,8 @@ func run(log *slog.Logger) error {
 	// and OAuthToken.Valid()'s 30-second margin would let the token die
 	// mid-fetch after several hundred requests.
 	tokens := adapterfortnox.NewFortnoxRefreshingTokenStore(
-		postgres.NewTokenStore(store, cipher), cfg, tokenHeadroom, log)
+		postgres.NewTokenStore(store, cipher), cfg, tokenHeadroom, log).
+		WithRefreshLock(postgres.NewRefreshLock(store, log))
 
 	tok, err := tokens.Load(ctx, tenant.ID)
 	if err != nil {

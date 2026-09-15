@@ -35,6 +35,23 @@ type RefreshingTokenStore struct {
 	minLifetime time.Duration
 	now         func() time.Time
 	log         *slog.Logger
+	lock        domain.RefreshLock
+}
+
+// WithRefreshLock serialises refreshes across processes.
+//
+// Required wherever more than one process can hold the same tenant's token.
+// On 2026-09-14 three overview Jobs started in the same second, all loaded the
+// same token, all found it expired, and all POSTed the SAME refresh token to
+// Fortnox before any had stored a replacement. Fortnox rotates refresh tokens
+// and detects reuse, so it invalidated the whole family — the production
+// connection had to be re-authorized by hand at a consent screen.
+//
+// AtomicRefresh cannot prevent that: its compare-and-swap runs AFTER the HTTP
+// call, by which time the reuse has already happened.
+func (s *RefreshingTokenStore) WithRefreshLock(lock domain.RefreshLock) *RefreshingTokenStore {
+	s.lock = lock
+	return s
 }
 
 var _ domain.TokenStore = (*RefreshingTokenStore)(nil)
@@ -84,6 +101,31 @@ func (s *RefreshingTokenStore) Load(ctx context.Context, tenantID domain.TenantI
 		return domain.OAuthToken{}, fmt.Errorf(
 			"token for %s expires at %s and has no refresh token — reconnect the company",
 			tenantID, tok.ExpiresAt.Format(time.RFC3339))
+	}
+
+	if s.lock != nil {
+		release, lerr := s.lock.Acquire(ctx, tenantID)
+		if lerr != nil {
+			// Deliberately NOT falling through to an unserialised refresh.
+			// That is precisely the behaviour that revoked the token: a failed
+			// read is recoverable, a revoked token needs a human at a consent
+			// screen.
+			return domain.OAuthToken{}, fmt.Errorf("acquire refresh lock for %s: %w", tenantID, lerr)
+		}
+		defer release()
+
+		// Re-read UNDER the lock. Whoever held it before us may have already
+		// refreshed, in which case their token is good and calling the token
+		// endpoint again would present a refresh token Fortnox has consumed.
+		fresh, rerr := s.inner.Load(ctx, tenantID)
+		if rerr != nil {
+			return domain.OAuthToken{}, fmt.Errorf("re-read token for %s under refresh lock: %w", tenantID, rerr)
+		}
+		if fresh.AccessToken != "" && s.now().Add(s.minLifetime).Before(fresh.ExpiresAt) {
+			s.log.Info("another process refreshed first; using its token", "tenant", tenantID)
+			return fresh, nil
+		}
+		tok = fresh
 	}
 
 	newTok, err := s.refresh(tok.RefreshToken)

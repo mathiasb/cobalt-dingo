@@ -130,3 +130,22 @@ type PaymentSubmitter interface {
 
 // SubmissionRef is the opaque reference returned by the PISP after submission.
 type SubmissionRef string
+
+// RefreshLock serialises OAuth token refreshes for one tenant across
+// processes.
+//
+// Implementations: internal/adapter/postgres
+//
+// Exists because Fortnox rotates the refresh token on every use and detects
+// reuse. Two processes that refresh concurrently both present the same refresh
+// token, and Fortnox invalidates the entire family — which revoked this
+// estate's production connection on 2026-09-14 and required a human to
+// re-authorize at a consent screen.
+//
+// A compare-and-swap on the stored token cannot substitute for this: the swap
+// happens after the network call, so the damage is already done.
+type RefreshLock interface {
+	// Acquire blocks until the caller may refresh this tenant's token. The
+	// returned function must be called to release it.
+	Acquire(ctx context.Context, tenantID TenantID) (release func(), err error)
+}
