@@ -217,8 +217,34 @@ jobs:
           # This does not hand the agent a push path: `git push` and `git
           # remote` are both outside CIPolicy's git verbs (dispatch#72), and
           # this step runs after the agent has finished.
+          # AGENT_PR_DEPLOY_KEY is a write deploy key for THIS repo only
+          # (cobalt-dingo#98), mirroring the INFRA_DEPLOY_KEY shape dispatch's
+          # CD uses one repo over. Narrower than a PAT on purpose: git only, no
+          # API surface, and it cannot reach any other repo -- where a
+          # write-scoped PAT would, since effective access is scope n permission
+          # and only the scope half travels with the token (dispatch#67 fix #2).
+          #
+          # It is bound to THIS step, which runs after the agent has finished,
+          # and persist-credentials: false keeps it out of the checkout the
+          # agent works in. That placement is the whole point: run 5915 escaped
+          # on a credential that was in the working tree, not on one the job
+          # held afterwards.
+          #
+          # The runner filesystem persists between jobs, so the key is removed
+          # on the way out whether or not the push succeeds.
+          mkdir -p ~/.ssh
+          trap 'rm -f ~/.ssh/id_agent_pr' EXIT
+          echo '${{ secrets.AGENT_PR_DEPLOY_KEY }}' > ~/.ssh/id_agent_pr
+          chmod 600 ~/.ssh/id_agent_pr
+          ssh-keyscan -p 30022 10.0.1.20 >> ~/.ssh/known_hosts 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/id_agent_pr -o IdentitiesOnly=yes"
           git push "ssh://git@10.0.1.20:30022/${{ github.repository }}.git" "$branch"
-          curl -sS -X POST \
+          # --fail-with-body: the branch is already pushed by this point, so a
+          # rejected PR creation must fail the job loudly rather than exit 0 and
+          # leave a branch nobody opened anything for. The Actions token cannot
+          # git-push on this instance; whether it can create a PR through the
+          # API is a separate permission and is being learned here.
+          curl -sS --fail-with-body -X POST \
             -H "Authorization: token $GITEA_TOKEN" \
             -H "Content-Type: application/json" \
             -d "{\"head\":\"$branch\",\"base\":\"main\",\"title\":\"agent: #${{ github.event.issue.number }} ${{ github.event.issue.title }}\",\"body\":\"Opened by \`agent-run\` for #${{ github.event.issue.number }}.\\n\\nCI is the ground-truth verdict. A human reviews, merges and closes — this workflow does none of those.\"}" \
