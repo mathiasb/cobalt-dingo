@@ -26,6 +26,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/mathiasb/cobalt-dingo/internal/adapter/alert"
 	adapterfortnox "github.com/mathiasb/cobalt-dingo/internal/adapter/fortnox"
 	"github.com/mathiasb/cobalt-dingo/internal/adapter/postgres"
 	"github.com/mathiasb/cobalt-dingo/internal/clitoken"
@@ -207,6 +208,29 @@ func run(log *slog.Logger) error {
 			return fmt.Errorf("unbooked customer invoices: %w", err)
 		}
 	}
+	// Watch for newly appeared unbooked invoices (#93). Enabled for the
+	// scheduled run and off for an ad-hoc one, so reading the report by hand
+	// never consumes an alert that the nightly job should have raised.
+	alerted := false
+	if os.Getenv("OVERVIEW_ALERT_UNBOOKED") == "true" {
+		refs := make([]domain.UnbookedRef, 0, len(ov.UnbookedSupplier)+len(ov.UnbookedCustomer))
+		for _, inv := range ov.UnbookedSupplier {
+			refs = append(refs, domain.UnbookedRef{Kind: domain.UnbookedPayable, InvoiceNumber: inv.InvoiceNumber})
+		}
+		for _, inv := range ov.UnbookedCustomer {
+			refs = append(refs, domain.UnbookedRef{Kind: domain.UnbookedReceivable, InvoiceNumber: inv.InvoiceNumber})
+		}
+		watch := domain.NewUnbookedWatch(postgres.NewUnbookedStore(store), alert.NewLogAlerter(log))
+		change, werr := watch.Check(ctx, tenant.ID, refs)
+		if werr != nil {
+			return fmt.Errorf("unbooked-invoice watch: %w", werr)
+		}
+		alerted = change.HasAlert()
+		if len(change.Resolved) > 0 {
+			log.Info("unbooked invoices resolved since the last run", "count", len(change.Resolved))
+		}
+	}
+
 	// Names are off unless explicitly enabled, and only by the exact string
 	// "true" — the same shape as FORTNOX_<MODE>_ALLOW_WRITES. "1", "yes" and
 	// "TRUE" do not enable it, because a value that ALMOST means true is how
@@ -227,6 +251,13 @@ func run(log *slog.Logger) error {
 	// how a discrepancy becomes permanent; a failing Job gets noticed.
 	if !ov.Balances() {
 		return fmt.Errorf("accounting identity does not hold: out by %s", ov.Discrepancy.String())
+	}
+	// Also non-zero when an alert was raised, so the scheduled run shows as
+	// Failed rather than Complete. Same signal as an error, which is a real
+	// limitation of having one exit code and no delivery channel: a reader has
+	// to open the log to tell an alert from a fault.
+	if alerted {
+		return errors.New("new unbooked invoice(s) — see the ALERT line above")
 	}
 	return nil
 }

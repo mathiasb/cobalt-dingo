@@ -37,3 +37,23 @@ SET synced_at     = EXCLUDED.synced_at,
 SELECT synced_at, remote_total, fetch_version
 FROM fortnox_voucher_sync
 WHERE tenant_id = $1 AND year_id = $2;
+
+-- name: ListUnbookedSeen :many
+-- Ordered for stable output; the caller compares sets, but a stable read makes
+-- two identical states produce identical logs.
+SELECT kind, invoice_number
+FROM fortnox_unbooked_seen
+WHERE tenant_id = $1
+ORDER BY kind, invoice_number;
+
+-- name: RememberUnbooked :exec
+-- first_seen_at is kept on conflict: it records when the obligation was FIRST
+-- noticed, which is the useful fact. Overwriting it on every run would turn it
+-- into "last seen" and lose how long something has been outstanding.
+INSERT INTO fortnox_unbooked_seen (tenant_id, kind, invoice_number, first_seen_at)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (tenant_id, kind, invoice_number) DO NOTHING;
+
+-- name: ForgetUnbooked :exec
+DELETE FROM fortnox_unbooked_seen
+WHERE tenant_id = $1 AND kind = $2 AND invoice_number = $3;

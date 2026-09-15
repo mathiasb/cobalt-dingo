@@ -52,6 +52,13 @@ type FortnoxToken struct {
 	RefreshTokenFp     string
 }
 
+type FortnoxUnbookedSeen struct {
+	TenantID      string
+	Kind          string
+	InvoiceNumber int32
+	FirstSeenAt   time.Time
+}
+
 type FortnoxVoucherCache struct {
 	TenantID        string
 	YearID          int32

@@ -27,6 +27,22 @@ func (q *Queries) DeleteCachedYear(ctx context.Context, arg DeleteCachedYearPara
 	return err
 }
 
+const forgetUnbooked = `-- name: ForgetUnbooked :exec
+DELETE FROM fortnox_unbooked_seen
+WHERE tenant_id = $1 AND kind = $2 AND invoice_number = $3
+`
+
+type ForgetUnbookedParams struct {
+	TenantID      string
+	Kind          string
+	InvoiceNumber int32
+}
+
+func (q *Queries) ForgetUnbooked(ctx context.Context, arg ForgetUnbookedParams) error {
+	_, err := q.db.ExecContext(ctx, forgetUnbooked, arg.TenantID, arg.Kind, arg.InvoiceNumber)
+	return err
+}
+
 const getVoucherSync = `-- name: GetVoucherSync :one
 SELECT synced_at, remote_total, fetch_version
 FROM fortnox_voucher_sync
@@ -100,6 +116,69 @@ func (q *Queries) ListCachedVouchers(ctx context.Context, arg ListCachedVouchers
 		return nil, err
 	}
 	return items, nil
+}
+
+const listUnbookedSeen = `-- name: ListUnbookedSeen :many
+SELECT kind, invoice_number
+FROM fortnox_unbooked_seen
+WHERE tenant_id = $1
+ORDER BY kind, invoice_number
+`
+
+type ListUnbookedSeenRow struct {
+	Kind          string
+	InvoiceNumber int32
+}
+
+// Ordered for stable output; the caller compares sets, but a stable read makes
+// two identical states produce identical logs.
+func (q *Queries) ListUnbookedSeen(ctx context.Context, tenantID string) ([]ListUnbookedSeenRow, error) {
+	rows, err := q.db.QueryContext(ctx, listUnbookedSeen, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListUnbookedSeenRow
+	for rows.Next() {
+		var i ListUnbookedSeenRow
+		if err := rows.Scan(&i.Kind, &i.InvoiceNumber); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const rememberUnbooked = `-- name: RememberUnbooked :exec
+INSERT INTO fortnox_unbooked_seen (tenant_id, kind, invoice_number, first_seen_at)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (tenant_id, kind, invoice_number) DO NOTHING
+`
+
+type RememberUnbookedParams struct {
+	TenantID      string
+	Kind          string
+	InvoiceNumber int32
+	FirstSeenAt   time.Time
+}
+
+// first_seen_at is kept on conflict: it records when the obligation was FIRST
+// noticed, which is the useful fact. Overwriting it on every run would turn it
+// into "last seen" and lose how long something has been outstanding.
+func (q *Queries) RememberUnbooked(ctx context.Context, arg RememberUnbookedParams) error {
+	_, err := q.db.ExecContext(ctx, rememberUnbooked,
+		arg.TenantID,
+		arg.Kind,
+		arg.InvoiceNumber,
+		arg.FirstSeenAt,
+	)
+	return err
 }
 
 const upsertCachedVoucher = `-- name: UpsertCachedVoucher :exec
