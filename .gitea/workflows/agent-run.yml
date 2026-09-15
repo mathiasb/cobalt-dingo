@@ -26,9 +26,12 @@ name: agent run
 # so reusing that label would fire the CronJob and this workflow for the same
 # issue.
 #
-# REQUIRED SECRETS (not yet set on this repo — see the issue that tracks this):
-#   LITELLM_API_KEY   — gateway key (1Password: DMABE_LLMAPI_KEY / password)
-#   LITELLM_BASE_URL  — http://litellm.ai-stack.svc.cluster.local:4000/v1
+# REQUIRED SECRETS (all set on this repo since 2026-09-02):
+#   LITELLM_API_KEY         — gateway key. A rotated one fails the run in ~60ms
+#                             with a LiteLLM 401 indistinguishable from a
+#                             missing key, and nothing alerts on it.
+#   LITELLM_BASE_URL        — http://litellm.ai-stack.svc.cluster.local:4000/v1
+#   DISPATCH_BOT_TOKEN_RO   — read:repository + read:issue, dispatch-bot account
 #
 # The runner is an in-cluster pod (`gitea-runner` namespace), so the service DNS
 # resolves and there are no NetworkPolicies in either namespace to block it.
@@ -78,24 +81,46 @@ jobs:
     #
     # Still not done here (issue's fix #5): not trusting the agent's own summary
     # line is a downstream-consumer discipline change, not a workflow change.
-    # PAUSED AGAIN 2026-09-07 (dispatch#67 reopened). Run 5915 on issue #11
-    # escaped a second time: the "Assert origin/main did not move" verifier
-    # fired correctly (a2a969bf -> ca5bd654), proving fix #4 works and fix #1
-    # does not. dispatch-bot holds only 'read' on this repo and its token was
-    # the only credential in the agent's env, so the write did not come from
-    # this job — the executor still reaches the forge through a hosted MCP
-    # server carrying its own credential. Restore the condition below once
-    # that path is closed and a run proves it.
+    # PAUSED 2026-09-07 after run 5915 on issue #11 escaped a second time, and
+    # RESUMED 2026-09-15 once both halves of that escape were closed.
     #
-    #   if: >-
-    #     github.event.label.name == 'agent/ci-run' ||
-    #     contains(github.event.issue.labels.*.name, 'agent/ci-run')
-    if: false
+    # The pause comment blamed "a hosted MCP server carrying its own
+    # credential". That was wrong, and is corrected here rather than left to
+    # mislead the next reader: the agent used plain `git commit` + `git push`
+    # from the checkout. Two things had to be true at once, and each is now
+    # false independently --
+    #
+    #   CAPABILITY: CIPolicy rewrote MCPTools but inherited BashPrefixes
+    #   verbatim, and DefaultPolicy carries a bare "git", which authorises
+    #   `git push` as much as `git status`. Only COMPOUND commands were ever
+    #   refused (the log shows `|` and `&&` denied); the escape used neither.
+    #   Closed by dispatch#72: CI mode gets git status|diff|log|show.
+    #
+    #   CREDENTIAL: actions/checkout had planted a write-capable auth header
+    #   in .git/config. Closed by persist-credentials: false above.
+    #
+    # Fix #4 below stays exactly as it is. It caught BOTH escapes within a
+    # minute, because it checks the fact rather than trusting the policy --
+    # including on this resume, where the policy is once again believed correct.
+    if: >-
+      github.event.label.name == 'agent/ci-run' ||
+      contains(github.event.issue.labels.*.name, 'agent/ci-run')
     runs-on: self-hosted
     timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # dispatch#67 round two. By default this action writes
+          #   http.<host>.extraheader = AUTHORIZATION: basic ***
+          # -- the JOB's write-capable token -- into .git/config, and only
+          # strips it in a post-step that runs AFTER the agent has finished.
+          # For the whole agent window the untrusted model sits inside a
+          # repository that can push to main with no credential of its own.
+          # That is how run 5915 escaped while the read-only PAT handed to the
+          # agent step (fix #2) was working exactly as designed: that variable
+          # was never the credential in play. The PR step supplies its own.
+          persist-credentials: false
 
       # dispatch#67 fix #4, the verifier for fix #1. "The agent's tools no
       # longer include a forge write" is a claim about CIPolicy; this checks
@@ -170,6 +195,12 @@ jobs:
             exit 1
           fi
           branch="agent/issue-${{ github.event.issue.number }}"
+          # persist-credentials: false leaves this checkout with no auth of its
+          # own. The job supplies one HERE, after the agent has finished, from
+          # the write-capable secrets.GITEA_TOKEN bound to this step -- and
+          # --local, so it is not left on the runner for a later job to inherit.
+          # The value never reaches argv: the helper reads it at push time.
+          git config --local credential.helper '!f() { echo username=ci; echo password=$GITEA_TOKEN; }; f'
           git config user.name  "agent-ci"
           git config user.email "agent-ci@d-ma.be"
           git checkout -b "$branch"
