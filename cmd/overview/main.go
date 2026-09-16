@@ -37,11 +37,21 @@ import (
 	"github.com/mathiasb/cobalt-dingo/internal/report"
 )
 
-// cacheMaxAge is the age backstop. Completeness is checked on every run
-// against Fortnox's own count, so this exists only to catch the case that
-// check cannot see: a voucher deleted AND replaced between runs, leaving the
-// total unchanged. Rare enough to measure in hours, not minutes.
-const cacheMaxAge = 12 * time.Hour
+// cacheMaxAge is the age backstop, and it must OUTLAST the schedule that
+// drives this binary — see cache_age_test.go.
+//
+// Completeness is checked on every run against Fortnox's own count, so this
+// exists only to catch what that check cannot see: a voucher deleted AND
+// replaced between runs, leaving the total unchanged.
+//
+// It was 12h against a nightly CronJob, which meant every scheduled run found
+// the cache stale and re-read all 405 vouchers — one request each, two
+// minutes, growing with the books. The cache paid its full cost and returned
+// nothing. Measured 2026-09-16.
+//
+// A week bounds the blind spot to a human timescale while letting six runs in
+// seven serve from cache in seconds.
+const cacheMaxAge = 7 * 24 * time.Hour
 
 // tokenHeadroom is how much access-token life this command insists on before
 // it starts reading. A Fortnox access token lasts an hour, so asking for 15
