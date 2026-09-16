@@ -3,6 +3,29 @@
     "knowledge": {
       "url": "http://localhost:3100/mcp",
       "description": "Project knowledge base — vector + graph retrieval"
+    },
+    "brain": {
+      "type": "http",
+      "url": "https://koala.tail30472e.ts.net:8443/mcp",
+      "headers": {
+        "Authorization": "Bearer ${BRAIN_MCP_TOKEN}"
+      }
+    },
+    "gitea": {
+      "_comment": "gitea-mcp authenticates by PASS-THROUGH: the bearer is a Gitea PAT it validates against Gitea and then acts as. GITEA_MCP_TOKEN -- which this entry used until 2026-09-08 -- 401s against it, so every harness synced from this file had a dead gitea server and no signal saying so. Probed 2026-09-08: GITEA_MCP_TOKEN 401, DMABE_GITEA_API_TOKEN 200, on both the public and the Serve URL.",
+      "type": "http",
+      "url": "https://koala.tail30472e.ts.net:8446/mcp",
+      "headers": {
+        "Authorization": "Bearer ${DMABE_GITEA_API_TOKEN}"
+      }
+    },
+    "infra": {
+      "_comment": "The bearer is belt-and-braces: this endpoint answers 200 with or without it, since Serve already limits reach to the tailnet. Sending it anyway means the day the server starts enforcing is not the day every harness breaks.",
+      "type": "http",
+      "url": "https://koala.tail30472e.ts.net:8444/mcp",
+      "headers": {
+        "Authorization": "Bearer ${INFRA_MCP_TOKEN}"
+      }
     }
   }
 }

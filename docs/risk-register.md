@@ -9,6 +9,14 @@ supplier invoice to money leaving a bank account, as designed in
 the read-only surface shipped up to v0.64.0 are not re-assessed here; `ADR-0001` and
 `docs/irreversible-operations.md` cover that boundary.
 
+> **Scope note, 2026-09-16.** Payment execution is parked and the venture framing is
+> paused ([ADR-0009](adr/0009-personal-infrastructure-venture-framing-paused.md)).
+> Every entry below therefore describes a path **nobody is currently building**, for a
+> product with **no customers**. `R-COMP-03` in particular is not applicable while there
+> is no customer contract to be missing. The register is retained unchanged rather than
+> deleted: it is the analysis of record, and the resumption triggers in ADR-0009 point
+> back to it. Re-assess before any entry is treated as live again.
+
 **Overall risk level for the payment path: HIGH.** Driven by R-PAY-01, R-AGENT-01 and R-COMP-03.
 Nothing in this register is mitigated today, because none of the payment path is built —
 which is the correct state, and the reason `ADR-0001` holds.

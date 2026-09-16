@@ -1,8 +1,23 @@
 # cobalt-dingo: Product Vision
 
+> **PAUSED 2026-09-16 — read [ADR-0009](../../adr/0009-personal-infrastructure-venture-framing-paused.md) first.**
+> The venture framing this document describes is paused, not abandoned. cobalt-dingo now
+> runs as single-tenant personal finance infrastructure, so the buyer, pricing, tenancy
+> and payment-execution content below describes a product nobody is currently building.
+> Two further corrections, so this is not read as current:
+> - The **graduated autonomy ladder** (levels 1–3) and the **north-star metric**
+>   ("% processed without owner intervention") were superseded on 2026-09-16 by
+>   [ADR-0007](../../adr/0007-approval-is-a-human-act-bound-to-the-artifact.md), which
+>   requires a human approval record before any batch is submitted. Levels 1–3 are
+>   unreachable under it. See #108.
+> - The chart of accounts is **BAS 2026**; this document says BAS 2024.
+>
+> Kept unedited below because it is the reasoning of record for the venture, and the
+> resumption triggers in ADR-0009 point back to it.
+
 **Version**: 0.3.0
 **Date**: 2026-04-15
-**Status**: Approved
+**Status**: Paused (was: Approved) — see ADR-0009
 **Author**: Mathias Bergqvist
 
 ---
