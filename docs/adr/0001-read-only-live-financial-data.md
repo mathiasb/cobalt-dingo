@@ -1,5 +1,5 @@
 ---
-adr:           0001
+adr:           "0001"
 title:         "Live company data is read-only; the write path stays sandbox-only until a later ADR opens it"
 status:        accepted
 date:          2026-09-08

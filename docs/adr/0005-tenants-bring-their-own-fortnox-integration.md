@@ -1,5 +1,5 @@
 ---
-adr:           0005
+adr:           "0005"
 title:         Each tenant registers their own Fortnox integration; cobalt-dingo stores the credentials encrypted
 status:        accepted
 date:          2026-09-12

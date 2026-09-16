@@ -1,5 +1,5 @@
 ---
-adr:           0003
+adr:           "0003"
 title:         "Downstream credentials are keyed by an internal user ID, never by the OIDC subject"
 status:        accepted
 date:          2026-09-08

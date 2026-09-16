@@ -1,5 +1,5 @@
 ---
-adr:           0006
+adr:           "0006"
 title:         Cache Fortnox vouchers, and never serve a cached answer whose completeness was not checked
 status:        amended
 date:          2026-09-14

@@ -1,7 +1,12 @@
 # Payment authority, evidence and liability
 
-**Status:** Draft for decision. Nothing here is decided until the marked
-`DECISION NEEDED` blocks are answered and the result is lifted into an ADR.
+**Status:** Two of the three decisions are taken and recorded as
+[ADR-0007](adr/0007-approval-is-a-human-act-bound-to-the-artifact.md) (authority model,
+and the customer as initiator) and
+[ADR-0008](adr/0008-file-export-is-the-first-submission-channel.md) (channel
+sequencing), both accepted by Mathias 2026-09-16. **The liability allocation in §3.1
+remains open** and is the subject of #106 — see §3.1 for why the instruments that
+authorise a payment do not, by themselves, allocate the loss.
 **Written:** 2026-09-16.
 **Closes:** the deliverable of [#106](https://git.d-ma.be/mathias/cobalt-dingo/issues/106),
 and is the artifact that makes [#20](https://git.d-ma.be/mathias/cobalt-dingo/issues/20)
@@ -100,7 +105,7 @@ Two properties this chain must have, and they are the whole design:
 | Actor | May cause | May never cause |
 |---|---|---|
 | **Payer** (customer's authorised signatory) | Approval of a specific batch; the only actor whose act authorises money movement | — |
-| **Consultant** (accounting firm, acting for the payer) | Everything up to approval: assemble, review, correct, resubmit for approval | Approval, unless the payer has delegated it in a recorded, revocable way |
+| **Consultant** (accounting firm, acting for the payer) | Everything up to approval: assemble, review, correct, resubmit for approval. **Approval itself when a recorded PoA covers it** — the same instrument that makes them *ombud* at Skatteverket — in which case the approval record cites that PoA (ADR-0007) | Approval with no PoA reference recorded. An undocumented delegation is indistinguishable from none |
 | **cobalt-dingo the system** | Detection, enrichment, assembly, submission *of an already-approved artifact* | Approval. Ever. Under any configuration |
 | **An agent** (MCP client, LLM) | Everything the consultant may do, plus proposing | Approval, and any write whose preview it did not show |
 | **Operator** (us) | Infrastructure, support, incident response | Any act inside a tenant's authority chain |
@@ -133,8 +138,56 @@ Sources: a poisoned supplier record in Fortnox, an IBAN changed by an attacker
 faithfully executing a corrupted instruction, and the corruption entered upstream of
 us.**
 
-Liability: **UNRESOLVED.** Note that it is about to be partly regulated, which is the
-single most useful timing fact in this document:
+Liability: **partly settled, and the open part is the part that exposes us.**
+
+The working position offered 2026-09-16 was: *the customer is the initiator, and the PoA
+or PSD2 consent should regulate liability.* The first half is now
+[ADR-0007](adr/0007-approval-is-a-human-act-bound-to-the-artifact.md) and settles the
+posture. The second half needs splitting, because "liability" here is three separate
+limbs and the consent artifacts reach only one of them.
+
+**This analysis is engineering reading, not legal advice.** Statutory mechanics below are
+described functionally and deliberately without article numbers, because the estate's own
+discipline is to verify against EUR-Lex before quoting one. The lawyer dependency named in
+§11 and #106 is exactly this.
+
+| Limb | Who against whom | Governed by | State |
+|---|---|---|---|
+| **1. Authority** — was the payment authorised at all? | Payer ↔ the person who approved | The payer's own signatory rules, or a **PoA** where a consultant approves | **Settled.** ADR-0007: the approval record must name the authority basis, so a consultant's approval is provable exactly when a PoA covers it |
+| **2. Execution** — did the payment reach the account instructed? | Payer ↔ their bank, and (channel b) the platform | The bank agreement; PSD2's regime for unauthorised and for non-executed or defectively-executed transactions | **Mostly settled, per channel.** Not ours to allocate |
+| **3. Defect** — did our software produce a wrong instruction? | Payer ↔ **us** | **Our customer contract. Nothing else.** | **OPEN — this is #106** |
+
+Three reasons limb 3 is not covered by either instrument named:
+
+1. **Channel (a), which ADR-0008 makes our first supported path, has neither.** The payer
+   uploads the file in their own bank portal under their own bank agreement. There is no
+   PSD2 consent because no third-party access right is exercised, and no PoA because we
+   never act toward the bank at all. The only instruments in play are the payer's bank
+   terms and our own.
+2. **PSD2's liability regime does not reach a technology supplier.** It allocates between
+   the payer, their bank and — where one exists — the licensed initiation platform. We are
+   deliberately outside that chain; that is the entire content of the tech-provider
+   posture. So consent governs limb 2 and is silent on limb 3, on *every* channel.
+3. **The failure mode in this section is an *authorised* payment.** The payer approved a
+   batch whose beneficiary IBAN had been substituted upstream. Consent was given, freely
+   and correctly, for the thing that happened. Protections built around *unauthorised*
+   transactions therefore do not engage by construction — which is precisely the gap
+   Verification of Payee exists to close.
+
+**A caution on the PoA specifically.** A PoA held by *us* is not a liability shield and
+may be a liability magnet: acting for the payer toward a third party is a step toward the
+"agent of a payment institution" characterisation that DECISIONS.md 2026-04-15 explicitly
+avoids. The PoA that helps is the one the **consultant** already holds over their client —
+the same instrument that makes them *ombud* at Skatteverket — with us remaining a tool
+neither holding nor relying on it, beyond recording which PoA an approval cited.
+
+**What therefore has to exist for limb 3,** and none of it is written today: a defined
+standard of correctness for what we produce, a liability cap, a notification duty on both
+sides, and professional-indemnity cover sized against a realistic batch. That is a
+lawyer's work, and it is the one dependency in this document with no owner.
+
+Timing note, and the most useful fact here: limb 3's answer is about to be partly shaped
+by regulation moving underneath it.
 
 - **Verification of Payee (VOP)** is mandated by the **Instant Payments Regulation**,
   not by PSD3/PSR. Eurozone PSPs were reachable by 2025-10-09; **non-euro EEA, which
@@ -208,7 +261,7 @@ someone who was not there.
 | Beneficiary snapshot + source + fetch time | At enrichment | The supplier's IBAN today is not evidence of the IBAN we paid |
 | Payee-verification result, when available | At enrichment | §3.1; a dated obligation is coming, and the record is the defence |
 | **Exact batch bytes + content hash** | At assembly | This is the thing approved. Regenerating it is not the same as storing it |
-| **Approval record**: actor identity, timestamp, hash of what was displayed, method (and, when applicable, the bank's own signature reference) | At approval | The authority event. Without the displayed-artifact hash, "approved" is an unfalsifiable claim |
+| **Approval record**: actor identity, **authority basis**, timestamp, hash of what was displayed, method (and, when applicable, the bank's own signature reference) | At approval | The authority event. Without the displayed-artifact hash, "approved" is an unfalsifiable claim |
 | Submission record: channel, credential identity, request id, response | At submission | Distinguishes "we sent it" from "they accepted it" — the gap where duplicates are born |
 | Execution confirmation (camt.05x), actual rate, actual fees | At execution | Reconciliation, and the FX/fee exception lane |
 
@@ -234,16 +287,15 @@ configuration afterthought.
 | **B. Approval per payment** | Each payment approved individually | Lowest blast radius per act, highest friction; realistically means bulk-approving, which re-creates A while feeling safer |
 | **C. Dual authorisation above a threshold** | A second authorised human above a configured amount | Matches how corporate treasury actually works, and is what a finance function will expect to see |
 
-> **DECISION NEEDED — authority model**
-> **Question:** Which model ships first, and is dual authorisation a v1 feature or a
-> configurable we design the schema for and leave off?
-> **Options:** (A) single-per-batch only; (B) per-payment; (C) A plus threshold-based
-> dual authorisation.
-> **Recommendation:** **A now, with the schema shaped for C.** The approval record in
-> §4 should carry a set of approvals rather than one, so adding a second approver later
-> is a policy change and not a migration of evidence. B is friction that buys nothing
-> we do not get from A plus a good preview.
-> **Blocks:** #20 (a platform will ask), #65, #88.
+> **DECIDED 2026-09-16 — [ADR-0007](adr/0007-approval-is-a-human-act-bound-to-the-artifact.md)**
+> **A now, with the record shaped for C.** The approval record carries a *set* of
+> approvers, so threshold-based dual authorisation is later policy rather than a
+> migration of evidence. Per-payment approval (B) was rejected: realistic use is
+> bulk-approving a list, which reconstitutes batch approval while feeling safer.
+> ADR-0007 also settles that **the customer is the initiator** on every channel, and
+> adds a requirement this section did not originally carry — the approval record must
+> name the **authority basis** the approver acted under (own signatory right, or a
+> specific recorded PoA with scope and validity). See §4.
 
 A caution against locking this to any regulatory assumption: the PSR "clarifies the
 treatment of SCA for business-to-business payment flows" and is described as a
@@ -290,18 +342,13 @@ rather than 'settled law.'"* (`wiki/openbanking/facts/corporate-treasury-apis-si
 3. **The regulatory posture is per-channel, not global.** Any statement of the form
    "cobalt-dingo is/is not in scope of PSD2" is wrong unless it names the channel.
 
-> **DECISION NEEDED — channel sequencing**
-> **Question:** Do we harden (a) into a supported, evidenced product path before
-> pursuing (b)?
-> **Options:** (1) harden (a) first, pursue (b) in parallel as a commercial
-> conversation; (2) treat (b) as a prerequisite and leave (a) as the dev artifact it is
-> today; (3) pursue (c) with a specific bank via Jonas's relationships.
-> **Recommendation:** **(1).** It makes the authority, evidence and reconciliation
-> model real against actual money at the lowest regulatory exposure, and every artifact
-> it produces is exactly what (b) needs anyway. It also converts #20 from a blocker
-> into a roadmap item, which is the honest description once (a) works.
-> **Blocks:** #20, #22 (a file-export product and a one-click product are not the same
-> price), #88.
+> **DECIDED 2026-09-16 — [ADR-0008](adr/0008-file-export-is-the-first-submission-channel.md)**
+> **Harden (a) first; pursue (b) in parallel as a commercial conversation, not a
+> prerequisite.** Every artifact (a) forces us to build is what a platform will require
+> before integrating us, so (a) is the preparation for (b) rather than a detour around
+> it. #20 becomes a channel-quality item and should be relabelled off BLOCKER.
+> The case against is recorded in the ADR rather than dismissed: **the one click may be
+> the product**, and #22's pricing must be set against what (a) actually delivers.
 
 ---
 
@@ -338,6 +385,8 @@ EARS-lite, so each line is a test rather than a sentiment. These hold on every c
 ```
 THE SYSTEM SHALL require a human approval record before any batch is submitted
 THE SYSTEM SHALL bind each approval to the content hash of the exact artifact displayed
+THE SYSTEM SHALL record the authority basis each approver acted under, and the PoA
+  reference where the approver is not the payer's own signatory
 THE SYSTEM SHALL regenerate a stored batch byte-identically for the same generator version
 THE SYSTEM SHALL stamp the acting identity on every row in the authority chain
 THE SYSTEM SHALL retain the batch, the approval record and the execution confirmation
@@ -378,15 +427,17 @@ The #20 call script. Our current answer, and where it is missing.
 
 | # | Their question | Our answer today |
 |---|---|---|
-| 1 | Tech provider, or agent of a payment institution? | Technology provider; the platform holds the licences (DECISIONS.md, 2026-04-15). Stated, never tested with a counterparty |
-| 2 | Who initiates, and what evidence proves the payer authorised it? | §1 and §4 — **as of this document**. Not yet implemented |
-| 3 | SCA / signature model? | §5, recommendation A-shaped-for-C. **Needs your decision** |
-| 4 | What prevents wrong or duplicate submission? | §3.2 duplicate key (designed, must be tested); §3.1 beneficiary integrity **unresolved** |
-| 5 | Who bears loss on a misdirected payment? | **Unresolved** — §3.1, and the regime is moving |
+| 1 | Tech provider, or agent of a payment institution? | **Technology provider, and the customer is the initiator** — ADR-0007. Consistent with DECISIONS.md 2026-04-15. Stated, never yet tested with a counterparty |
+| 2 | Who initiates, and what evidence proves the payer authorised it? | §1 and §4, with the authority basis recorded per approval — ADR-0007. Designed, not yet implemented |
+| 3 | SCA / signature model? | **Single approval per batch, record shaped for threshold-based dual** — ADR-0007. `SignaturePolicy` is a replaceable object because the PSR's B2B mechanics are not public |
+| 4 | What prevents wrong or duplicate submission? | §3.2 duplicate key (designed, must be tested); §3.1 beneficiary integrity still the weak point |
+| 5 | Who bears loss on a misdirected payment? | Limbs 1 and 2 settled (§3.1). **Limb 3 — our own defect liability — open, and it is contractual, not statutory.** #106 |
 | 6 | Volumes, currencies, corridors? | **Unknown** — depends on #22, which is also open |
 
-Questions 3, 5 and 6 are ours to answer before the call is worth making. That is the
-whole argument for writing this document before dialling.
+Four of six are now answerable. Questions 5 and 6 remain, and both are commercial rather
+than technical: a contract limb that needs a lawyer, and a buyer that needs #22. Note that
+neither blocks the channel-(a) work ADR-0008 sequences first — they block signing with a
+platform, which is the correct thing for them to block.
 
 ---
 
@@ -395,9 +446,13 @@ whole argument for writing this document before dialling.
 Written as ADR-able statements, so they lift into `docs/adr/0007-*.md` unchanged once
 decided. None of these are implemented today.
 
-1. **`Approval` is a domain concept**, not a UI state: `{approvers[], approved_at,
-   displayed_artifact_hash, method, batch_id}`. A set, not a single approver, so
-   dual authorisation is later policy rather than a migration of evidence.
+1. **`Approval` is a domain concept**, not a UI state: `{approvers[], authority_basis,
+   approved_at, displayed_artifact_hash, method, batch_id}`. A set, not a single
+   approver, so dual authorisation is later policy rather than a migration of evidence.
+   `authority_basis` distinguishes an approver acting on their own signatory right from
+   one acting under a recorded PoA, and carries the PoA reference, scope and validity
+   when it is the latter — without it, a consultant-approved batch cannot be shown to
+   have been authorised (ADR-0007).
 2. **`Batch` gains an immutable approved artifact**: the bytes and their hash, stored
    at approval. `BatchStatus` gains the transition that cannot be reversed.
 3. **`PaymentSubmitter` grows adapters, not branches.** File export is an adapter, not

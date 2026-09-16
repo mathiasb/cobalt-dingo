@@ -1,5 +1,5 @@
 ---
-adr:           0004
+adr:           "0004"
 title:         "One authenticated web front end, in internal/ui; the receipts server serves only /health"
 status:        accepted
 date:          2026-09-08

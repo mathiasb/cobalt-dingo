@@ -1,5 +1,5 @@
 ---
-adr:           0002
+adr:           "0002"
 title:         "Financial sources arrive as parsed files on one ingest channel, not as per-vendor API clients"
 status:        accepted
 date:          2026-09-08

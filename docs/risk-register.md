@@ -9,11 +9,11 @@ supplier invoice to money leaving a bank account, as designed in
 the read-only surface shipped up to v0.64.0 are not re-assessed here; `ADR-0001` and
 `docs/irreversible-operations.md` cover that boundary.
 
-**Overall risk level for the payment path: HIGH.** Driven by R-PAY-01 and R-AGENT-01.
+**Overall risk level for the payment path: HIGH.** Driven by R-PAY-01, R-AGENT-01 and R-COMP-03.
 Nothing in this register is mitigated today, because none of the payment path is built —
 which is the correct state, and the reason `ADR-0001` holds.
 
-Last updated: 2026-09-16.
+Last updated: 2026-09-16 (9 entries; ADR-0007 and ADR-0008 accepted the authority model and channel sequencing, R-COMP-03 added for the defect-liability limb they do not cover).
 
 ---
 
@@ -26,8 +26,8 @@ Last updated: 2026-09-16.
 | Likelihood | M — supplier-invoice fraud is the most common attack on exactly this workflow, and `docs/irreversible-operations.md` already classes supplier bank-detail edits as Tier 3, "quiet and therefore arguably worse" |
 | Impact | H |
 | Overall | **H** |
-| Mitigation | Beneficiary snapshot with provenance stored at enrichment; a change between approval and submission is a refusal, not a silent re-resolve; evidence model shaped to record a payee-verification result before one is required. Liability allocation itself is **unresolved** — that is #106, not a control |
-| Validation | `TestSubmit_RefusesWhenBeneficiaryChangedSinceApproval`; `TestEnrich_StoresBeneficiaryProvenance`; #106 for the liability position |
+| Mitigation | Beneficiary snapshot with provenance stored at enrichment; a change between approval and submission is a refusal, not a silent re-resolve; evidence model shaped to record a payee-verification result before one is required. **Liability is now split three ways** (authority / execution / defect — see §3.1): authority settled by ADR-0007, execution not ours to allocate, **defect liability still open** as #106 and contractual rather than statutory |
+| Validation | `TestSubmit_RefusesWhenBeneficiaryChangedSinceApproval`; `TestEnrich_StoresBeneficiaryProvenance`; #106 for the defect-liability limb |
 | Status | open |
 
 ---
@@ -101,8 +101,8 @@ Last updated: 2026-09-16.
 | Likelihood | M — this is the default outcome unless designed for, because a boolean is the obvious implementation |
 | Impact | H — it is the evidence on which every liability position in #106 rests |
 | Overall | **H** |
-| Mitigation | Approval binds to the content hash of the exact artifact displayed; actor identity stamped at the API boundary (#105); batch bytes stored at approval rather than regenerated; seven-year retention applied to batch, approval and execution confirmation together |
-| Validation | `TestApproval_BindsToDisplayedArtifactHash`; `TestApproval_RecordsActorIdentity`; #105 |
+| Mitigation | ADR-0007: approval binds to the content hash of the exact artifact displayed; actor identity stamped at the API boundary (#105); **authority basis recorded per approver**, with the PoA reference where the approver is not the payer's own signatory; batch bytes stored at approval rather than regenerated; seven-year retention applied to batch, approval and execution confirmation together |
+| Validation | `TestApproval_BindsToDisplayedArtifactHash`; `TestApproval_RecordsActorIdentityAndAuthorityBasis`; #105 |
 | Status | open |
 
 ---
@@ -131,6 +131,21 @@ Last updated: 2026-09-16.
 | Likelihood | M — the short sentence is the one that ends up in a deck |
 | Impact | M |
 | Overall | **M** |
-| Mitigation | Regulatory posture is a property of the submission adapter, documented per channel in `payment-authority-and-liability.md` §6–7. Any client-facing claim names the channel |
+| Mitigation | Regulatory posture is a property of the submission adapter, documented per channel in `payment-authority-and-liability.md` §6–7 and decided in ADR-0008. Any client-facing claim names the channel |
 | Validation | #20's written go/no-go must state the position per channel, not once |
+| Status | open |
+
+---
+
+### R-COMP-03 — Our own defect liability rests on a contract that does not exist
+
+| Field | Value |
+|-------|-------|
+| Risk | A payment goes wrong because our software produced a wrong instruction — a mis-assembled batch, a mis-resolved beneficiary, a duplicate we failed to suppress. Liability for that limb is **not** allocated by the payer's bank agreement, nor by a PSD2 consent (which allocates between payer, bank and any licensed initiation platform, a chain we are deliberately outside), nor by a PoA. It is allocated by our customer contract, and we have none written for it |
+| Regulatory reference | None — and that is the finding. The statutory regimes govern the authority and execution limbs; the defect limb is purely contractual. Note also that the most likely failure (R-PAY-01) is an **authorised** payment, so protections built around unauthorised transactions do not engage by construction |
+| Likelihood | M for a defect occurring at some point across real batches; H that we would be in an undefined position if one did, given the current absence |
+| Impact | H — unbounded in principle. A batch is as large as the customer's payables |
+| Overall | **H** |
+| Mitigation | Needed and absent: a defined standard of correctness for what we produce, a liability cap, a mutual notification duty, and professional-indemnity cover sized against a realistic batch. Note the counter-indication on instruments: a PoA held by **us** is not a shield and arguably weakens the technology-provider posture; the PoA that helps is the one the consultant already holds over their client |
+| Validation | #106 — a written liability position, reviewed by a lawyer, before any batch is submitted on any channel. This is a gate on ADR-0008's channel-(a) hardening reaching a real customer, not on building it |
 | Status | open |
