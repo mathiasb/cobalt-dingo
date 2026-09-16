@@ -77,3 +77,12 @@ amended annual report, whether a corrected VAT declaration is needed for a
 given change. Mathias knows this and I do not. **Where this document and his
 judgement disagree, he is right**, and the entries above should be treated as
 the shape of the problem rather than as advice.
+
+## Scope boundary — this document is only half the problem
+
+Everything above is irreversibility **in the books**, where the correction path
+exists and is named in law: a *rättelseverifikation*. Irreversibility **in the
+money** is the harder half, because the counterparty is a bank and the
+correction path is a recovery request, not a posting. It is covered separately
+in [`payment-authority-and-liability.md`](payment-authority-and-liability.md),
+with the risks it raises tracked in [`risk-register.md`](risk-register.md).
