@@ -26,7 +26,7 @@ func registerAPTools(s *server.MCPServer, deps Deps) {
 	), apOverdueHandler(deps))
 
 	s.AddTool(mcp.NewTool("ap_by_supplier",
-		mcp.WithDescription("Group unpaid invoices by supplier, sorted by total amount descending."),
+		mcp.WithDescription("Group unpaid invoices by supplier with per-currency totals, sorted by total amount descending."),
 		mcp.WithNumber("limit",
 			mcp.Description("Maximum number of suppliers to return (default: all)."),
 		),
@@ -167,12 +167,42 @@ func apOverdueHandler(deps Deps) server.ToolHandlerFunc {
 
 // --- ap_by_supplier ---
 
+// currencyTotal is an invoice total for one currency. Summing amounts across
+// currencies requires FX rates, which the read path does not have, so tools
+// never collapse amounts into a single figure — they return one total per
+// currency instead.
+type currencyTotal struct {
+	Currency string  `json:"currency"`
+	Total    float64 `json:"total"`
+}
+
+// sumCurrencyTotals totals amounts per currency, ordered by first appearance
+// so output is deterministic for a given input order.
+func sumCurrencyTotals(amounts []domain.Money) []currencyTotal {
+	var order []string
+	minorByCurrency := map[string]int64{}
+	for _, amount := range amounts {
+		if _, seen := minorByCurrency[amount.Currency]; !seen {
+			order = append(order, amount.Currency)
+		}
+		minorByCurrency[amount.Currency] += amount.MinorUnits
+	}
+
+	totals := make([]currencyTotal, 0, len(order))
+	for _, currency := range order {
+		totals = append(totals, currencyTotal{
+			Currency: currency,
+			Total:    float64(minorByCurrency[currency]) / 100,
+		})
+	}
+	return totals
+}
+
 type supplierGroup struct {
-	SupplierNumber int      `json:"supplier_number"`
-	SupplierName   string   `json:"supplier_name"`
-	Count          int      `json:"count"`
-	TotalSEK       float64  `json:"total_sek,omitempty"`
-	Currencies     []string `json:"currencies"`
+	SupplierNumber int             `json:"supplier_number"`
+	SupplierName   string          `json:"supplier_name"`
+	Count          int             `json:"count"`
+	Currencies     []currencyTotal `json:"currencies"`
 }
 
 func apBySupplierHandler(deps Deps) server.ToolHandlerFunc {
@@ -193,30 +223,25 @@ func apBySupplierHandler(deps Deps) server.ToolHandlerFunc {
 			return inv.SupplierNumber
 		}) {
 			grp := grouped[num]
-			var total int64
-			currencySet := map[string]struct{}{}
+			amounts := make([]domain.Money, len(grp))
 			name := ""
-			for _, inv := range grp {
-				total += inv.Amount.MinorUnits
-				currencySet[inv.Amount.Currency] = struct{}{}
+			for i, inv := range grp {
+				amounts[i] = inv.Amount
 				name = inv.SupplierName
 			}
-			var currencies []string
-			for c := range currencySet {
-				currencies = append(currencies, c)
-			}
-			sort.Strings(currencies)
 			groups = append(groups, supplierGroup{
 				SupplierNumber: num,
 				SupplierName:   name,
 				Count:          len(grp),
-				TotalSEK:       float64(total) / 100,
-				Currencies:     currencies,
+				Currencies:     sumCurrencyTotals(amounts),
 			})
 		}
 
+		// Single-currency suppliers sort by that currency's total; for a
+		// mixed-currency supplier the first currency's total is used, which
+		// keeps ordering stable without inventing an FX rate.
 		sort.Slice(groups, func(i, j int) bool {
-			return groups[i].TotalSEK > groups[j].TotalSEK
+			return groups[i].Currencies[0].Total > groups[j].Currencies[0].Total
 		})
 
 		if limit > 0 && limit < len(groups) {

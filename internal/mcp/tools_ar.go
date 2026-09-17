@@ -25,7 +25,7 @@ func registerARTools(s *server.MCPServer, deps Deps) {
 	), arOverdueHandler(deps))
 
 	s.AddTool(mcp.NewTool("ar_by_customer",
-		mcp.WithDescription("Group unpaid customer invoices by customer, sorted by total amount descending."),
+		mcp.WithDescription("Group unpaid customer invoices by customer with per-currency totals, sorted by total amount descending."),
 		mcp.WithNumber("limit",
 			mcp.Description("Maximum number of customers to return (default: all)."),
 		),
@@ -151,11 +151,10 @@ func arOverdueHandler(deps Deps) server.ToolHandlerFunc {
 // --- ar_by_customer ---
 
 type customerGroup struct {
-	CustomerNumber int      `json:"customer_number"`
-	CustomerName   string   `json:"customer_name"`
-	Count          int      `json:"count"`
-	TotalSEK       float64  `json:"total_sek,omitempty"`
-	Currencies     []string `json:"currencies"`
+	CustomerNumber int             `json:"customer_number"`
+	CustomerName   string          `json:"customer_name"`
+	Count          int             `json:"count"`
+	Currencies     []currencyTotal `json:"currencies"`
 }
 
 func arByCustomerHandler(deps Deps) server.ToolHandlerFunc {
@@ -176,30 +175,25 @@ func arByCustomerHandler(deps Deps) server.ToolHandlerFunc {
 			return inv.CustomerNumber
 		}) {
 			grp := grouped[num]
-			var total int64
-			currencySet := map[string]struct{}{}
+			amounts := make([]domain.Money, len(grp))
 			name := ""
-			for _, inv := range grp {
-				total += inv.Amount.MinorUnits
-				currencySet[inv.Amount.Currency] = struct{}{}
+			for i, inv := range grp {
+				amounts[i] = inv.Amount
 				name = inv.CustomerName
 			}
-			var currencies []string
-			for c := range currencySet {
-				currencies = append(currencies, c)
-			}
-			sort.Strings(currencies)
 			groups = append(groups, customerGroup{
 				CustomerNumber: num,
 				CustomerName:   name,
 				Count:          len(grp),
-				TotalSEK:       float64(total) / 100,
-				Currencies:     currencies,
+				Currencies:     sumCurrencyTotals(amounts),
 			})
 		}
 
+		// Single-currency customers sort by that currency's total; for a
+		// mixed-currency customer the first currency's total is used, which
+		// keeps ordering stable without inventing an FX rate.
 		sort.Slice(groups, func(i, j int) bool {
-			return groups[i].TotalSEK > groups[j].TotalSEK
+			return groups[i].Currencies[0].Total > groups[j].Currencies[0].Total
 		})
 
 		if limit > 0 && limit < len(groups) {
