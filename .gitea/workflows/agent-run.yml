@@ -188,7 +188,25 @@ jobs:
 
       - name: Open a PR if the agent changed anything
         env:
-          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          # cobalt-dingo#101. The PR is opened as `dispatch-bot`, NOT as the
+          # Actions identity, because Gitea does not fire workflows for events
+          # its own identity creates. A PR opened by gitea-actions therefore got
+          # zero runs -- no CI, and no rubric review either, so ADR-0010's
+          # "on the agent lane it BLOCKS" could never fire on the agent lane.
+          # Verified 2026-09-17: a dispatch-bot-authored PR produces
+          # pull_request runs; a gitea-actions one produces none.
+          #
+          # The token is scope write:repository, which in Gitea is per-CATEGORY
+          # and therefore INCLUDES merge. The bot is stopped from merging by
+          # branch protection (enable_merge_whitelist on main), not by the
+          # scope -- an identity gate is only as real as the identity
+          # separation beneath it (agentsquad#47). Verified mechanically with
+          # this exact credential before wiring it here:
+          #   open a PR        -> 201
+          #   merge that PR    -> 405  User not allowed to merge PR
+          #   commit to main   -> 403  user cannot commit to repo
+          # Re-run those three after any branch-protection change.
+          GITEA_TOKEN: ${{ secrets.AGENT_PR_BOT_TOKEN }}
         run: |
           if git diff --quiet && git diff --cached --quiet; then
             # dispatch#67 fix #3: "no changes" used to exit 0. The job cannot
