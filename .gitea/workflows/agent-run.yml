@@ -19,8 +19,15 @@ name: agent run
 # THE AGENT NEVER PUSHES. It edits files in the checkout; this job creates the
 # branch, commits, and opens the PR. That is the important difference from the
 # issue flow, where the agent held a push credential and pushed to main. Agent
-# edits to workflows or tests now arrive as a reviewable diff behind branch
-# protection (dispatch#55).
+# edits to workflows or tests now arrive as a reviewable diff (dispatch#55).
+#
+# CORRECTED 2026-09-17: this said "behind branch protection", and there was none.
+# The API returned {"protected": false} for this repo, dispatch and hyperguild
+# alike. What actually held the line was "Assert origin/main did not move" below,
+# which is a DETECTOR, not a preventer -- it caught both real escapes after the
+# fact. Protection with a push whitelist and a rubric review on the agent lane
+# landed in ADR-0010; the required-status-check half is #112 and is not live yet,
+# so do not read this line as a wall again until that closes.
 #
 # Deliberately NOT `status:dispatch`: this repo is still in dispatch-repos.txt,
 # so reusing that label would fire the CronJob and this workflow for the same

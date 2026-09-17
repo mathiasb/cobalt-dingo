@@ -1,0 +1,134 @@
+name: PR review
+
+# An LLM reviews every PR diff against .review/rubric.md and posts one sticky
+# comment. On the agent lane it BLOCKS; on Mathias's own PRs it is advisory.
+# Decided in docs/adr/0010-the-agent-lane-is-gated-by-a-versioned-review-rubric.md.
+#
+# WHY THIS EXISTS: agent-run.yml opens PRs and its body says "a human reviews,
+# merges and closes". Under ADR-0009 that human is one person with no external
+# forcing function — which ADR-0009 itself names as the main risk of running this
+# repo as personal infrastructure. This is that forcing function.
+#
+# WHY ONE STAGE, NOT TWO. erp-mafia/accounted splits this into `pull_request` ->
+# `workflow_run` so the privileged half never checks out a fork's head. We have no
+# forks: every PR is same-repo, from Mathias or from agent-run. Copying the split
+# would buy nothing and import their worst bug — `workflow_run` jobs do not appear
+# in the PR's checks list, which is how ten consecutive PRs of theirs got no
+# compliance signal at all and nobody noticed.
+#
+# The trust separation we DO need is a different one, and it is below: this job
+# holds the model credential and a comment-capable token, so it checks out the
+# BASE sha and never the PR head. The head arrives as a diff — data, read by a
+# binary compiled from the base tree. No code from the PR is built or run here.
+#
+# Consequence worth knowing: a PR that edits the rubric or the reviewer is judged
+# by the version on main. Loosening lands only once merged. That is deliberate.
+#
+# REQUIRED SECRETS (already set on this repo for agent-run.yml):
+#   LITELLM_API_KEY   — gateway key. A rotated one fails in ~60ms with a 401
+#                       indistinguishable from a missing key, and nothing alerts.
+#   LITELLM_BASE_URL  — http://litellm.ai-stack.svc.cluster.local:4000/v1
+# GITEA_TOKEN is the job's own; it posts the comment and nothing else.
+
+"on":
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: pr-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: Rubric review
+    runs-on: self-hosted
+    timeout-minutes: 15
+    steps:
+      # The BASE sha, not the head. persist-credentials: false because nothing
+      # here needs to push, and a write-capable header sitting in .git/config is
+      # how run 5915 escaped in agent-run.yml.
+      - name: Checkout the base tree
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      # Plumbing only. No dependency install, no repo code, nothing that runs a
+      # hook — the PR head is fetched as objects and diffed, never checked out.
+      - name: Compute the diff
+        env:
+          # Never interpolate ${{ }} into a shell body: substitution happens
+          # before bash parses, so a value with metacharacters is an execution
+          # sink. Through env: it is just a string.
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          for sha in "$BASE_SHA" "$HEAD_SHA"; do
+            case "$sha" in
+              [0-9a-f]*) [ ${#sha} -ge 7 ] || { echo "::error::short sha: $sha" >&2; exit 1; } ;;
+              *) echo "::error::not a hex sha: $sha" >&2; exit 1 ;;
+            esac
+          done
+          git fetch --no-tags origin "$HEAD_SHA" "$BASE_SHA"
+          git diff "$BASE_SHA...$HEAD_SHA" > /tmp/pr.diff
+          wc -c < /tmp/pr.diff
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Build the reviewer from the base tree
+        run: go build -o /tmp/pr-review ./cmd/pr-review
+
+      # One step, three outcomes, because the difference between them is the
+      # control:
+      #   exit 2 — the reviewer did not produce a usable verdict. ALWAYS fails,
+      #            on every lane. "No output" must never pass as green; that is
+      #            precisely how accounted's compliance gate went quiet for ten
+      #            PRs, and the estate's own rule is to check the exit code
+      #            rather than trust a summary line.
+      #   exit 1 — findings at or above the threshold stand unanswered. Fails on
+      #            the agent lane only.
+      #   exit 0 — clean, below threshold, or accepted with a recorded reason.
+      - name: Review
+        env:
+          LITELLM_BASE_URL: ${{ secrets.LITELLM_BASE_URL }}
+          LITELLM_API_KEY: ${{ secrets.LITELLM_API_KEY }}
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          REVIEW_MODEL: koala/qwen36-35b-a3b
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_REF: ${{ github.head_ref }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -uo pipefail
+          case "$PR_NUMBER" in ''|*[!0-9]*) echo "::error::bad PR number" >&2; exit 1 ;; esac
+
+          lane=advisory
+          case "$HEAD_REF" in agent/*) lane=blocking ;; esac
+          echo "lane=$lane head_ref=$HEAD_REF"
+
+          /tmp/pr-review \
+            -diff /tmp/pr.diff \
+            -rubric .review/rubric.md \
+            -threshold high \
+            -repo "$REPO" \
+            -pr "$PR_NUMBER"
+          rc=$?
+
+          case "$rc" in
+            0) echo "review clean or below threshold" ;;
+            1)
+              if [ "$lane" = blocking ]; then
+                echo "::error::Blocking findings on the agent lane. Fix them, or answer one on the PR with 'review-accept: R-XXX-NN -- reason'." >&2
+                exit 1
+              fi
+              echo "::warning::Blocking-severity findings; advisory on this lane. See the review comment." >&2
+              ;;
+            *)
+              echo "::error::the reviewer produced no usable verdict (exit $rc). This PR is UNREVIEWED — it is not clean." >&2
+              exit 1
+              ;;
+          esac
