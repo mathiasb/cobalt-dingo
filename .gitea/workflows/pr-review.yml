@@ -110,13 +110,24 @@ jobs:
           case "$HEAD_REF" in agent/*) lane=blocking ;; esac
           echo "lane=$lane head_ref=$HEAD_REF"
 
+          # `|| rc=$?`, not a bare call. Gitea invokes `run:` as `bash -e`, and
+          # the `set -uo pipefail` above ADDS options -- it does not clear the
+          # -e the runner already applied. So a bare call exits the step the
+          # instant the reviewer returns 1, before `rc=$?` is ever assigned,
+          # and every branch below this is dead code.
+          #
+          # First run of this workflow (PR #115) proved it: lane was correctly
+          # detected as `advisory`, and the step failed anyway. The advisory
+          # lane had never been advisory, and on the blocking lane the
+          # ::error:: naming the review-accept escape hatch never printed
+          # either -- the step just died with `exit status 1`.
+          rc=0
           /tmp/pr-review \
             -diff /tmp/pr.diff \
             -rubric .review/rubric.md \
             -threshold high \
             -repo "$REPO" \
-            -pr "$PR_NUMBER"
-          rc=$?
+            -pr "$PR_NUMBER" || rc=$?
 
           case "$rc" in
             0) echo "review clean or below threshold" ;;
