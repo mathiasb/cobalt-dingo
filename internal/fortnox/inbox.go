@@ -60,10 +60,10 @@ type inboxResponse struct {
 // Calls GET /3/inbox. Requires the `inbox` scope, which is separate from
 // `archive` in Fortnox's scope list.
 func (c *Client) GetInbox() (InboxFolder, error) {
-	raw, err := c.Get(c.baseURL + "/3/inbox")
+	raw, err := c.get(c.baseURL + "/3/inbox")
 	if err != nil {
 		// The scope failure is the one worth naming. Matching on the status
-		// text rather than a code because Get wraps the status into the error;
+		// text rather than a code because get wraps the status into the error;
 		// a wrong guess here degrades to the generic error, never to silence.
 		if strings.Contains(err.Error(), http.StatusText(http.StatusForbidden)) ||
 			strings.Contains(err.Error(), "403") {

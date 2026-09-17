@@ -41,7 +41,7 @@ func (c *Client) ListAssets() ([]AssetRow, error) {
 // Calls GET /3/assets/{id}.
 func (c *Client) GetAsset(assetID int) (AssetRow, error) {
 	u := fmt.Sprintf("%s/3/assets/%d", c.baseURL, assetID)
-	raw, err := c.Get(u)
+	raw, err := c.get(u)
 	if err != nil {
 		return AssetRow{}, fmt.Errorf("get asset: %w", err)
 	}

@@ -362,43 +362,22 @@ func financialYearSummary(cfg config.Fortnox, token string) string {
 	return fmt.Sprintf("%d: %s", len(years), strings.Join(parts, ", "))
 }
 
-// supplierInvoiceStates reports the count under each documented filter value.
+// supplierInvoiceStates reports the count under each documented filter value,
+// through the typed counter on the client.
 //
 // The enum comes from the vendored OpenAPI spec rather than from guessing:
 // cancelled, fullypaid, unpaid, unpaidoverdue, unbooked, pendingpayment,
 // authorizepending.
 func supplierInvoiceStates(baseURL, token string) string {
-	filters := []string{"unpaid", "unpaidoverdue", "unbooked", "authorizepending", "pendingpayment", "fullypaid"}
-	parts := make([]string, 0, len(filters))
-	for _, f := range filters {
-		n, err := supplierInvoiceCount(baseURL, token, f)
-		if err != nil {
-			parts = append(parts, fmt.Sprintf("%s=ERR(%v)", f, err))
-			continue
-		}
-		parts = append(parts, fmt.Sprintf("%s=%d", f, n))
+	counts, err := fortnox.NewClient(baseURL, token, true).SupplierInvoiceStateCounts()
+	if err != nil {
+		return "unreadable: " + err.Error()
+	}
+	parts := make([]string, 0, len(counts))
+	for _, f := range fortnox.SupplierInvoiceFilters {
+		parts = append(parts, fmt.Sprintf("%s=%d", f, counts[f]))
 	}
 	return strings.Join(parts, " ")
-}
-
-// supplierInvoiceCount reads @TotalResources for one filter, which is the
-// total across pages rather than the length of page one — the distinction that
-// makes this a count and not a sample.
-func supplierInvoiceCount(baseURL, token, filter string) (int, error) {
-	c := fortnox.NewClient(baseURL, token, true)
-	raw, err := c.Get(fmt.Sprintf("%s/3/supplierinvoices?filter=%s", baseURL, filter))
-	if err != nil {
-		return 0, err
-	}
-	var envelope struct {
-		MetaInformation struct {
-			TotalResources int `json:"@TotalResources"`
-		} `json:"MetaInformation"`
-	}
-	if err := json.Unmarshal(raw, &envelope); err != nil {
-		return 0, err
-	}
-	return envelope.MetaInformation.TotalResources, nil
 }
 
 // accountBalanceLine reports an account's opening and closing balance.

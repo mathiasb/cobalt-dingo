@@ -126,7 +126,7 @@ func (c *Client) ListVouchersWithRows(yearID int) ([]VoucherJSON, error) {
 // nothing about it to notice.
 func (c *Client) GetVoucher(yearID int, series string, number int) (VoucherJSON, error) {
 	u := fmt.Sprintf("%s/3/vouchers/%s/%d?financialyear=%d", c.baseURL, series, number, yearID)
-	raw, err := c.Get(u)
+	raw, err := c.get(u)
 	if err != nil {
 		return VoucherJSON{}, fmt.Errorf("get voucher %s/%d: %w", series, number, err)
 	}
@@ -153,7 +153,7 @@ type predefinedAccountsResponse struct {
 // Calls GET /3/predefinedaccounts.
 func (c *Client) ListPredefinedAccounts() ([]PredefinedAccountRow, error) {
 	u := c.baseURL + "/3/predefinedaccounts"
-	raw, err := c.Get(u)
+	raw, err := c.get(u)
 	if err != nil {
 		return nil, fmt.Errorf("list predefined accounts: %w", err)
 	}

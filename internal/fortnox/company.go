@@ -29,7 +29,7 @@ type CompanyInfoResponse struct {
 // Calls GET /3/companyinformation.
 func (c *Client) GetCompanyInfo() (CompanyInfoRow, error) {
 	u := c.baseURL + "/3/companyinformation"
-	raw, err := c.Get(u)
+	raw, err := c.get(u)
 	if err != nil {
 		return CompanyInfoRow{}, fmt.Errorf("get company info: %w", err)
 	}

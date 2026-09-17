@@ -19,9 +19,12 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
+	"net/http"
 	"os"
 	"sort"
 	"time"
@@ -120,13 +123,12 @@ func run(log *slog.Logger) error {
 		return fmt.Errorf("confirm company: %w", err)
 	}
 
-	c := fortnox.NewClient(cfg.BaseURL(), tok.AccessToken, true)
 	var problems int
 
 	for _, p := range probes {
 		fmt.Printf("\n=== %s (%s)\n", p.name, p.path)
 
-		raw, err := c.Get(cfg.BaseURL() + p.path)
+		raw, err := fetchRaw(cfg.BaseURL()+p.path, tok.AccessToken)
 		if err != nil {
 			fmt.Printf("  FETCH FAILED: %v\n", err)
 			problems++
@@ -174,4 +176,36 @@ func run(log *slog.Logger) error {
 		return fmt.Errorf("%d endpoint(s) diverge from what our structs read", problems)
 	}
 	return nil
+}
+
+// fetchRaw performs one authenticated GET and returns the response body
+// verbatim.
+//
+// fortnox-shape inspects the RAW shape of what Fortnox sends, so no typed
+// client method can serve it: decoding into a struct would discard exactly
+// the field-and-type information this command exists to compare. It therefore
+// carries its own GET, the same way cmd/probe-sandbox does.
+func fetchRaw(requestURL, token string) (json.RawMessage, error) {
+	req, err := http.NewRequest(http.MethodGet, requestURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("GET %s: %w", requestURL, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GET %s: unexpected status %d", requestURL, resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read body: %w", err)
+	}
+	return json.RawMessage(body), nil
 }

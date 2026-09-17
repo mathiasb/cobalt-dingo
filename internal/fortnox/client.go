@@ -263,9 +263,10 @@ func (c *Client) do(req *http.Request) (*http.Response, error) {
 	}
 }
 
-// Get performs an authenticated, rate-limited GET request and returns the raw
-// JSON response body.
-func (c *Client) Get(requestURL string) (json.RawMessage, error) {
+// get performs an authenticated, rate-limited GET request and returns the raw
+// JSON response body. Unexported on purpose: the raw transport layer stays
+// inside this package, and callers outside it use the typed methods.
+func (c *Client) get(requestURL string) (json.RawMessage, error) {
 	req, err := http.NewRequest(http.MethodGet, requestURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("build request: %w", err)
@@ -311,7 +312,7 @@ type supplierInvoicePaymentsResponse struct {
 // Calls GET /3/supplierinvoicepayments?invoicenumber={n}.
 func (c *Client) ListSupplierInvoicePayments(invoiceNumber int) ([]SupplierInvoicePaymentRow, error) {
 	u := fmt.Sprintf("%s/3/supplierinvoicepayments?invoicenumber=%d", c.baseURL, invoiceNumber)
-	raw, err := c.Get(u)
+	raw, err := c.get(u)
 	if err != nil {
 		return nil, fmt.Errorf("list supplier invoice payments: %w", err)
 	}
@@ -342,7 +343,7 @@ type fullSupplierResponse struct {
 // Calls GET /3/suppliers/{n}.
 func (c *Client) GetFullSupplier(supplierNumber int) (FullSupplierRow, error) {
 	u := fmt.Sprintf("%s/3/suppliers/%d", c.baseURL, supplierNumber)
-	raw, err := c.Get(u)
+	raw, err := c.get(u)
 	if err != nil {
 		return FullSupplierRow{}, fmt.Errorf("get full supplier: %w", err)
 	}
@@ -424,7 +425,7 @@ type customerInvoicePaymentsResponse struct {
 // Calls GET /3/invoicepayments?invoicenumber={n}.
 func (c *Client) ListCustomerInvoicePayments(invoiceNumber int) ([]CustomerInvoicePaymentRow, error) {
 	u := fmt.Sprintf("%s/3/invoicepayments?invoicenumber=%d", c.baseURL, invoiceNumber)
-	raw, err := c.Get(u)
+	raw, err := c.get(u)
 	if err != nil {
 		return nil, fmt.Errorf("list customer invoice payments: %w", err)
 	}
@@ -453,7 +454,7 @@ type fullCustomerResponse struct {
 // Calls GET /3/customers/{n}.
 func (c *Client) GetFullCustomer(customerNumber int) (FullCustomerRow, error) {
 	u := fmt.Sprintf("%s/3/customers/%d", c.baseURL, customerNumber)
-	raw, err := c.Get(u)
+	raw, err := c.get(u)
 	if err != nil {
 		return FullCustomerRow{}, fmt.Errorf("get full customer: %w", err)
 	}
@@ -516,7 +517,7 @@ type financialYearsResponse struct {
 // Calls GET /3/financialyears.
 func (c *Client) ListFinancialYears() ([]FinancialYearRow, error) {
 	u := c.baseURL + "/3/financialyears"
-	raw, err := c.Get(u)
+	raw, err := c.get(u)
 	if err != nil {
 		return nil, fmt.Errorf("list financial years: %w", err)
 	}
@@ -543,7 +544,7 @@ func (c *Client) GetAllPages(baseURL string) ([]json.RawMessage, error) {
 		q.Set("page", strconv.Itoa(page))
 		u.RawQuery = q.Encode()
 
-		raw, err := c.Get(u.String())
+		raw, err := c.get(u.String())
 		if err != nil {
 			return nil, fmt.Errorf("get page %d: %w", page, err)
 		}

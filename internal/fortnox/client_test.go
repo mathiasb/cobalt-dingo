@@ -147,7 +147,7 @@ func TestGet(t *testing.T) {
 	defer srv.Close()
 
 	c := NewClient(srv.URL, "test-token", false)
-	raw, err := c.Get(srv.URL + "/3/something")
+	raw, err := c.get(srv.URL + "/3/something")
 
 	require.NoError(t, err)
 	require.NotNil(t, raw)

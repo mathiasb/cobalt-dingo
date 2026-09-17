@@ -28,7 +28,7 @@ type totalResourcesEnvelope struct {
 //
 // Zero is a valid answer. Absent is an error — see totalResourcesEnvelope.
 func (c *Client) TotalResources(requestURL string) (int, error) {
-	raw, err := c.Get(requestURL)
+	raw, err := c.get(requestURL)
 	if err != nil {
 		return 0, fmt.Errorf("count records: %w", err)
 	}
