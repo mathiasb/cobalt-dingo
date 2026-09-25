@@ -106,6 +106,19 @@ These rules apply to every task across every project, regardless of harness.
    revisit Y". Those are exactly the items that need a locator. If it is worth
    saying in a summary, it is worth writing where it can be found again without you.
 
+7. **Finish what's closable — only involve me for a genuine call.** If a
+   tracker issue, PR, or checklist item is demonstrably resolved — the fix
+   landed, the state changed, you verified it live — close/merge/check it off
+   in the same turn. Don't leave it open "for the record" or park it waiting
+   on me to confirm something that already happened; that's bookkeeping, not
+   a decision. Reserve asking me (`AskUserQuestion`, a `DECISION NEEDED`
+   comment, or otherwise pausing) for when it's genuinely mine to call:
+   irreversible or prod/host-impacting actions, a real judgment call with no
+   clearly-better option, ambiguous intent, or anything secret-writes/
+   destructive-git already gate. Before claiming something is closable,
+   verify it live (re-check the issue, re-run the command) rather than
+   trusting your own earlier summary (brain: `filed-issue-not-same-as-fixed`).
+
 ## CAD sprint patterns
 
 Two CAD sprint archetypes (defs: brain `wiki/homelab/decisions/continuous-agentic-development-cad-concept-2026-06-16`):
