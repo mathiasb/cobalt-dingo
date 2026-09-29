@@ -208,7 +208,18 @@ jobs:
           # Re-run those three after any branch-protection change.
           GITEA_TOKEN: ${{ secrets.AGENT_PR_BOT_TOKEN }}
         run: |
-          if git diff --quiet && git diff --cached --quiet; then
+          # dispatch#74: `git diff` does not see UNTRACKED files, so an agent
+          # whose work is entirely NEW files -- adding a test file to a repo
+          # that has none, say -- produces two clean diffs and is reported as
+          # having done nothing. veckomeny run 8238 wrote internal/web/index_test.go,
+          # verified it by breaking the template on purpose, and had the whole
+          # run discarded here. cobalt-dingo never hit it because its agent
+          # tasks modified files that already existed.
+          #
+          # git status --porcelain covers modified, staged, deleted AND
+          # untracked, and respects .gitignore so generated output is not
+          # counted as work.
+          if [ -z "$(git status --porcelain)" ]; then
             # dispatch#67 fix #3: "no changes" used to exit 0. The job cannot
             # distinguish "the agent did nothing" from "the agent did it
             # somewhere this checkout can't see" -- run 5228 was the second
