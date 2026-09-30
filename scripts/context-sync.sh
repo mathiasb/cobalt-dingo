@@ -58,7 +58,7 @@ if [ "$FORCE" = false ]; then
     while IFS= read -r _match; do
       _lineno="${_match%%:*}"
       _content="${_match#*:}"
-      _token=$(printf '%s' "$_content" | grep -o '{{[^}]*}}' | head -1)
+      _token=$(head -1 < <(grep -o '{{[^}]*}}' <<<"$_content"))
       echo "  $PROJECT_FILE:$_lineno: unfilled placeholder $_token" >&2
     done <<< "$_placeholders"
     echo "" >&2

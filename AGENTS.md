@@ -73,6 +73,27 @@ These rules apply to every task across every project, regardless of harness.
    when a human reviewer outside the project is required. Document the reason in
    PROJECT.md.
 
+   **Exception — a GitOps repo where a branch cannot be reconciled.** In a repo whose
+   deployment watches one branch (`mathias/infra`: Flux watches `main`), a branch is
+   invisible to the thing that applies it. A `risk/medium` change to `alerts.yaml` or
+   `litellm-config.yaml` can be linted on a branch but never *exercised* there, so a
+   PR would buy a review of a state that was never deployed.
+
+   There, `risk/medium`+ work stays on `main` and instead requires a **recorded
+   adversarial review pass before the push** — `skills:pr-gatekeeper` or equivalent,
+   reviewing the staged diff. **The reviewer's verdict goes in the issue, not a PR
+   thread.** No verdict recorded means the lane was not used, and saying "the gate was
+   green" is not the same claim.
+
+   Be honest about what this is: a recorded *independent* pass, not four-eyes in the
+   sense `assessor-loop` §4.1 means for a regulated organisation, because the reviewer
+   is an agent. It is more than the repo had and less than the model it mirrors; do not
+   describe it as the stronger property. (infra#470, decided 2026-09-29.)
+
+   This lane depends on the `risk/` label being right. A label that triggers a heavier
+   lane is load-bearing, not cosmetic — if work that belongs in it is unlabelled, the
+   lane silently does not apply.
+
 6. **Close the loop — every substantive task ends with the same ritual.** Shipping
    the code is not the end of the task; capturing it is. Run this unprompted:
    - **Tag + bump SemVer** on the change (annotated tag; minor for a feature or
@@ -113,6 +134,30 @@ These rules apply to every task across every project, regardless of harness.
    destructive-git already gate. Before claiming something is closable,
    verify it live (re-check the issue, re-run the command) rather than
    trusting your own earlier summary (brain: `filed-issue-not-same-as-fixed`).
+
+8. **Control code needs an adversary, not a checklist.** Code whose job is to
+   refuse, deny, gate or contain is not adequately verified by a green gate.
+   Rule 5 makes CI the quality gate and that holds for ordinary work — but a
+   passing suite only asserts what its author already thought of, and for a
+   control the author is precisely the person whose imagination just failed.
+   Measured on `dispatch#75`: five review rounds, five real escapes verified by
+   execution, and **CI was green on every one of them** while `git rm
+   ././.dispatch-allow` deleted the file the control existed to protect. So
+   route this work through a review with authority to block, instructed to
+   verify by execution rather than by reading the implementation. Expect to be
+   blocked more than once; that is the control working, not the reviewer being
+   difficult. (brain: `a-green-gate-is-not-evidence-for-control-code`; the
+   practices live in the `pr-gatekeeper` agent.)
+
+9. **A test's name must not claim more than its assertions prove.** Name a test
+   after the mechanism it observes, not the goal it serves.
+   `DoesNotInheritEnv` is honest; `IsContained` is a claim the test cannot
+   support. This is not pedantry about naming — when name and assertion
+   diverge, the name wins in the reader's head and the gap becomes invisible,
+   which is what lets the defect survive review. Found three times in one PR,
+   twice in tests written to fix the previous instance of it; each passed while
+   the thing it was named for was exploitable. If you cannot name the mechanism,
+   you do not yet know what the test observes.
 
 ## CAD sprint patterns
 
@@ -327,8 +372,20 @@ Workflow:
    and missing-untracked adapters). A drift fails the check with a
    message telling you to stage the regenerated files.
 
-Behavior rules in this file and per-project rules in `PROJECT.md` apply
-unconditionally on every host, every harness.
+Behavior rules in this file and per-project rules in `PROJECT.md` apply on every
+host and every harness.
+
+**Where a project rule contradicts a rule here, the project rule governs — and it
+must state its reason.** Both halves matter: the project file wins because it knows
+something this file cannot (infra's Flux constraint is real and not visible from
+here), and it must say why because a bare override is indistinguishable from drift.
+
+This replaces the previous wording, which said rules here and in `PROJECT.md` both
+apply *"unconditionally"*. That was not a tiebreak but a contradiction, and it went
+unnoticed until rule 5 and infra's "never create feature branches" had to be obeyed
+at the same time (infra#470). A standard can hold two individually sensible clauses
+that are jointly unsatisfiable, and survive for as long as everyone reads it
+charitably — the same failure the Inception Sprint Oath's G6 had.
 
 ## Engineering Skills
 
