@@ -149,21 +149,43 @@ jobs:
           git clone -b main ssh://git@10.0.1.20:30022/mathias/infra.git /tmp/infra
           cd /tmp/infra
 
-          DEPLOYMENT="k3s/apps/cobalt-dingo/deployment.yaml"
+          APP_DIR="k3s/apps/cobalt-dingo"
+          # EVERY manifest that references this image, not just the
+          # Deployment. This used to name deployment.yaml alone, so the nightly
+          # overview CronJob — added later — sat on the image it was created
+          # with for 17 days and silently ran superseded code. The fix it was
+          # missing (v0.68.0, a cache backstop shorter than its own schedule)
+          # had shipped, been tagged, and never once executed.
+          #
+          # Discovering it needed someone to notice a job taking three minutes
+          # instead of seventeen seconds. Nothing failed, so nothing reported.
+          # grep -rl returns 1 on no-match, which under `bash -e` would kill
+          # the step before the explicit check below could explain why.
+          MANIFESTS=$(grep -rl "image: localhost:5000/cobalt-dingo:" "$APP_DIR" || true)
+          if [ -z "$MANIFESTS" ]; then
+            echo "✗ no manifests reference the image — the path or image name changed"; exit 1
+          fi
+          echo "patching:"; echo "$MANIFESTS"
+
           # In-place update of the image tag. Use sed (not yq) so we don't
           # depend on additional tooling on the runner.
-          sed -i "s|image: localhost:5000/cobalt-dingo:.*|image: localhost:5000/cobalt-dingo:${IMAGE_TAG}|" "$DEPLOYMENT"
+          echo "$MANIFESTS" | xargs sed -i "s|image: localhost:5000/cobalt-dingo:.*|image: localhost:5000/cobalt-dingo:${IMAGE_TAG}|"
 
-          # Verify the patch took effect.
-          grep -q "localhost:5000/cobalt-dingo:${IMAGE_TAG}" "$DEPLOYMENT" \
-            || { echo "✗ image tag patch failed"; exit 1; }
+          # Verify no manifest kept an OLDER tag. Asserting the new tag is
+          # present is not enough — that passes while a second file still
+          # carries a stale one, which is exactly how this was missed.
+          # `|| true` because both greps legitimately return 1 when clean.
+          STALE=$(grep -rn "image: localhost:5000/cobalt-dingo:" "$APP_DIR" | grep -v "${IMAGE_TAG}" || true)
+          if [ -n "$STALE" ]; then
+            echo "✗ manifests still on another tag after patching:"; echo "$STALE"; exit 1
+          fi
 
-          if git diff --quiet "$DEPLOYMENT"; then
+          if git diff --quiet "$APP_DIR"; then
             echo "ℹ image tag unchanged — skipping push"
           else
             git -c user.name="cobalt-dingo CI" \
                 -c user.email="ci@cobalt-dingo.local" \
-                commit -m "chore(deploy): cobalt-dingo → ${IMAGE_TAG}" "$DEPLOYMENT"
+                commit -m "chore(deploy): cobalt-dingo → ${IMAGE_TAG}" "$APP_DIR"
             git push origin main
             echo "✓ pushed to infra repo"
           fi
