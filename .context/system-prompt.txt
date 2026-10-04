@@ -304,10 +304,16 @@ entries that age well are about *why*, *how to avoid*, and *what to do when*.
 |---------|-------|-------|
 | **Claude Code, Claude Desktop** | `brain_query` (BM25), `brain_answer` (LLM-synth + sources) MCP tools | `brain_write` MCP tool |
 | **Crush, Pi, Antigravity, other MCP-capable** | same MCP server: `ingestion-brain` (via the `mcp__*_brain__*` namespace once authenticated) | same |
-| **Anything HTTP-only (curl, scripts)** | `POST https://brain-mcp.d-ma.be/query` with `{"query":"..."}` (auth via `BRAIN_MCP_TOKEN`) | `POST .../write` with `{"content":"...","filename":"..."}` |
+| **Anything HTTP-only (curl, scripts)** | Tailnet only: `POST https://koala.tail30472e.ts.net:8443/query` with `{"query":"..."}`, sending `BRAIN_MCP_TOKEN` (not yet enforced on REST, hyperguild#149). The public `brain-mcp.d-ma.be` serves `/mcp` only (infra#517). | `POST .../write` with `{"content":"...","wing":"...","hall":"..."}` |
 | **Browser / human inspection** | `https://git.d-ma.be/mathias/hyperguild` → `knowledge/` and `wiki/` markdown files |
 
-- **Scoping**: defaults to `public` collection; client projects filter to `{client}` + `public`.
+- **Scoping — the brain holds no confidential client content.** Nothing on the read path
+  filters by client: every token holder can read every wing, and `wing` on `brain_query`
+  is an optional argument, not an access control. Client confidentiality is enforced only
+  at write time (`capture`'s I1 gate refuses internal/confidential). So never `brain_write`
+  client material; generalise it first or keep it in the client's own repo. (hyperguild#144,
+  decided 2026-10-01. This line previously claimed client projects were filtered; they
+  were not.)
 - **Routing**: brain_answer's LLM uses berget.ai as primary, iguana ollama as
   fallback. Both are configurable in the `supervisor/ingestion-deployment.yaml`
   on the koala k3s cluster; don't hardcode local-only model names into the
