@@ -161,9 +161,12 @@ jobs:
           # infra#347/dispatch#68: repointed from the dead berget/kimi-k2.6.
           LITELLM_EXECUTORS: "kimi=berget/kimi-k3,qwen=koala/qwen36-35b-a3b,glm=berget/glm-4.7-fp8"
           DISPATCH_KIMI_MAX_TURNS: "80"
+          # signals#47: event values reach the shell only through env, never
+          # through `${{ }}` expansion inside run:.
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
         # Exit status is the contract: non-zero means no work happened, and the
         # job stops rather than opening an empty PR.
-        run: /tmp/dispatch-bin run ${{ github.repository }} ${{ github.event.issue.number }} .
+        run: /tmp/dispatch-bin run "$GITHUB_REPOSITORY" "$ISSUE_NUMBER" .
 
       # dispatch#67 fix #4. Independent of the diff check below: a forge write
       # does not touch this checkout's working tree at all, so a clean `git
@@ -207,6 +210,15 @@ jobs:
           #   commit to main   -> 403  user cannot commit to repo
           # Re-run those three after any branch-protection change.
           GITEA_TOKEN: ${{ secrets.AGENT_PR_BOT_TOKEN }}
+          AGENT_PR_DEPLOY_KEY: ${{ secrets.AGENT_PR_DEPLOY_KEY }}
+          # signals#47: the issue title is attacker-controlled (anyone who can
+          # open an issue writes it). It used to be expanded by `${{ }}` straight
+          # into the curl -d string below, i.e. into the shell source, in the
+          # step that holds the PR bot token and the write deploy key. A title
+          # containing `$(...)` or a `"` ran as code. It now arrives only as an
+          # env var and is JSON-encoded by python3, never parsed by the shell.
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
         run: |
           # dispatch#74: `git diff` does not see UNTRACKED files, so an agent
           # whose work is entirely NEW files -- adding a test file to a repo
@@ -230,12 +242,12 @@ jobs:
                  "Verify by hand this was truly a no-op before treating it as one." >&2
             exit 1
           fi
-          branch="agent/issue-${{ github.event.issue.number }}"
+          branch="agent/issue-$ISSUE_NUMBER"
           git config user.name  "agent-ci"
           git config user.email "agent-ci@d-ma.be"
           git checkout -b "$branch"
           git add -A
-          git commit -m "agent: address #${{ github.event.issue.number }}" -m "Opened by the agent-run workflow. Closes nothing automatically — a human reviews, merges and closes."
+          git commit -m "agent: address #$ISSUE_NUMBER" -m "Opened by the agent-run workflow. Closes nothing automatically — a human reviews, merges and closes."
           # Push over SSH, not HTTPS. persist-credentials: false left this
           # checkout with no auth, and the obvious replacement -- a credential
           # helper feeding secrets.GITEA_TOKEN -- gets 403: the Actions token
@@ -270,18 +282,28 @@ jobs:
           # on the way out whether or not the push succeeds.
           mkdir -p ~/.ssh
           trap 'rm -f ~/.ssh/id_agent_pr' EXIT
-          echo '${{ secrets.AGENT_PR_DEPLOY_KEY }}' > ~/.ssh/id_agent_pr
+          printf '%s\n' "$AGENT_PR_DEPLOY_KEY" > ~/.ssh/id_agent_pr
           chmod 600 ~/.ssh/id_agent_pr
           ssh-keyscan -p 30022 10.0.1.20 >> ~/.ssh/known_hosts 2>/dev/null
           export GIT_SSH_COMMAND="ssh -i ~/.ssh/id_agent_pr -o IdentitiesOnly=yes"
-          git push "ssh://git@10.0.1.20:30022/${{ github.repository }}.git" "$branch"
+          git push "ssh://git@10.0.1.20:30022/$GITHUB_REPOSITORY.git" "$branch"
           # --fail-with-body: the branch is already pushed by this point, so a
           # rejected PR creation must fail the job loudly rather than exit 0 and
           # leave a branch nobody opened anything for. The Actions token cannot
           # git-push on this instance; whether it can create a PR through the
           # API is a separate permission and is being learned here.
+          payload="$(BRANCH="$branch" python3 -c '
+          import json, os
+          n = os.environ["ISSUE_NUMBER"]
+          print(json.dumps({
+              "head": os.environ["BRANCH"],
+              "base": "main",
+              "title": "agent: #%s %s" % (n, os.environ["ISSUE_TITLE"]),
+              "body": "Opened by `agent-run` for #%s.\n\nCI is the ground-truth verdict. A human reviews, merges and closes \u2014 this workflow does none of those." % n,
+          }))
+          ')"
           curl -sS --fail-with-body -X POST \
             -H "Authorization: token $GITEA_TOKEN" \
             -H "Content-Type: application/json" \
-            -d "{\"head\":\"$branch\",\"base\":\"main\",\"title\":\"agent: #${{ github.event.issue.number }} ${{ github.event.issue.title }}\",\"body\":\"Opened by \`agent-run\` for #${{ github.event.issue.number }}.\\n\\nCI is the ground-truth verdict. A human reviews, merges and closes — this workflow does none of those.\"}" \
-            "https://git.d-ma.be/api/v1/repos/${{ github.repository }}/pulls"
+            --data-binary "$payload" \
+            "https://git.d-ma.be/api/v1/repos/$GITHUB_REPOSITORY/pulls"

@@ -67,10 +67,12 @@ jobs:
 
       - name: Derive image tags
         id: meta
+        env:
+          # signals#47: a ref name can carry $(...); pass it via env, not ${{ }}.
+          REF: ${{ github.ref }}
         run: |
           SHA=$(git rev-parse --short HEAD)
           echo "sha-tag=${SHA}" >> "$GITHUB_OUTPUT"
-          REF="${{ github.ref }}"
           if [[ "$REF" == refs/tags/v* ]]; then
             echo "version-tag=${REF#refs/tags/}" >> "$GITHUB_OUTPUT"
           fi
