@@ -495,5 +495,5 @@ decided. None of these are implemented today.
   `wiki/openbanking/facts/psd3-psr-timeline-uncertain-application-2027-to-2028`,
   `knowledge/ap-automation-cannot-auto-reconcile-fx-fees-and-gainloss`,
   `knowledge/swedish-domestic-pain001-wire-constraints`
-- `~/dev/docs/research/erp-mafia-accounted-blueprint.md` — how the nearest competitor
+- `docs/research/erp-mafia-accounted-blueprint.md` — how the nearest competitor
   answered the same questions, and where they declined to
