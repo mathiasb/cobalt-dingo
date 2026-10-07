@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # setup-koala-runner.sh
 # Run as mathias on koala. Installs and registers the Gitea act_runner.
+# HISTORICAL: the koala runner is an in-cluster pod now (infra#233/#241); the host act_runner this script
+# installs is inactive and disabled. Kept for reference, do not re-run it without reading infra#558.
 #
 # Usage:
 #   GITEA_RUNNER_TOKEN=<token> bash setup-koala-runner.sh
@@ -87,17 +89,10 @@ else
   ok "act_runner v${VER} installed"
 fi
 
-# ── 6. sudoers for k3s ctr ───────────────────────────────────────────────────
-
-info "Configuring sudoers for k3s ctr..."
-sudo tee /etc/sudoers.d/act_runner > /dev/null << 'EOF'
-# Allow act_runner to import images into k3s containerd
-# Both the PATH symlink and the versioned binary are listed for safety
-mathias ALL=(root) NOPASSWD: /usr/local/bin/k3s ctr *
-mathias ALL=(root) NOPASSWD: /var/lib/rancher/k3s/data/current/bin/k3s ctr *
-EOF
-sudo chmod 440 /etc/sudoers.d/act_runner
-sudo visudo -cf /etc/sudoers.d/act_runner && ok "sudoers valid"
+# ── 6. (removed) passwordless k3s ctr grant ─────────────────────────────────
+# This step used to install a passwordless sudo grant for `k3s ctr *`, which is root-equivalent. CI now runs in an
+# in-cluster pod runner (infra#233/#241) and nothing used the grant; it was removed from koala and from this
+# repo under infra#558. An image import is `task image:import`, which asks for a sudo password.
 
 # ── 7. Runner working directory ──────────────────────────────────────────────
 

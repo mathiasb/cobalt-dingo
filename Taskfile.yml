@@ -30,11 +30,12 @@ tasks:
   # ── Quality ─────────────────────────────────────────────────────────────────
 
   check:
-    desc: Run code checks (lint + test + vet) — used by CI
+    desc: Run code checks (lint + test + vet + no passwordless root grants) — used by CI
     cmds:
       - task: lint
       - task: test
       - task: vet
+      - bash scripts/assert-no-passwordless-root-grants.sh
 
   check:local:
     desc: Full pre-commit check (context drift + code) — for local dev
@@ -93,7 +94,7 @@ tasks:
           .
 
   image:import:
-    desc: Import built image directly into k3s containerd (single-node, no registry)
+    desc: Import built image directly into k3s containerd (single-node, no registry). Asks for a sudo password; there is deliberately no passwordless grant (infra#558)
     deps: [image:build]
     cmds:
       - buildah push {{.PROJECT_NAME}}:{{.SHORT_SHA}} oci-archive:/tmp/{{.PROJECT_NAME}}-{{.SHORT_SHA}}.tar
