@@ -16,9 +16,21 @@ cd "$(dirname "$0")/.." || exit 1
 self="scripts/assert-no-passwordless-root-grants.sh"
 hits="$(grep -rIn -E 'NOPASSWD|/etc/sudoers\.d' scripts Taskfile.yml .gitea 2>/dev/null | grep -v "^${self}:" || true)"
 
+fail=0
 if [ -n "$hits" ]; then
   echo "  RED   a script, task or workflow installs or mentions a passwordless sudo grant:"
   printf '%s\n' "$hits" | sed 's/^/        /'
-  exit 1
+  fail=1
 fi
-echo "  GREEN no passwordless root grant is installed by this repo's code paths"
+
+# Second user-to-root path from the same era: k3s imports every tarball in its agent images directory at start,
+# so that directory must stay root-owned. fix-koala-images-dir.sh chowned it to the dev user (infra#558).
+imgs="$(grep -rIn -E 'agent/images' scripts Taskfile.yml .gitea 2>/dev/null | grep -v "^${self}:" || true)"
+if [ -n "$imgs" ]; then
+  echo "  RED   a script, task or workflow touches the k3s agent images directory (it must stay root-owned):"
+  printf '%s\n' "$imgs" | sed 's/^/        /'
+  fail=1
+fi
+
+[ "$fail" -eq 0 ] || exit 1
+echo "  GREEN no passwordless root grant, and no dev-owned k3s image-import directory, is installed by this repo's code paths"
