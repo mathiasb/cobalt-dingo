@@ -1,7 +1,7 @@
 ---
 adr:           "0012"
 title:         "Approval has four mechanisms, chosen by blast radius, not by artifact type"
-status:        proposed
+status:        accepted
 date:          2026-10-10
 deciders:      Mathias
 supersedes:    null
@@ -11,6 +11,8 @@ verify:        "scripts/assert-approval-mechanism-matches-risk.sh"
 # ADR-0012 — Approval has four mechanisms, chosen by blast radius, not by artifact type
 
 ## Status
+
+**Accepted 2026-10-14 by Mathias (tier 4, live approval).** Evidence: in a recorded session on koala, after this ADR and its PR #125 were read and discussed, Mathias wrote "Ok, jag accepterar ADR-0012" (his condition was that it could be accepted and is not irreversible; it is a status line and is reverted by one commit). The `verify:` script named in the frontmatter does not exist yet; tracked as a follow-up, so the Validation section is not yet executable.
 
 Proposed 2026-10-10 by Mathias, arising directly out of merging PR #124 (ADR-0011)
 and noticing the merge convention used to get there was itself undecided. Not yet
