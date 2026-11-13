@@ -36,6 +36,7 @@ tasks:
       - task: test
       - task: vet
       - bash scripts/assert-no-passwordless-root-grants.sh
+      - bash scripts/test-govulncheck-pinned.sh
 
   check:local:
     desc: Full pre-commit check (context drift + code) — for local dev
@@ -79,7 +80,7 @@ tasks:
       # merely require exits 0, so this is the tightest gate that stays quiet on
       # the common case. It was advisory-only until 2026-09-08, which meant
       # `task check` reported green regardless of what the scan found — see #70.
-      - govulncheck ./...
+      - bash scripts/govulncheck-pinned.sh ./...
 
   # ── Image build (buildah + k3s containerd, no registry on single-node) ──────
 
