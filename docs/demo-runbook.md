@@ -16,15 +16,15 @@ Bet #142 (placed 2026-11-24), slice #147, PR #148. Demo date: Friday 2026-11-27.
 
 ## Which build is running
 
-`~/invoice-demo/bin/demo` was built from the reviewed head of PR #148 (`292691e`), **not from `main`**, because the PR was not merged when the demo went up. After the merge, rebuild from `main`:
+`~/invoice-demo/bin/demo` was built from the head of PR #151 (`ccf72b4`, branch `feat/ap-entries`), which is **stacked on PR #148**; neither is merged, so this is **not `main`**. Both PRs were independently reviewed (#148 twice, #151 twice). After the merges, rebuild from `main`:
 
 ```
 cd <a clean checkout of main>
-go build -o ~/invoice-demo/bin/demo ./cmd/demo
+go build -o ~/invoice-demo/bin/demo.new ./cmd/demo && mv ~/invoice-demo/bin/demo.new ~/invoice-demo/bin/demo
 systemctl --user restart invoice-demo.service
 ```
 
-A restart forgets every correction made on the page (state is in memory).
+A restart forgets every correction and every downloadable CSV (both are in memory only).
 
 ## Everyday commands
 
@@ -48,15 +48,19 @@ Wildcard DNS means there is no record to remove. After step 2 the name falls thr
 
 ## What it does and does not do
 
-- Reads an image, shows the fields, proposes an expense account from past bookings with the vouchers behind it, and learns corrections in memory.
+- Reads up to 4 invoice images per submit (and total size capped), shows the fields, proposes an expense account from past bookings with the vouchers behind it, and learns corrections in memory.
+- For each trusted invoice it shows the **proposed accounts payable entry**: debit the expense account, debit input VAT (the account past bookings used, else 2641), credit 2440; a gap up to 0.50 balances on 3740. One CSV of all entries is downloadable for 30 minutes (20 submits at most, memory only). An invoice that does not reconcile, has no proposed account, or is a credit note gets **no entry** and the page says why.
+- Entries are in the invoice currency, not converted to SEK, and reverse-charge VAT on foreign purchases is not modelled (the entry says so). See #152.
 - **No accounting-system access of any kind.** Nothing is posted anywhere. Uploads are held in memory for one request and are not written to disk (pinned by a test with the temp directory watched).
-- One model call at a time (a second gets 503). Corrections are capped at 200 until restart.
+- One model call at a time and at most 2 uploads being read at once (more get 503). One shared 150 s model deadline per submit. Corrections are capped at 200 until restart.
 - The data is synthetic, and the page says so. The accuracy shown says nothing about a real company's books.
 
-## Known limits, tracked in #149
+## Known limits, tracked in #149 and #152
 
-Memory per concurrent upload (about 23 MB each, authenticated users only); the learning cap is global; `*.ts.net` model hosts are accepted for any tailnet; the default HTTP transport honours `HTTP_PROXY`; the page has not been viewed in a browser; checks were run from koala, so the path from outside the LAN has not been independently exercised.
+The learning cap is global; `*.ts.net` model hosts are accepted for any tailnet; the default HTTP transport honours `HTTP_PROXY`; the page has not been viewed in a browser; checks were run from koala, so the path from outside the LAN has not been independently exercised.
 
 ## Review record
 
-PR #148: round 1 BLOCK (uploads spooled to disk over 1 MB, no CSRF protection, unbounded learning, URL guard bypasses, error reflection); round 2 APPROVE-WITH-CONDITIONS, conditions met in `292691e`. The rubric review job (ADR-0010 lane) returned "no usable verdict" and so counts as **unreviewed by that lane**, not clean.
+PR #148: round 1 BLOCK (uploads spooled to disk over 1 MB, no CSRF protection, unbounded learning, URL guard bypasses, error reflection); round 2 APPROVE-WITH-CONDITIONS, conditions met in `292691e`.
+
+PR #151: round 1 BLOCK (an int64 overflow built an unbalanced entry that reported itself balanced, reachable through the real parser; zero-valued lines; a parse slot leaked on a panic; test gaps), all fixed test-first; round 2 APPROVE on `02532da`, non-blocking findings taken in `ccf72b4`. Reviews are recorded independent agent passes, not four-eyes. The rubric review job (ADR-0010 lane) returned "no usable verdict" and so counts as **unreviewed by that lane**, not clean.
