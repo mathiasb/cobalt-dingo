@@ -10,8 +10,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
+	"regexp"
 	"strings"
 
+	"github.com/mathiasb/cobalt-dingo/internal/extract"
 	"github.com/mathiasb/cobalt-dingo/internal/process"
 )
 
@@ -28,6 +31,15 @@ var (
 	ErrNoProposal = errors.New("no entry: no expense account could be proposed for this supplier")
 	ErrCreditNote = errors.New("no entry: credit notes are not supported")
 	ErrUnbalanced = errors.New("no entry: the amounts cannot be balanced")
+
+	// ErrInvalidInvoice is returned for a date or currency that is not in the
+	// expected form: both end up in the CSV, and both come from a model.
+	ErrInvalidInvoice = errors.New("no entry: the invoice date or currency is not in a usable form")
+)
+
+var (
+	dateRe     = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+	currencyRe = regexp.MustCompile(`^[A-Z]{3}$`)
 )
 
 // Line is one debit or credit. Amounts are minor units of the entry's currency.
@@ -45,14 +57,32 @@ type Entry struct {
 	Warnings []string
 }
 
+// check is the last guard, independent of how the lines were derived: every
+// line is a debit or a credit and neither is zero or negative, and the entry
+// balances. Sums use big integers so that a wrap cannot hide in the check.
+func (e Entry) check() error {
+	d, c := new(big.Int), new(big.Int)
+	for _, l := range e.Lines {
+		if (l.Debit > 0) == (l.Credit > 0) || l.Debit < 0 || l.Credit < 0 {
+			return fmt.Errorf("%w: line on account %d is not a single positive debit or credit", ErrUnbalanced, l.Account)
+		}
+		d.Add(d, big.NewInt(l.Debit))
+		c.Add(c, big.NewInt(l.Credit))
+	}
+	if d.Cmp(c) != 0 {
+		return ErrUnbalanced
+	}
+	return nil
+}
+
 // Balanced reports whether debits equal credits.
 func (e Entry) Balanced() bool {
-	var d, c int64
+	d, c := new(big.Int), new(big.Int)
 	for _, l := range e.Lines {
-		d += l.Debit
-		c += l.Credit
+		d.Add(d, big.NewInt(l.Debit))
+		c.Add(c, big.NewInt(l.Credit))
 	}
-	return d == c
+	return d.Cmp(c) == 0
 }
 
 // Build proposes the entry: debit the expense account for the net, debit input
@@ -70,6 +100,14 @@ func Build(res process.Result) (Entry, error) {
 		return Entry{}, ErrCreditNote
 	case !inv.NetKnown:
 		return Entry{}, fmt.Errorf("%w: the net total was not read", ErrUnbalanced)
+	case !dateRe.MatchString(inv.InvoiceDate) || !currencyRe.MatchString(inv.Currency):
+		return Entry{}, ErrInvalidInvoice
+	// Bounds first: every sum below is then far from int64's edge, so none can
+	// wrap into a gap that looks like rounding.
+	case inv.Total > extract.MaxAmountMinor || inv.NetTotal > extract.MaxAmountMinor || inv.VATAmount > extract.MaxAmountMinor:
+		return Entry{}, fmt.Errorf("%w: an amount is larger than %d minor units", ErrUnbalanced, extract.MaxAmountMinor)
+	case inv.Total == 0 || inv.NetTotal == 0:
+		return Entry{}, fmt.Errorf("%w: the net or the total is zero", ErrUnbalanced)
 	}
 
 	lines := []Line{{Account: res.Proposal.Candidates[0].Account, Debit: inv.NetTotal}}
@@ -104,9 +142,12 @@ func Build(res process.Result) (Entry, error) {
 	}
 	if inv.Currency != "SEK" {
 		e.Warnings = append(e.Warnings, fmt.Sprintf("amounts are in %s and not converted to SEK", inv.Currency))
+		if inv.VATAmount == 0 {
+			e.Warnings = append(e.Warnings, "reverse-charge VAT is not modelled: a foreign purchase of services normally needs input and output VAT (2645 and 2614), which this entry leaves out")
+		}
 	}
-	if !e.Balanced() {
-		return Entry{}, ErrUnbalanced
+	if err := e.check(); err != nil {
+		return Entry{}, err
 	}
 	return e, nil
 }
@@ -121,7 +162,7 @@ func WriteCSV(w io.Writer, entries []Entry) error {
 		warn := safe(strings.Join(e.Warnings, "; "))
 		for _, l := range e.Lines {
 			row := []string{
-				fmt.Sprint(i + 1), e.Date, safe(e.Text), fmt.Sprint(l.Account),
+				fmt.Sprint(i + 1), safe(e.Date), safe(e.Text), fmt.Sprint(l.Account),
 				amount(l.Debit), amount(l.Credit), safe(e.Currency), warn,
 			}
 			if err := cw.Write(row); err != nil {
