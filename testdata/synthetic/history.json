@@ -1,0 +1,6776 @@
+[
+ {
+  "Series": "A",
+  "Number": 3,
+  "Description": "Stockholms Elverk AB faktura 8422",
+  "TransactionDate": "2025-01-15",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5020,
+    "Debit": {
+     "MinorUnits": 71800,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 17950,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 89750,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 1,
+  "Description": "Kontorsbolaget i Malmö AB faktura 8621",
+  "TransactionDate": "2025-01-21",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5460,
+    "Debit": {
+     "MinorUnits": 71400,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 17850,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 89250,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 2,
+  "Description": "Lund Konsult HB",
+  "TransactionDate": "2025-01-29",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 6550,
+    "Debit": {
+     "MinorUnits": 1307000,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 326750,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 1633750,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 9,
+  "Description": "Stockholms Elverk AB faktura 3953",
+  "TransactionDate": "2025-02-04",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5020,
+    "Debit": {
+     "MinorUnits": 99300,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 24825,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 124125,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 11,
+  "Description": "Dublin Software Ltd",
+  "TransactionDate": "2025-02-04",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5420,
+    "Debit": {
+     "MinorUnits": 264000,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 264000,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 12,
+  "Description": "Alpine Rail AG",
+  "TransactionDate": "2025-02-04",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5810,
+    "Debit": {
+     "MinorUnits": 531300,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 531300,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 5,
+  "Description": "Fjällresor AB",
+  "TransactionDate": "2025-02-09",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5810,
+    "Debit": {
+     "MinorUnits": 354400,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 21264,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 375664,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 6,
+  "Description": "Svea Programvara AB",
+  "TransactionDate": "2025-02-11",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5420,
+    "Debit": {
+     "MinorUnits": 265700,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 66425,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 332125,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 4,
+  "Description": "Nordkloud AB",
+  "TransactionDate": "2025-02-21",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 6540,
+    "Debit": {
+     "MinorUnits": 110900,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 27725,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 138625,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 8,
+  "Description": "Lund Konsult HB faktura 9444",
+  "TransactionDate": "2025-02-21",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 6550,
+    "Debit": {
+     "MinorUnits": 1821200,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 455300,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 2276500,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 13,
+  "Description": "Helsinki Print Oy",
+  "TransactionDate": "2025-02-22",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5460,
+    "Debit": {
+     "MinorUnits": 237600,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 237600,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 10,
+  "Description": "Telefonia Sverige AB",
+  "TransactionDate": "2025-02-24",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 6212,
+    "Debit": {
+     "MinorUnits": 57800,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 14450,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 72250,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 7,
+  "Description": "Parkera Smart AB faktura 9470",
+  "TransactionDate": "2025-02-25",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5810,
+    "Debit": {
+     "MinorUnits": 5300,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 1325,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 6625,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 15,
+  "Description": "Kontorsbolaget i Malmö AB",
+  "TransactionDate": "2025-03-01",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5460,
+    "Debit": {
+     "MinorUnits": 148400,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 37100,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 185500,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 20,
+  "Description": "Berlin Cloudworks GmbH faktura 6860",
+  "TransactionDate": "2025-03-01",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 6540,
+    "Debit": {
+     "MinorUnits": 89100,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 89100,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 21,
+  "Description": "Alpine Rail AG",
+  "TransactionDate": "2025-03-05",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5810,
+    "Debit": {
+     "MinorUnits": 806300,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 806300,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 14,
+  "Description": "Nordkloud AB faktura 1572",
+  "TransactionDate": "2025-03-09",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 6540,
+    "Debit": {
+     "MinorUnits": 410000,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 102500,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 512500,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 19,
+  "Description": "Telefonia Sverige AB",
+  "TransactionDate": "2025-03-09",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 6212,
+    "Debit": {
+     "MinorUnits": 36100,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 9025,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 45125,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 17,
+  "Description": "Parkera Smart AB",
+  "TransactionDate": "2025-03-15",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5800,
+    "Debit": {
+     "MinorUnits": 7800,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 1950,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 9750,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 16,
+  "Description": "Svea Programvara AB",
+  "TransactionDate": "2025-03-25",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5420,
+    "Debit": {
+     "MinorUnits": 142500,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 35625,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 178125,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 18,
+  "Description": "Stockholms Elverk AB",
+  "TransactionDate": "2025-03-26",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5020,
+    "Debit": {
+     "MinorUnits": 156900,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 39225,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 196125,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 25,
+  "Description": "Parkera Smart AB",
+  "TransactionDate": "2025-04-03",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5800,
+    "Debit": {
+     "MinorUnits": 18000,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 4500,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 22500,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 27,
+  "Description": "Telefonia Sverige AB faktura 9752",
+  "TransactionDate": "2025-04-05",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 6230,
+    "Debit": {
+     "MinorUnits": 27200,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 6800,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 34000,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 29,
+  "Description": "Dublin Software Ltd faktura 3218",
+  "TransactionDate": "2025-04-06",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5420,
+    "Debit": {
+     "MinorUnits": 489500,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 489500,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 28,
+  "Description": "Berlin Cloudworks GmbH faktura 9504",
+  "TransactionDate": "2025-04-08",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 6540,
+    "Debit": {
+     "MinorUnits": 132000,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 132000,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 22,
+  "Description": "Fjällresor AB",
+  "TransactionDate": "2025-04-19",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5810,
+    "Debit": {
+     "MinorUnits": 207700,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 12462,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 220162,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 23,
+  "Description": "Kontorsbolaget i Malmö AB",
+  "TransactionDate": "2025-04-21",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5410,
+    "Debit": {
+     "MinorUnits": 161300,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 40325,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 201625,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 26,
+  "Description": "Stockholms Elverk AB",
+  "TransactionDate": "2025-04-23",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5020,
+    "Debit": {
+     "MinorUnits": 87900,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 21975,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 109875,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 24,
+  "Description": "Svea Programvara AB",
+  "TransactionDate": "2025-04-25",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5420,
+    "Debit": {
+     "MinorUnits": 153000,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 38250,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 191250,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 35,
+  "Description": "Alpine Rail AG faktura 4826",
+  "TransactionDate": "2025-05-10",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5810,
+    "Debit": {
+     "MinorUnits": 457600,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 457600,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 31,
+  "Description": "Svea Programvara AB",
+  "TransactionDate": "2025-05-15",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5420,
+    "Debit": {
+     "MinorUnits": 270400,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 67600,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 338000,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 32,
+  "Description": "Lund Konsult HB",
+  "TransactionDate": "2025-05-16",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 6550,
+    "Debit": {
+     "MinorUnits": 915700,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 228925,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 1144625,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 34,
+  "Description": "Dublin Software Ltd",
+  "TransactionDate": "2025-05-16",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5420,
+    "Debit": {
+     "MinorUnits": 359700,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 359700,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 30,
+  "Description": "Fjällresor AB",
+  "TransactionDate": "2025-05-19",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5810,
+    "Debit": {
+     "MinorUnits": 362800,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 21768,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 384568,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 36,
+  "Description": "Helsinki Print Oy",
+  "TransactionDate": "2025-05-20",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5460,
+    "Debit": {
+     "MinorUnits": 38500,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 38500,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 33,
+  "Description": "Telefonia Sverige AB faktura 2249",
+  "TransactionDate": "2025-05-24",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 6212,
+    "Debit": {
+     "MinorUnits": 61400,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 15350,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 76750,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 43,
+  "Description": "Dublin Software Ltd faktura 7762",
+  "TransactionDate": "2025-06-06",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5420,
+    "Debit": {
+     "MinorUnits": 257400,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 257400,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 42,
+  "Description": "Berlin Cloudworks GmbH faktura 4452",
+  "TransactionDate": "2025-06-07",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 6540,
+    "Debit": {
+     "MinorUnits": 212300,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 212300,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 37,
+  "Description": "Nordkloud AB",
+  "TransactionDate": "2025-06-09",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 6540,
+    "Debit": {
+     "MinorUnits": 387400,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 96850,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 484250,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 40,
+  "Description": "Svea Programvara AB faktura 8276",
+  "TransactionDate": "2025-06-09",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5420,
+    "Debit": {
+     "MinorUnits": 216000,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 54000,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 270000,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 39,
+  "Description": "Kontorsbolaget i Malmö AB",
+  "TransactionDate": "2025-06-20",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5460,
+    "Debit": {
+     "MinorUnits": 79400,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 19850,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 99250,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 38,
+  "Description": "Fjällresor AB",
+  "TransactionDate": "2025-06-23",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5810,
+    "Debit": {
+     "MinorUnits": 343200,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 20592,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 363792,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 41,
+  "Description": "Lund Konsult HB faktura 9226",
+  "TransactionDate": "2025-06-23",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 6550,
+    "Debit": {
+     "MinorUnits": 998400,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 249600,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 1248000,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 44,
+  "Description": "Helsinki Print Oy",
+  "TransactionDate": "2025-06-24",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5460,
+    "Debit": {
+     "MinorUnits": 51700,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 51700,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 52,
+  "Description": "Helsinki Print Oy",
+  "TransactionDate": "2025-07-01",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5460,
+    "Debit": {
+     "MinorUnits": 266200,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 266200,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 45,
+  "Description": "Nordkloud AB",
+  "TransactionDate": "2025-07-06",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 6540,
+    "Debit": {
+     "MinorUnits": 324500,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 81125,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 405625,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 47,
+  "Description": "Kontorsbolaget i Malmö AB",
+  "TransactionDate": "2025-07-09",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5460,
+    "Debit": {
+     "MinorUnits": 160500,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 40125,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 200625,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 51,
+  "Description": "Telefonia Sverige AB",
+  "TransactionDate": "2025-07-10",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 6212,
+    "Debit": {
+     "MinorUnits": 62400,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 15600,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 78000,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 49,
+  "Description": "Lund Konsult HB faktura 6751",
+  "TransactionDate": "2025-07-13",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 6550,
+    "Debit": {
+     "MinorUnits": 1398200,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 349550,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 1747750,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 50,
+  "Description": "Stockholms Elverk AB faktura 8873",
+  "TransactionDate": "2025-07-14",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5020,
+    "Debit": {
+     "MinorUnits": 115600,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 28900,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 144500,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 46,
+  "Description": "Fjällresor AB faktura 8108",
+  "TransactionDate": "2025-07-19",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5810,
+    "Debit": {
+     "MinorUnits": 214000,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 12840,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 226840,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 48,
+  "Description": "Svea Programvara AB faktura 4964",
+  "TransactionDate": "2025-07-20",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5420,
+    "Debit": {
+     "MinorUnits": 45900,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 11475,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 57375,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 60,
+  "Description": "Helsinki Print Oy faktura 2198",
+  "TransactionDate": "2025-08-08",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5460,
+    "Debit": {
+     "MinorUnits": 305800,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 305800,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 54,
+  "Description": "Svea Programvara AB faktura 7865",
+  "TransactionDate": "2025-08-10",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5420,
+    "Debit": {
+     "MinorUnits": 162900,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 40725,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 203625,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 55,
+  "Description": "Parkera Smart AB",
+  "TransactionDate": "2025-08-10",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5800,
+    "Debit": {
+     "MinorUnits": 21500,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 5375,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 26875,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 57,
+  "Description": "Telefonia Sverige AB faktura 7730",
+  "TransactionDate": "2025-08-17",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 6212,
+    "Debit": {
+     "MinorUnits": 25400,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 6350,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 31750,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 58,
+  "Description": "Dublin Software Ltd",
+  "TransactionDate": "2025-08-17",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5420,
+    "Debit": {
+     "MinorUnits": 218900,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 218900,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 53,
+  "Description": "Kontorsbolaget i Malmö AB",
+  "TransactionDate": "2025-08-23",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5460,
+    "Debit": {
+     "MinorUnits": 147900,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 36975,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 184875,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 59,
+  "Description": "Alpine Rail AG",
+  "TransactionDate": "2025-08-24",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5810,
+    "Debit": {
+     "MinorUnits": 788700,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 788700,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 56,
+  "Description": "Lund Konsult HB faktura 3675",
+  "TransactionDate": "2025-08-25",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 6550,
+    "Debit": {
+     "MinorUnits": 2201200,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 550300,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 2751500,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 61,
+  "Description": "Nordkloud AB",
+  "TransactionDate": "2025-09-01",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 6540,
+    "Debit": {
+     "MinorUnits": 176500,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 44125,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 220625,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 64,
+  "Description": "Parkera Smart AB faktura 9456",
+  "TransactionDate": "2025-09-03",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5800,
+    "Debit": {
+     "MinorUnits": 34300,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 8575,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 42875,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 66,
+  "Description": "Stockholms Elverk AB",
+  "TransactionDate": "2025-09-03",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5020,
+    "Debit": {
+     "MinorUnits": 99400,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 24850,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 124250,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 62,
+  "Description": "Fjällresor AB",
+  "TransactionDate": "2025-09-06",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5810,
+    "Debit": {
+     "MinorUnits": 460600,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 27636,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 488236,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 71,
+  "Description": "Helsinki Print Oy faktura 3749",
+  "TransactionDate": "2025-09-10",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5460,
+    "Debit": {
+     "MinorUnits": 192500,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 192500,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 70,
+  "Description": "Alpine Rail AG faktura 1539",
+  "TransactionDate": "2025-09-11",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5810,
+    "Debit": {
+     "MinorUnits": 590700,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 590700,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 68,
+  "Description": "Berlin Cloudworks GmbH faktura 6690",
+  "TransactionDate": "2025-09-13",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 6540,
+    "Debit": {
+     "MinorUnits": 38500,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 38500,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 63,
+  "Description": "Kontorsbolaget i Malmö AB faktura 6032",
+  "TransactionDate": "2025-09-15",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5460,
+    "Debit": {
+     "MinorUnits": 103800,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 25950,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 129750,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 67,
+  "Description": "Telefonia Sverige AB faktura 2416",
+  "TransactionDate": "2025-09-20",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 6212,
+    "Debit": {
+     "MinorUnits": 28000,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 7000,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 35000,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 65,
+  "Description": "Lund Konsult HB",
+  "TransactionDate": "2025-09-23",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 6550,
+    "Debit": {
+     "MinorUnits": 1514400,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 378600,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 1893000,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 69,
+  "Description": "Dublin Software Ltd",
+  "TransactionDate": "2025-09-23",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5420,
+    "Debit": {
+     "MinorUnits": 105600,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 105600,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 77,
+  "Description": "Berlin Cloudworks GmbH faktura 8090",
+  "TransactionDate": "2025-10-02",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 6540,
+    "Debit": {
+     "MinorUnits": 80300,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 80300,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 72,
+  "Description": "Fjällresor AB",
+  "TransactionDate": "2025-10-03",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5810,
+    "Debit": {
+     "MinorUnits": 197500,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 11850,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 209350,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 78,
+  "Description": "Dublin Software Ltd",
+  "TransactionDate": "2025-10-03",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5420,
+    "Debit": {
+     "MinorUnits": 133100,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 133100,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 76,
+  "Description": "Telefonia Sverige AB",
+  "TransactionDate": "2025-10-08",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 6212,
+    "Debit": {
+     "MinorUnits": 59600,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 14900,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 74500,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 74,
+  "Description": "Svea Programvara AB",
+  "TransactionDate": "2025-10-10",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5420,
+    "Debit": {
+     "MinorUnits": 121600,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 30400,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 152000,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 75,
+  "Description": "Parkera Smart AB",
+  "TransactionDate": "2025-10-13",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5810,
+    "Debit": {
+     "MinorUnits": 17800,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 4450,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 22250,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 79,
+  "Description": "Helsinki Print Oy faktura 3232",
+  "TransactionDate": "2025-10-23",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5460,
+    "Debit": {
+     "MinorUnits": 58300,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 58300,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 73,
+  "Description": "Kontorsbolaget i Malmö AB faktura 1601",
+  "TransactionDate": "2025-10-25",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5460,
+    "Debit": {
+     "MinorUnits": 127200,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 31800,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 159000,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 83,
+  "Description": "Berlin Cloudworks GmbH",
+  "TransactionDate": "2025-11-01",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 6540,
+    "Debit": {
+     "MinorUnits": 117700,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 117700,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 81,
+  "Description": "Svea Programvara AB",
+  "TransactionDate": "2025-11-09",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5420,
+    "Debit": {
+     "MinorUnits": 271400,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 67850,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 339250,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 84,
+  "Description": "Dublin Software Ltd",
+  "TransactionDate": "2025-11-09",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5420,
+    "Debit": {
+     "MinorUnits": 49500,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 49500,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 82,
+  "Description": "Stockholms Elverk AB faktura 8728",
+  "TransactionDate": "2025-11-14",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5020,
+    "Debit": {
+     "MinorUnits": 71600,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 17900,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 89500,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 80,
+  "Description": "Nordkloud AB faktura 9133",
+  "TransactionDate": "2025-11-22",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5420,
+    "Debit": {
+     "MinorUnits": 396100,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 99025,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 495125,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 85,
+  "Description": "Nordkloud AB faktura 4396",
+  "TransactionDate": "2025-12-07",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 6540,
+    "Debit": {
+     "MinorUnits": 282300,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 70575,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 352875,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 91,
+  "Description": "Dublin Software Ltd faktura 6443",
+  "TransactionDate": "2025-12-11",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5420,
+    "Debit": {
+     "MinorUnits": 119900,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 119900,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 89,
+  "Description": "Stockholms Elverk AB faktura 2884",
+  "TransactionDate": "2025-12-13",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5020,
+    "Debit": {
+     "MinorUnits": 146200,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 36550,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 182750,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 87,
+  "Description": "Parkera Smart AB",
+  "TransactionDate": "2025-12-16",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5800,
+    "Debit": {
+     "MinorUnits": 8600,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 2150,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 10750,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 88,
+  "Description": "Lund Konsult HB",
+  "TransactionDate": "2025-12-17",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 6550,
+    "Debit": {
+     "MinorUnits": 1648200,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 412050,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 2060250,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 86,
+  "Description": "Kontorsbolaget i Malmö AB faktura 4698",
+  "TransactionDate": "2025-12-18",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5460,
+    "Debit": {
+     "MinorUnits": 171500,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 42875,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 214375,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 90,
+  "Description": "Berlin Cloudworks GmbH",
+  "TransactionDate": "2025-12-19",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 6540,
+    "Debit": {
+     "MinorUnits": 30800,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 30800,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 92,
+  "Description": "Alpine Rail AG faktura 6951",
+  "TransactionDate": "2025-12-23",
+  "Year": 2025,
+  "Rows": [
+   {
+    "Account": 5810,
+    "Debit": {
+     "MinorUnits": 92400,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 92400,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 95,
+  "Description": "Helsinki Print Oy faktura 9678",
+  "TransactionDate": "2026-01-01",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 5460,
+    "Debit": {
+     "MinorUnits": 260700,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 260700,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 93,
+  "Description": "Svea Programvara AB",
+  "TransactionDate": "2026-01-04",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 5420,
+    "Debit": {
+     "MinorUnits": 188600,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 47150,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 235750,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 94,
+  "Description": "Berlin Cloudworks GmbH",
+  "TransactionDate": "2026-01-04",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 6540,
+    "Debit": {
+     "MinorUnits": 207900,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 207900,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 99,
+  "Description": "Stockholms Elverk AB",
+  "TransactionDate": "2026-02-12",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 5020,
+    "Debit": {
+     "MinorUnits": 110800,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 27700,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 138500,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 96,
+  "Description": "Nordkloud AB",
+  "TransactionDate": "2026-02-13",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 6540,
+    "Debit": {
+     "MinorUnits": 357500,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 89375,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 446875,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 97,
+  "Description": "Svea Programvara AB faktura 9105",
+  "TransactionDate": "2026-02-16",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 5420,
+    "Debit": {
+     "MinorUnits": 101300,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 25325,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 126625,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 100,
+  "Description": "Telefonia Sverige AB",
+  "TransactionDate": "2026-02-17",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 6212,
+    "Debit": {
+     "MinorUnits": 40600,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 10150,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 50750,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 98,
+  "Description": "Parkera Smart AB",
+  "TransactionDate": "2026-02-20",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 5800,
+    "Debit": {
+     "MinorUnits": 17800,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 4450,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 22250,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 102,
+  "Description": "Dublin Software Ltd faktura 5805",
+  "TransactionDate": "2026-02-21",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 5420,
+    "Debit": {
+     "MinorUnits": 108900,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 108900,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 101,
+  "Description": "Berlin Cloudworks GmbH",
+  "TransactionDate": "2026-02-23",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 6540,
+    "Debit": {
+     "MinorUnits": 181500,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 181500,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 103,
+  "Description": "Nordkloud AB",
+  "TransactionDate": "2026-03-07",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 6540,
+    "Debit": {
+     "MinorUnits": 195300,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 48825,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 244125,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 106,
+  "Description": "Stockholms Elverk AB faktura 8613",
+  "TransactionDate": "2026-03-09",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 5020,
+    "Debit": {
+     "MinorUnits": 115200,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 28800,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 144000,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 107,
+  "Description": "Dublin Software Ltd faktura 8049",
+  "TransactionDate": "2026-03-13",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 5420,
+    "Debit": {
+     "MinorUnits": 390500,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 390500,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 104,
+  "Description": "Svea Programvara AB faktura 6662",
+  "TransactionDate": "2026-03-16",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 5420,
+    "Debit": {
+     "MinorUnits": 75700,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 18925,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 94625,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 108,
+  "Description": "Alpine Rail AG faktura 9895",
+  "TransactionDate": "2026-03-19",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 5810,
+    "Debit": {
+     "MinorUnits": 218900,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 218900,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 105,
+  "Description": "Parkera Smart AB",
+  "TransactionDate": "2026-03-21",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 5800,
+    "Debit": {
+     "MinorUnits": 19100,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 4775,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 23875,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 113,
+  "Description": "Helsinki Print Oy",
+  "TransactionDate": "2026-04-14",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 5460,
+    "Debit": {
+     "MinorUnits": 179300,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 179300,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 109,
+  "Description": "Svea Programvara AB",
+  "TransactionDate": "2026-04-17",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 5420,
+    "Debit": {
+     "MinorUnits": 182300,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 45575,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 227875,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 110,
+  "Description": "Lund Konsult HB",
+  "TransactionDate": "2026-04-22",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 6550,
+    "Debit": {
+     "MinorUnits": 1763900,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 440975,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 2204875,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 112,
+  "Description": "Telefonia Sverige AB faktura 3183",
+  "TransactionDate": "2026-04-23",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 6212,
+    "Debit": {
+     "MinorUnits": 44200,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 11050,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 55250,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 111,
+  "Description": "Stockholms Elverk AB",
+  "TransactionDate": "2026-04-25",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 5020,
+    "Debit": {
+     "MinorUnits": 100000,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 25000,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 125000,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 115,
+  "Description": "Parkera Smart AB faktura 6334",
+  "TransactionDate": "2026-05-16",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 5800,
+    "Debit": {
+     "MinorUnits": 27800,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 6950,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 34750,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 117,
+  "Description": "Helsinki Print Oy",
+  "TransactionDate": "2026-05-16",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 5460,
+    "Debit": {
+     "MinorUnits": 304700,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 304700,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 114,
+  "Description": "Nordkloud AB",
+  "TransactionDate": "2026-05-22",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 6540,
+    "Debit": {
+     "MinorUnits": 151300,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 37825,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 189125,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 116,
+  "Description": "Alpine Rail AG faktura 2914",
+  "TransactionDate": "2026-05-25",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 5810,
+    "Debit": {
+     "MinorUnits": 156200,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 156200,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 118,
+  "Description": "Lund Konsult HB faktura 2448",
+  "TransactionDate": "2026-06-09",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 6550,
+    "Debit": {
+     "MinorUnits": 1376900,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 344225,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 1721125,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 120,
+  "Description": "Alpine Rail AG",
+  "TransactionDate": "2026-06-15",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 5810,
+    "Debit": {
+     "MinorUnits": 83600,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 83600,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 119,
+  "Description": "Berlin Cloudworks GmbH faktura 3223",
+  "TransactionDate": "2026-06-16",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 6540,
+    "Debit": {
+     "MinorUnits": 198000,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 198000,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 121,
+  "Description": "Nordkloud AB",
+  "TransactionDate": "2026-07-01",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 6540,
+    "Debit": {
+     "MinorUnits": 179400,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 44850,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 224250,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 127,
+  "Description": "Alpine Rail AG faktura 8644",
+  "TransactionDate": "2026-07-03",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 5810,
+    "Debit": {
+     "MinorUnits": 843700,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 843700,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 122,
+  "Description": "Kontorsbolaget i Malmö AB faktura 8948",
+  "TransactionDate": "2026-07-04",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 5460,
+    "Debit": {
+     "MinorUnits": 64200,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 16050,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 80250,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 124,
+  "Description": "Lund Konsult HB faktura 7705",
+  "TransactionDate": "2026-07-08",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 6550,
+    "Debit": {
+     "MinorUnits": 1733900,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 433475,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 2167375,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 126,
+  "Description": "Dublin Software Ltd faktura 7672",
+  "TransactionDate": "2026-07-17",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 5420,
+    "Debit": {
+     "MinorUnits": 331100,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 331100,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 125,
+  "Description": "Telefonia Sverige AB",
+  "TransactionDate": "2026-07-19",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 6212,
+    "Debit": {
+     "MinorUnits": 31300,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 7825,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 39125,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 123,
+  "Description": "Parkera Smart AB faktura 9110",
+  "TransactionDate": "2026-07-26",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 5810,
+    "Debit": {
+     "MinorUnits": 32100,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 8025,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 40125,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 130,
+  "Description": "Kontorsbolaget i Malmö AB",
+  "TransactionDate": "2026-08-02",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 5460,
+    "Debit": {
+     "MinorUnits": 65500,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 16375,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 81875,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 131,
+  "Description": "Svea Programvara AB",
+  "TransactionDate": "2026-08-07",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 5420,
+    "Debit": {
+     "MinorUnits": 291000,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 72750,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 363750,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 135,
+  "Description": "Alpine Rail AG",
+  "TransactionDate": "2026-08-10",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 5810,
+    "Debit": {
+     "MinorUnits": 548900,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 548900,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 128,
+  "Description": "Nordkloud AB faktura 4843",
+  "TransactionDate": "2026-08-19",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 6540,
+    "Debit": {
+     "MinorUnits": 348400,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 87100,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 435500,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 129,
+  "Description": "Fjällresor AB",
+  "TransactionDate": "2026-08-22",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 5810,
+    "Debit": {
+     "MinorUnits": 151700,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 9102,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 160802,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 134,
+  "Description": "Telefonia Sverige AB",
+  "TransactionDate": "2026-08-23",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 6212,
+    "Debit": {
+     "MinorUnits": 67600,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 16900,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 84500,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 132,
+  "Description": "Parkera Smart AB",
+  "TransactionDate": "2026-08-24",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 5800,
+    "Debit": {
+     "MinorUnits": 37600,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 9400,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 47000,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 133,
+  "Description": "Lund Konsult HB",
+  "TransactionDate": "2026-08-24",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 6550,
+    "Debit": {
+     "MinorUnits": 1871500,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 467875,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 2339375,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 138,
+  "Description": "Lund Konsult HB",
+  "TransactionDate": "2026-09-01",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 6550,
+    "Debit": {
+     "MinorUnits": 1323800,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 330950,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 1654750,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 140,
+  "Description": "Alpine Rail AG",
+  "TransactionDate": "2026-09-03",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 5810,
+    "Debit": {
+     "MinorUnits": 537900,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 537900,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 139,
+  "Description": "Telefonia Sverige AB faktura 8251",
+  "TransactionDate": "2026-09-06",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 6212,
+    "Debit": {
+     "MinorUnits": 32000,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 8000,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 40000,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 136,
+  "Description": "Kontorsbolaget i Malmö AB faktura 8559",
+  "TransactionDate": "2026-09-17",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 5460,
+    "Debit": {
+     "MinorUnits": 229700,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 57425,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 287125,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 137,
+  "Description": "Parkera Smart AB",
+  "TransactionDate": "2026-09-25",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 5800,
+    "Debit": {
+     "MinorUnits": 14600,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 3650,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 18250,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 144,
+  "Description": "Dublin Software Ltd faktura 4615",
+  "TransactionDate": "2026-10-04",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 5420,
+    "Debit": {
+     "MinorUnits": 470800,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 470800,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 141,
+  "Description": "Kontorsbolaget i Malmö AB faktura 5713",
+  "TransactionDate": "2026-10-08",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 5460,
+    "Debit": {
+     "MinorUnits": 160900,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 40225,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 201125,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 142,
+  "Description": "Telefonia Sverige AB",
+  "TransactionDate": "2026-10-09",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 6212,
+    "Debit": {
+     "MinorUnits": 33700,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2641,
+    "Debit": {
+     "MinorUnits": 8425,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 42125,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 146,
+  "Description": "Helsinki Print Oy",
+  "TransactionDate": "2026-10-17",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 5460,
+    "Debit": {
+     "MinorUnits": 205700,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 205700,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 143,
+  "Description": "Berlin Cloudworks GmbH",
+  "TransactionDate": "2026-10-19",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 6540,
+    "Debit": {
+     "MinorUnits": 23100,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 23100,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ },
+ {
+  "Series": "A",
+  "Number": 145,
+  "Description": "Alpine Rail AG",
+  "TransactionDate": "2026-10-24",
+  "Year": 2026,
+  "Rows": [
+   {
+    "Account": 5810,
+    "Debit": {
+     "MinorUnits": 654500,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   },
+   {
+    "Account": 2440,
+    "Debit": {
+     "MinorUnits": 0,
+     "Currency": "SEK"
+    },
+    "Credit": {
+     "MinorUnits": 654500,
+     "Currency": "SEK"
+    },
+    "Description": "",
+    "CostCenter": "",
+    "Project": ""
+   }
+  ]
+ }
+]
