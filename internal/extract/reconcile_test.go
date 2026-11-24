@@ -60,8 +60,11 @@ func TestReconciled_AllowsRoundingUpToFiftyMinorUnitsButNotMore(t *testing.T) {
 	}
 }
 
-// The three misreads found on real layouts (issue #146), built so that net and
-// VAT are read correctly and only the total is wrong.
+// Three shapes a misread total can take, built so that net and VAT are read
+// correctly and only the total is wrong. These are constructed cases: the
+// "dropped digit" one was first seen as a LABEL error in the katanaml dataset
+// (the model had read the printed total correctly), and the other two were seen
+// as model misreads under an earlier prompt that no longer reproduces them.
 func TestReconciled_FalseForTheThreeKnownWrongTotalShapes(t *testing.T) {
 	tests := []struct {
 		name, net, vat, wrongTotal string

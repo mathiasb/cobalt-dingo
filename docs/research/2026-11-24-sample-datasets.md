@@ -63,17 +63,46 @@ invoices mostly use ISO dates, but invoices from US suppliers do not, and a swap
 date puts a booking in the wrong period. Fix direction: ask for the date as printed,
 normalise in code with an explicit locale, and flag any date that is ambiguous.
 
-### Failure mode 2: wrong totals that look plausible (3 of 6 totals inspected)
+### Failure mode 2: wrong totals (CORRECTED, see the re-run below)
 
-- dropped digit: 157929.37 read for 1579929.37
-- transposed digits: 8095.77 read for 8905.77
-- a different figure: 286.02 read for 314.62
+The first run's totals were 90.5% (67/74). I reported three plausible-looking
+misreads: a dropped digit (157929.37 for 1579929.37), transposed digits (8095.77
+for 8905.77) and a different figure (286.02 for 314.62). **The first of those was
+wrong.** Looking at the image (invoice 014), the printed total is "$ 157 929,37",
+exactly what the model read; the dataset's own ground truth, 1579929.37, has an
+extra digit. It is a label error, not a model error. The other two were real misreads
+under the first prompt.
 
-A wrong total posted to the books is worse than a refusal. Fix direction: read net,
-VAT and gross and the line sum, and require net + VAT = gross; where that fails,
-mark the proposal "do not trust" instead of showing it. That check costs nothing
-and would catch all three here only if the model's other amounts are right, which
-is untested.
+## Re-run after the #146 fixes (dates as printed, net total read, net + VAT = total)
+
+Same 74 invoices, same model, temperature 0, mean 12.3 s per image, date order set
+to month-first because this dataset is American.
+
+| Field | First run | After |
+|---|---|---|
+| supplier | 97.3% | 97.3% (72/74) |
+| invoice number | 100% | 100% |
+| invoice date | 79.7% | 100% (74/74) |
+| total | 90.5% | 98.6% (73/74); the one miss is the label error above, so effectively 100% |
+| VAT amount | 100% | 100% |
+| all labelled fields | 94.6% | 99.3% (438/441) |
+
+What this does and does not show:
+
+- **The date result depends on the order setting being right.** 32 of 74 dates were
+  ambiguous (both parts 12 or below, different). Under the wrong setting each would
+  be read wrongly and silently; the flag is what catches that. I did not run the
+  wrong setting, so the size of the damage is an inference, not a measurement.
+- **The totals improvement cannot be credited to the cross-check.** The prompt changed
+  in three ways at once (dates as printed, a net total asked for, "including VAT"
+  added to the total), and only the prompt-plus-code was run. Two earlier misreads
+  stopped reproducing; the cause is unknown.
+- **The cross-check itself was exercised on zero genuine wrong totals.** It reports
+  0 of 1 caught, and that one is the label error, where net + VAT equals the printed
+  total, so nothing was wrong to catch. It flagged 0 of 73 correct totals falsely.
+  Its ability to catch a real misread rests on unit tests with constructed cases only.
+- Supplier misses (2) are unchanged; I have not looked at them.
+- One model, one run, one dataset whose content is generated.
 
 ## A defect this found earlier
 
