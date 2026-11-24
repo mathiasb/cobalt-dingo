@@ -1,7 +1,7 @@
 # Bet (draft): prove a controlled, reversible write path
 
-Tracker: #139. Status: **drafted by an agent, not placed.** Only Mathias places a bet;
-after a slice starts the outcome, guardrail, threshold and out-of-scope list are frozen
+Tracker: #139. Status: **placed by Mathias, 2026-11-24, as drafted.** Drafted by an agent on
+2026-11-20; only Mathias places a bet. After a slice starts the outcome, guardrail, threshold and out-of-scope list are frozen
 (`skills:bet`, iron law 4).
 
 Discovery inputs: `2026-11-20-write-path-discovery-movement-1.md`,
@@ -27,7 +27,7 @@ moves or moves on a feeling. Mathias wants the pattern proven, not just the feat
 
 **Outcome (people, not output).** By the read date the accounting firm's reviewer has
 judged system-proposed vouchers, produced against the TEST company only, acceptable to
-post as proposed. Proposed threshold, for Mathias to set or change *before* S1 starts:
+post as proposed. Threshold, accepted as drafted when the bet was placed:
 at least 90% of at least 30 proposals acceptable, zero judged unsafe. Read from the
 firm's written review.
 
