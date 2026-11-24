@@ -147,3 +147,29 @@ func TestExtract_FailsOnANon200Response(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "404")
 }
+
+// Real invoices often carry no due date (10 of 10 in the katanaml sample). The
+// booking proposal does not need one, so absence is not an error; a due date
+// that IS present and malformed still is.
+func TestExtract_AcceptsAReplyWithNoDueDate(t *testing.T) {
+	srv := stub(t, `{"supplier":"Smith Ltd","invoice_number":"26343874","invoice_date":"2015-09-18","due_date":null,"currency":"USD","total":"3490.29","vat_amount":"317.30"}`, nil)
+	defer srv.Close()
+	c := &extract.Client{BaseURL: srv.URL, Model: "m"}
+
+	inv, err := c.Extract(context.Background(), []byte("x"))
+
+	require.NoError(t, err)
+	assert.Equal(t, "", inv.DueDate)
+	assert.Equal(t, int64(349029), inv.Total)
+}
+
+func TestExtract_StillRejectsAMalformedDueDateThatIsPresent(t *testing.T) {
+	srv := stub(t, `{"supplier":"A","invoice_number":"1","invoice_date":"2026-11-11","due_date":"next month","currency":"SEK","total":"1.00","vat_amount":"0.00"}`, nil)
+	defer srv.Close()
+	c := &extract.Client{BaseURL: srv.URL, Model: "m"}
+
+	_, err := c.Extract(context.Background(), []byte("x"))
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "due_date")
+}

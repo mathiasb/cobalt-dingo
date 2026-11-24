@@ -26,6 +26,7 @@ const prompt = "Extract from this invoice image as JSON with exactly these keys:
 	"vat_amount (plain decimal with dot). Use null if absent."
 
 // Invoice is what the model read from the image. Amounts are minor units.
+// DueDate is empty when the invoice states none.
 type Invoice struct {
 	Supplier      string
 	InvoiceNumber string
@@ -132,7 +133,6 @@ func parseInvoice(content string) (Invoice, error) {
 		{"supplier", raw.Supplier, &inv.Supplier},
 		{"invoice_number", raw.InvoiceNumber, &inv.InvoiceNumber},
 		{"invoice_date", raw.InvoiceDate, &inv.InvoiceDate},
-		{"due_date", raw.DueDate, &inv.DueDate},
 		{"currency", raw.Currency, &inv.Currency},
 	} {
 		if f.src == nil || strings.TrimSpace(*f.src) == "" {
@@ -140,7 +140,19 @@ func parseInvoice(content string) (Invoice, error) {
 		}
 		*f.dst = strings.TrimSpace(*f.src)
 	}
-	for _, d := range []struct{ name, v string }{{"invoice_date", inv.InvoiceDate}, {"due_date", inv.DueDate}} {
+	// The due date is optional: many real invoices carry none and the booking
+	// proposal does not need it. A due date that is present must still parse.
+	if raw.DueDate != nil && strings.TrimSpace(*raw.DueDate) != "" {
+		inv.DueDate = strings.TrimSpace(*raw.DueDate)
+	}
+	for _, d := range []struct {
+		name     string
+		v        string
+		optional bool
+	}{{"invoice_date", inv.InvoiceDate, false}, {"due_date", inv.DueDate, true}} {
+		if d.optional && d.v == "" {
+			continue
+		}
 		if _, err := time.Parse("2006-01-02", d.v); err != nil {
 			return Invoice{}, fmt.Errorf("field %s is not YYYY-MM-DD: %q", d.name, d.v)
 		}
