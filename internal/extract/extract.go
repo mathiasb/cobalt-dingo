@@ -87,7 +87,12 @@ func (c *Client) Extract(ctx context.Context, image []byte) (Invoice, error) {
 
 	hc := c.HTTP
 	if hc == nil {
-		hc = &http.Client{Timeout: 5 * time.Minute}
+		// Redirects are not followed: the document goes to the configured host
+		// and nowhere else, whatever that host answers.
+		hc = &http.Client{
+			Timeout:       5 * time.Minute,
+			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+		}
 	}
 	resp, err := hc.Do(req)
 	if err != nil {

@@ -234,3 +234,24 @@ func TestExtract_AsksTheModelForDatesAsPrintedNotReformatted(t *testing.T) {
 	assert.Contains(t, prompt, "exactly as printed")
 	assert.NotContains(t, prompt, "YYYY-MM-DD", "the model must not be asked to convert dates")
 }
+
+// A model host that redirects would move the document to whatever it names; the
+// local-network guard on the URL means nothing if redirects are followed.
+func TestExtract_DoesNotFollowARedirectOffTheConfiguredHost(t *testing.T) {
+	var elsewhereHit bool
+	elsewhere := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		elsewhereHit = true
+		_ = json.NewEncoder(w).Encode(map[string]any{"message": map[string]any{"content": goodReply}})
+	}))
+	defer elsewhere.Close()
+	redirector := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, elsewhere.URL+"/api/chat", http.StatusTemporaryRedirect)
+	}))
+	defer redirector.Close()
+	c := &extract.Client{BaseURL: redirector.URL, Model: "m"}
+
+	_, err := c.Extract(context.Background(), []byte("x"))
+
+	require.Error(t, err)
+	assert.False(t, elsewhereHit, "the image must not be sent to the redirect target")
+}
