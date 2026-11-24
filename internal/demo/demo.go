@@ -9,22 +9,27 @@ package demo
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"html/template"
 	"io"
 	"io/fs"
 	"log/slog"
+	"mime/multipart"
 	"net"
 	"net/http"
 	"regexp"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/mathiasb/cobalt-dingo/internal/apentry"
 	"github.com/mathiasb/cobalt-dingo/internal/booking"
 	"github.com/mathiasb/cobalt-dingo/internal/process"
 )
@@ -37,12 +42,17 @@ const (
 
 	defaultModelTimeout = 3 * time.Minute
 	defaultMaxLearned   = 200
+	defaultMaxFiles     = 4
+	defaultMaxParsing   = 2
+	entryStoreMax       = 20
+	entryStoreTTL       = 30 * time.Minute
 	becauseShown        = 5
 )
 
 var (
 	sampleNameRe = regexp.MustCompile(`^[0-9]{3}\.png$`)
 	accountRe    = regexp.MustCompile(`^[1-8][0-9]{3}$`)
+	entryNameRe  = regexp.MustCompile(`^[0-9a-f]{32}\.csv$`)
 )
 
 // Config configures the demo handler.
@@ -56,11 +66,21 @@ type Config struct {
 
 	ModelTimeout time.Duration // zero means the default
 	MaxLearned   int           // zero means the default
+
+	MaxFiles       int              // files per submit; zero means the default
+	MaxTotalUpload int64            // bytes across all files in one submit; zero means twice MaxUpload
+	MaxParsing     int              // uploads being read at once; zero means the default
+	Now            func() time.Time // for expiry; nil means time.Now
 }
 
 type server struct {
 	cfg  Config
 	busy chan struct{} // capacity one: a second model call is refused, not queued
+
+	// parsing bounds uploads being read at once. Reading an upload costs memory
+	// (about 23 MB per 8 MB file) before the model gate is reached.
+	parsing chan struct{}
+	entries *entryStore
 
 	mu      sync.RWMutex // guards prop and learned: Learn writes, Propose reads
 	prop    *booking.Proposer
@@ -77,12 +97,26 @@ func New(cfg Config) http.Handler {
 	if cfg.MaxLearned <= 0 {
 		cfg.MaxLearned = defaultMaxLearned
 	}
+	if cfg.MaxFiles <= 0 {
+		cfg.MaxFiles = defaultMaxFiles
+	}
+	if cfg.MaxTotalUpload <= 0 {
+		cfg.MaxTotalUpload = 2 * cfg.MaxUpload
+	}
+	if cfg.MaxParsing <= 0 {
+		cfg.MaxParsing = defaultMaxParsing
+	}
+	if cfg.Now == nil {
+		cfg.Now = time.Now
+	}
 	s := &server{
-		cfg:  cfg,
-		busy: make(chan struct{}, 1),
-		prop: booking.NewProposer(cfg.History),
+		cfg:     cfg,
+		busy:    make(chan struct{}, 1),
+		parsing: make(chan struct{}, cfg.MaxParsing),
+		entries: newEntryStore(cfg.Now, entryStoreMax, entryStoreTTL),
+		prop:    booking.NewProposer(cfg.History),
 		page: template.Must(template.New("page").Funcs(template.FuncMap{
-			"money": money, "pct": pct,
+			"money": money, "pct": pct, "amt": amt, "inc": func(i int) int { return i + 1 },
 		}).Parse(pageHTML)),
 	}
 	mux := http.NewServeMux()
@@ -90,6 +124,7 @@ func New(cfg Config) http.Handler {
 	mux.HandleFunc("POST /process", s.processHandler)
 	mux.HandleFunc("POST /feedback", s.feedback)
 	mux.HandleFunc("GET /samples/{name}", s.sample)
+	mux.HandleFunc("GET /entries/{name}", s.entriesCSV)
 	// Browsers send cached basic-auth credentials on cross-site form posts, so
 	// state-changing requests from another origin are refused.
 	return s.guard(http.NewCrossOriginProtection().Handler(mux))
@@ -142,15 +177,25 @@ func (s *server) guard(next http.Handler) http.Handler {
 	})
 }
 
+// item is the outcome for one invoice in a submit.
+type item struct {
+	Name          string // sample file name, or the position of an upload
+	Result        *process.Result
+	Because       []booking.Example // the most recent few, not all of them
+	More          int               // how many past bookings were left out of Because
+	Supplier      string
+	Entry         *apentry.Entry
+	EntryWarnings []string // the entry's warnings that the reading does not already show
+	NoEntry       string   // why there is no entry
+	Error         string
+}
+
 type view struct {
-	Samples  []string
-	Result   *process.Result
-	Because  []booking.Example // the most recent few, not all of them
-	More     int               // how many past bookings were left out of Because
-	Notice   string
-	Error    string
-	Supplier string
-	Sample   string
+	Samples   []string
+	Items     []item
+	EntriesID string
+	Notice    string
+	Error     string
 }
 
 func (s *server) sampleNames() []string {
@@ -195,62 +240,100 @@ func (s *server) sample(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(data)
 }
 
-// image returns the bytes to process: a named sample, or an uploaded file held
-// in memory. On refusal it has already written the response.
-func (s *server) image(w http.ResponseWriter, r *http.Request) (data []byte, sample string, ok bool) {
-	r.Body = http.MaxBytesReader(w, r.Body, s.cfg.MaxUpload+multipartOverhead)
-	// The memory limit must cover the largest accepted upload: above it, net/http
-	// spools parts to os.TempDir(), and uploads are never to touch disk.
-	if err := r.ParseMultipartForm(s.cfg.MaxUpload + multipartOverhead); err != nil {
+// input is one invoice image to read: a sample or an upload held in memory.
+type input struct {
+	name string
+	data []byte
+}
+
+// inputs reads the submitted samples and uploads. On refusal it has already
+// written the response. Every refusal happens before anything reaches the model.
+func (s *server) inputs(w http.ResponseWriter, r *http.Request) ([]input, bool) {
+	limit := s.cfg.MaxTotalUpload + multipartOverhead
+	r.Body = http.MaxBytesReader(w, r.Body, limit)
+	// The memory limit must cover the largest accepted request: above it,
+	// net/http spools parts to os.TempDir(), and uploads are never to touch disk.
+	if err := r.ParseMultipartForm(limit); err != nil {
 		var tooBig *http.MaxBytesError
 		if errors.As(err, &tooBig) {
 			s.render(w, http.StatusRequestEntityTooLarge, view{Error: "That upload is too large."})
-			return nil, "", false
+			return nil, false
 		}
 		if err := r.ParseForm(); err != nil {
 			s.render(w, http.StatusBadRequest, view{Error: "Could not read the form."})
-			return nil, "", false
+			return nil, false
 		}
 	}
 
-	if name := r.FormValue("sample"); name != "" || r.MultipartForm == nil || len(r.MultipartForm.File["image"]) == 0 {
+	var files []*multipart.FileHeader
+	if r.MultipartForm != nil {
+		files = r.MultipartForm.File["image"]
+	}
+	samples := r.Form["sample"]
+	if len(files)+len(samples) == 0 {
+		s.render(w, http.StatusBadRequest, view{Error: "Choose a listed sample or upload an image."})
+		return nil, false
+	}
+	if len(files)+len(samples) > s.cfg.MaxFiles {
+		s.render(w, http.StatusBadRequest, view{Error: fmt.Sprintf("At most %d invoices at a time.", s.cfg.MaxFiles)})
+		return nil, false
+	}
+
+	var out []input
+	var total int64
+	for _, name := range samples {
 		if s.cfg.Samples == nil || !sampleNameRe.MatchString(name) {
 			s.render(w, http.StatusBadRequest, view{Error: "Choose a listed sample or upload an image."})
-			return nil, "", false
+			return nil, false
 		}
 		b, err := fs.ReadFile(s.cfg.Samples, name)
 		if err != nil {
 			s.render(w, http.StatusBadRequest, view{Error: "Unknown sample."})
-			return nil, "", false
+			return nil, false
 		}
-		return b, name, true
+		out = append(out, input{name: name, data: b})
 	}
-
-	f, _, err := r.FormFile("image")
-	if err != nil {
-		s.render(w, http.StatusBadRequest, view{Error: "Could not read the upload."})
-		return nil, "", false
+	for i, fh := range files {
+		f, err := fh.Open()
+		if err != nil {
+			s.render(w, http.StatusBadRequest, view{Error: "Could not read the upload."})
+			return nil, false
+		}
+		b, err := io.ReadAll(io.LimitReader(f, s.cfg.MaxUpload+1))
+		_ = f.Close()
+		if err != nil {
+			s.render(w, http.StatusBadRequest, view{Error: "Could not read the upload."})
+			return nil, false
+		}
+		if int64(len(b)) > s.cfg.MaxUpload {
+			s.render(w, http.StatusRequestEntityTooLarge, view{Error: "That upload is too large."})
+			return nil, false
+		}
+		total += int64(len(b))
+		if total > s.cfg.MaxTotalUpload {
+			s.render(w, http.StatusRequestEntityTooLarge, view{Error: "Those uploads are too large together."})
+			return nil, false
+		}
+		switch http.DetectContentType(b) {
+		case "image/png", "image/jpeg":
+		default:
+			s.render(w, http.StatusUnsupportedMediaType, view{Error: "Only PNG and JPEG images are accepted."})
+			return nil, false
+		}
+		out = append(out, input{name: fmt.Sprintf("upload %d", i+1), data: b})
 	}
-	defer func() { _ = f.Close() }()
-	b, err := io.ReadAll(io.LimitReader(f, s.cfg.MaxUpload+1))
-	if err != nil {
-		s.render(w, http.StatusBadRequest, view{Error: "Could not read the upload."})
-		return nil, "", false
-	}
-	if int64(len(b)) > s.cfg.MaxUpload {
-		s.render(w, http.StatusRequestEntityTooLarge, view{Error: "That upload is too large."})
-		return nil, "", false
-	}
-	switch http.DetectContentType(b) {
-	case "image/png", "image/jpeg":
-		return b, "", true
-	}
-	s.render(w, http.StatusUnsupportedMediaType, view{Error: "Only PNG and JPEG images are accepted."})
-	return nil, "", false
+	return out, true
 }
 
 func (s *server) processHandler(w http.ResponseWriter, r *http.Request) {
-	data, sample, ok := s.image(w, r)
+	select {
+	case s.parsing <- struct{}{}:
+	default:
+		s.render(w, http.StatusServiceUnavailable, view{Error: "Too many uploads are arriving at once. Try again in a moment."})
+		return
+	}
+	ins, ok := s.inputs(w, r)
+	<-s.parsing
 	if !ok {
 		return
 	}
@@ -263,26 +346,158 @@ func (s *server) processHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// One deadline for the whole submit, so a batch cannot outlast the server's
+	// write timeout; invoices that do not fit in it say so.
 	ctx, cancel := context.WithTimeout(r.Context(), s.cfg.ModelTimeout)
 	defer cancel()
-	inv, err := s.cfg.Extractor.Extract(ctx, data)
-	if err != nil {
-		// The detail names the model host and its error text: log it, do not show it.
-		slog.Warn("demo: extraction failed", "error", err)
-		s.render(w, http.StatusBadGateway, view{Error: "Could not read the invoice. The model may be busy or unreachable; try again."})
-		return
+
+	items := make([]item, 0, len(ins))
+	var entries []apentry.Entry
+	failed := 0
+	for _, in := range ins {
+		it := item{Name: in.name}
+		if ctx.Err() != nil {
+			it.Error = "Skipped: this submit ran out of time."
+			failed++
+			items = append(items, it)
+			continue
+		}
+		inv, err := s.cfg.Extractor.Extract(ctx, in.data)
+		if err != nil {
+			// The detail names the model host and its error text: log it, do not show it.
+			slog.Warn("demo: extraction failed", "error", err)
+			it.Error = "Could not read the invoice. The model may be busy or unreachable; try again."
+			failed++
+			items = append(items, it)
+			continue
+		}
+
+		s.mu.RLock()
+		res := process.Assess(inv, s.prop)
+		s.mu.RUnlock()
+		it.Result, it.Supplier = &res, inv.Supplier
+		it.Because = res.Proposal.Because
+		if len(it.Because) > becauseShown {
+			it.More = len(it.Because) - becauseShown
+			it.Because = it.Because[len(it.Because)-becauseShown:]
+		}
+		if e, err := apentry.Build(res); err != nil {
+			it.NoEntry = err.Error()
+		} else {
+			it.Entry = &e
+			it.EntryWarnings = newWarnings(e.Warnings, res.Warnings)
+			entries = append(entries, e)
+		}
+		items = append(items, it)
 	}
 
-	s.mu.RLock()
-	res := process.Assess(inv, s.prop)
-	s.mu.RUnlock()
-	shown := res.Proposal.Because
-	more := 0
-	if len(shown) > becauseShown {
-		more = len(shown) - becauseShown
-		shown = shown[len(shown)-becauseShown:]
+	v := view{Items: items}
+	if len(entries) > 0 {
+		v.EntriesID = s.entries.put(entries)
 	}
-	s.render(w, http.StatusOK, view{Result: &res, Because: shown, More: more, Sample: sample, Supplier: inv.Supplier})
+	code := http.StatusOK
+	if failed == len(items) {
+		code = http.StatusBadGateway
+	}
+	s.render(w, code, v)
+}
+
+// newWarnings returns the warnings in have that are not already in shown.
+func newWarnings(have, shown []string) []string {
+	var out []string
+	for _, w := range have {
+		dup := false
+		for _, x := range shown {
+			if w == x {
+				dup = true
+			}
+		}
+		if !dup {
+			out = append(out, w)
+		}
+	}
+	return out
+}
+
+// entriesCSV serves the entries of one earlier submit. The id is 128 random bits
+// kept in memory for a short time; the login guard wraps this like every route.
+func (s *server) entriesCSV(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	if !entryNameRe.MatchString(name) {
+		http.NotFound(w, r)
+		return
+	}
+	entries, ok := s.entries.get(strings.TrimSuffix(name, ".csv"))
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", `attachment; filename="ap-entries-proposed.csv"`)
+	if err := apentry.WriteCSV(w, entries); err != nil {
+		slog.Warn("demo: write csv", "error", err)
+	}
+}
+
+// entryStore keeps proposed entries in memory only, bounded in count and age.
+type entryStore struct {
+	mu    sync.Mutex
+	now   func() time.Time
+	max   int
+	ttl   time.Duration
+	byID  map[string]storedEntries
+	order []string
+}
+
+type storedEntries struct {
+	entries []apentry.Entry
+	at      time.Time
+}
+
+func newEntryStore(now func() time.Time, max int, ttl time.Duration) *entryStore {
+	return &entryStore{now: now, max: max, ttl: ttl, byID: map[string]storedEntries{}}
+}
+
+func (e *entryStore) put(entries []apentry.Entry) string {
+	var raw [16]byte
+	if _, err := rand.Read(raw[:]); err != nil {
+		// crypto/rand does not fail on supported platforms; if it ever does, do
+		// not hand out a guessable id.
+		panic(fmt.Sprintf("demo: crypto/rand: %v", err))
+	}
+	id := hex.EncodeToString(raw[:])
+
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.pruneLocked()
+	e.byID[id] = storedEntries{entries: entries, at: e.now()}
+	e.order = append(e.order, id)
+	for len(e.order) > e.max {
+		delete(e.byID, e.order[0])
+		e.order = e.order[1:]
+	}
+	return id
+}
+
+func (e *entryStore) get(id string) ([]apentry.Entry, bool) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.pruneLocked()
+	st, ok := e.byID[id]
+	return st.entries, ok
+}
+
+func (e *entryStore) pruneLocked() {
+	cutoff := e.now().Add(-e.ttl)
+	keep := e.order[:0]
+	for _, id := range e.order {
+		if e.byID[id].at.Before(cutoff) {
+			delete(e.byID, id)
+			continue
+		}
+		keep = append(keep, id)
+	}
+	e.order = keep
 }
 
 // maxFeedbackBody bounds a correction form: a supplier and a four-digit account
@@ -325,6 +540,13 @@ func money(minor int64, cur string) string {
 	return fmt.Sprintf("%s%d.%02d %s", neg, minor/100, minor%100, cur)
 }
 
+func amt(minor int64) string {
+	if minor == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%d.%02d", minor/100, minor%100)
+}
+
 func pct(f float64) string { return fmt.Sprintf("%.0f%%", f*100) }
 
 const pageHTML = `<!doctype html>
@@ -345,7 +567,8 @@ const pageHTML = `<!doctype html>
 <p class="banner"><strong>Synthetic data.</strong> The past bookings behind these proposals are made up, so the accuracy
 you see says nothing about any real company's books. <strong>Nothing is posted anywhere:</strong> this page has no
 connection to any accounting system. Images are read by a model on the local network, held in memory for one request
-and never stored.</p>
+and never stored. Accounts payable entries shown here are proposed only and not posted;
+the CSV is a file you choose what to do with.</p>
 
 {{if .Notice}}<p class="ok">{{.Notice}}</p>{{end}}
 {{if .Error}}<p class="bad">{{.Error}}</p>{{end}}
@@ -359,8 +582,12 @@ and never stored.</p>
 {{range .Samples}}<form method="post" action="/process"><img src="/samples/{{.}}" alt="sample {{.}}">
  <button name="sample" value="{{.}}">{{.}}</button></form>{{end}}</div>{{end}}
 
-{{with .Result}}
-<h2>2. What was read</h2>
+{{if .EntriesID}}<p><a href="/entries/{{.EntriesID}}.csv">Download all proposed entries (CSV)</a></p>{{end}}
+{{range $i, $it := .Items}}
+<h2>Invoice {{inc $i}}{{if $it.Name}}: {{$it.Name}}{{end}}</h2>
+{{if $it.Error}}<p class="bad">{{$it.Error}}</p>{{end}}
+{{with $it.Result}}
+<h3>What was read</h3>
 {{if .DoNotTrust}}<p class="bad">DO NOT TRUST this reading: the amounts do not add up. Check the invoice by hand.</p>{{end}}
 {{range .Warnings}}<p class="warn">{{.}}</p>{{end}}
 <table>
@@ -373,18 +600,18 @@ and never stored.</p>
  <tr><th>Total</th><td>{{money .Invoice.Total .Invoice.Currency}}</td></tr>
 </table>
 
-<h2>3. Proposed booking{{if .DoNotTrust}} (marked: do not trust){{end}}</h2>
+<h3>Proposed booking{{if .DoNotTrust}} (marked: do not trust){{end}}</h3>
 {{if .Proposal.Candidates}}
 <div{{if .DoNotTrust}} class="untrusted"{{end}}>
 <p>Confidence {{pct .Proposal.Confidence}}.{{if .Proposal.VATAccount}} Input VAT account used before: {{.Proposal.VATAccount}}.{{end}}</p>
 <table><tr><th>Expense account</th><th>Share of votes</th><th></th></tr>
 {{range .Proposal.Candidates}}<tr><td>{{.Account}}</td><td>{{pct .Score}}</td><td>
- <form method="post" action="/feedback"><input type="hidden" name="supplier" value="{{$.Supplier}}">
+ <form method="post" action="/feedback"><input type="hidden" name="supplier" value="{{$it.Supplier}}">
  <input type="hidden" name="account" value="{{.Account}}"><button>Accept {{.Account}}</button></form></td></tr>{{end}}
 </table>
 <p>Why: the same supplier was booked this way before:</p>
-<ul>{{range $.Because}}<li>{{if .Series}}voucher {{.Series}}{{.Number}}{{if .Date}}, {{.Date}}{{end}}{{else}}your correction{{end}}: account {{.Account}}</li>{{end}}
-{{if $.More}}<li>and {{$.More}} more like these</li>{{end}}</ul>
+<ul>{{range $it.Because}}<li>{{if .Series}}voucher {{.Series}}{{.Number}}{{if .Date}}, {{.Date}}{{end}}{{else}}your correction{{end}}: account {{.Account}}</li>{{end}}
+{{if $it.More}}<li>and {{$it.More}} more like these</li>{{end}}</ul>
 </div>
 <form method="post" action="/feedback"><input type="hidden" name="supplier" value="{{.Invoice.Supplier}}">
  <label>Or correct it to account <input name="account" size="5" inputmode="numeric" pattern="[1-8][0-9]{3}"></label>
@@ -393,6 +620,16 @@ and never stored.</p>
 <form method="post" action="/feedback"><input type="hidden" name="supplier" value="{{.Invoice.Supplier}}">
  <label>Teach it: book this supplier to account <input name="account" size="5" inputmode="numeric" pattern="[1-8][0-9]{3}"></label>
  <button>Learn</button></form>{{end}}
+
+<h3>Proposed accounts payable entry (not posted)</h3>
+{{if $it.Entry}}
+{{range $it.EntryWarnings}}<p class="warn">{{.}}</p>{{end}}
+<p>{{$it.Entry.Date}}: {{$it.Entry.Text}} ({{$it.Entry.Currency}})</p>
+<table><tr><th>Account</th><th>Debit</th><th>Credit</th></tr>
+{{range $it.Entry.Lines}}<tr><td>{{.Account}}</td><td>{{amt .Debit}}</td><td>{{amt .Credit}}</td></tr>{{end}}
+</table>
+{{else}}<p class="warn">{{$it.NoEntry}}</p>{{end}}
+{{end}}
 {{end}}
 </body></html>
 `

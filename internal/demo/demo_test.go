@@ -3,12 +3,15 @@ package demo_test
 import (
 	"bytes"
 	"context"
+	"encoding/csv"
 	"errors"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -33,11 +36,17 @@ type fakeExtractor struct {
 	gate chan struct{} // when set, Extract blocks until it is closed
 	in   chan struct{} // when set, signalled once Extract has started
 
+	byCall  []extract.Invoice // when set, call N (from 0) returns byCall[N]
+	errAt   map[int]error     // when set, call N returns errAt[N]
+	calls   atomic.Int32      // calls that got an answer or error to return
+	started atomic.Int32      // calls that reached Extract at all
+
 	onExtract func()      // when set, runs inside Extract
 	panicOnce atomic.Bool // when armed, the next Extract panics (and disarms)
 }
 
 func (f *fakeExtractor) Extract(ctx context.Context, _ []byte) (extract.Invoice, error) {
+	f.started.Add(1)
 	if f.panicOnce.CompareAndSwap(true, false) {
 		panic("extractor blew up")
 	}
@@ -56,6 +65,13 @@ func (f *fakeExtractor) Extract(ctx context.Context, _ []byte) (extract.Invoice,
 		case <-ctx.Done():
 			return extract.Invoice{}, ctx.Err()
 		}
+	}
+	n := int(f.calls.Add(1)) - 1
+	if err, ok := f.errAt[n]; ok {
+		return extract.Invoice{}, err
+	}
+	if n < len(f.byCall) {
+		return f.byCall[n], nil
 	}
 	return f.inv, f.err
 }
@@ -588,4 +604,250 @@ func TestFeedback_AnOversizeFormBodyIsRefusedBeforeItIsParsed(t *testing.T) {
 
 	assert.GreaterOrEqual(t, rec.Code, 400)
 	assert.Less(t, rec.Code, 500)
+}
+
+func uploadMany(t *testing.T, h http.Handler, files ...[]byte) *httptest.ResponseRecorder {
+	t.Helper()
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+	for i, data := range files {
+		fw, err := w.CreateFormFile("image", "inv"+strconv.Itoa(i)+".png")
+		require.NoError(t, err)
+		_, err = fw.Write(data)
+		require.NoError(t, err)
+	}
+	require.NoError(t, w.Close())
+	req := httptest.NewRequest(http.MethodPost, "/process", &buf)
+	req.Header.Set("Content-Type", w.FormDataContentType())
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec
+}
+
+var entriesLinkRe = regexp.MustCompile(`/entries/([0-9a-f]{32})\.csv`)
+
+func csvID(t *testing.T, body string) string {
+	t.Helper()
+	m := entriesLinkRe.FindStringSubmatch(body)
+	require.NotNil(t, m, "the page links to the CSV")
+	return m[1]
+}
+
+func getCSV(h http.Handler, id string) *httptest.ResponseRecorder {
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/entries/"+id+".csv", nil))
+	return rec
+}
+
+func unreconciled() extract.Invoice {
+	inv := good()
+	inv.Total = 175 // a dropped digit
+	return inv
+}
+
+func TestBatch_EachInvoiceShowsItsAccountsPayableEntryAndThePageSaysItIsOnlyAProposal(t *testing.T) {
+	domestic := extract.Invoice{
+		Supplier: "Hetzner Online GmbH", InvoiceNumber: "A-1", InvoiceDate: "2026-11-02", Currency: "SEK",
+		NetTotal: 10000, NetKnown: true, VATAmount: 2500, Total: 12500,
+	}
+	h := newHandler(t, &fakeExtractor{byCall: []extract.Invoice{domestic, good()}})
+
+	rec := uploadMany(t, h, pngBytes, pngBytes)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	body := rec.Body.String()
+	for _, want := range []string{"2440", "6540", "2641", "100.00", "125.00", "17.50"} {
+		assert.Contains(t, body, want)
+	}
+	assert.Contains(t, strings.ToLower(body), "proposed")
+	assert.Contains(t, strings.ToLower(body), "not posted")
+	assert.Contains(t, body, "not converted to SEK", "the euro invoice is flagged")
+}
+
+func TestBatch_ADoNotTrustInvoiceGetsNoEntryAndTheOthersStillDo(t *testing.T) {
+	h := newHandler(t, &fakeExtractor{byCall: []extract.Invoice{unreconciled(), good()}})
+
+	rec := uploadMany(t, h, pngBytes, pngBytes)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	body := rec.Body.String()
+	assert.Contains(t, body, "DO NOT TRUST")
+	assert.Contains(t, body, "no entry")
+	csvRows, err := csv.NewReader(getCSV(h, csvID(t, body)).Body).ReadAll()
+	require.NoError(t, err)
+	assert.Len(t, csvRows, 1+2, "the header and the two lines of the one trusted invoice")
+}
+
+func TestBatch_AFifthFileIsRefused(t *testing.T) {
+	ex := &fakeExtractor{inv: good()}
+	h := newHandler(t, ex)
+
+	rec := uploadMany(t, h, pngBytes, pngBytes, pngBytes, pngBytes, pngBytes)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.Equal(t, int32(0), ex.started.Load(), "nothing was sent to the model")
+}
+
+func TestBatch_OneUnreadableFileDoesNotDiscardTheOthers(t *testing.T) {
+	h := newHandler(t, &fakeExtractor{inv: good(), errAt: map[int]error{0: errors.New("model hiccup")}})
+
+	rec := uploadMany(t, h, pngBytes, pngBytes)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), "Could not read the invoice")
+	assert.Contains(t, rec.Body.String(), "Hetzner Online GmbH")
+	assert.NotContains(t, rec.Body.String(), "model hiccup", "the raw error is logged, not shown")
+}
+
+func TestBatch_AllFilesUnreadableIsABadGateway(t *testing.T) {
+	h := newHandler(t, &fakeExtractor{err: errors.New("down")})
+
+	rec := uploadMany(t, h, pngBytes, pngBytes)
+
+	assert.Equal(t, http.StatusBadGateway, rec.Code)
+}
+
+func TestBatch_FilesThatAreEachUnderTheLimitButTooBigTogetherAreRefused(t *testing.T) {
+	h := newHandler(t, &fakeExtractor{inv: good()}, func(c *demo.Config) { c.MaxUpload = 2000; c.MaxTotalUpload = 2500 })
+	f := append(append([]byte{}, pngBytes...), bytes.Repeat([]byte("v"), 1400)...)
+
+	rec := uploadMany(t, h, f, f)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
+}
+
+func TestEntries_TheCSVIsServedUnderTheIdOnThePageAsAnAttachment(t *testing.T) {
+	h := newHandler(t, &fakeExtractor{inv: good()})
+	id := csvID(t, uploadMany(t, h, pngBytes).Body.String())
+
+	rec := getCSV(h, id)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Header().Get("Content-Type"), "text/csv")
+	assert.Contains(t, rec.Header().Get("Content-Disposition"), "attachment")
+	rows, err := csv.NewReader(rec.Body).ReadAll()
+	require.NoError(t, err)
+	assert.Equal(t, "entry", rows[0][0])
+	assert.Equal(t, "2440", rows[2][3])
+}
+
+func TestEntries_AnUnknownOrMalformedIdIsNotFound(t *testing.T) {
+	h := newHandler(t, &fakeExtractor{inv: good()})
+	for _, id := range []string{strings.Repeat("0", 32), "abc", strings.Repeat("g", 32), "..%2f..%2fetc%2fpasswd", strings.Repeat("a", 33)} {
+		t.Run(id, func(t *testing.T) {
+			assert.Equal(t, http.StatusNotFound, getCSV(h, id).Code)
+		})
+	}
+}
+
+func TestEntries_TheDownloadNeedsTheLoginToo(t *testing.T) {
+	h := newHandler(t, &fakeExtractor{inv: good()}, func(c *demo.Config) { c.User, c.Pass = "demo", "s3cret" })
+	req := httptest.NewRequest(http.MethodPost, "/process", strings.NewReader("sample=001.png"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.SetBasicAuth("demo", "s3cret")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	id := csvID(t, rec.Body.String())
+
+	without := getCSV(h, id)
+
+	assert.Equal(t, http.StatusUnauthorized, without.Code)
+	withAuth := httptest.NewRequest(http.MethodGet, "/entries/"+id+".csv", nil)
+	withAuth.SetBasicAuth("demo", "s3cret")
+	ok := httptest.NewRecorder()
+	h.ServeHTTP(ok, withAuth)
+	assert.Equal(t, http.StatusOK, ok.Code)
+}
+
+func TestEntries_ExpireAfterThirtyMinutesAndOnlyTheNewestTwentyAreKept(t *testing.T) {
+	now := time.Date(2026, 11, 25, 9, 0, 0, 0, time.UTC)
+	h := newHandler(t, &fakeExtractor{inv: good()}, func(c *demo.Config) { c.Now = func() time.Time { return now } })
+
+	first := csvID(t, uploadMany(t, h, pngBytes).Body.String())
+	var last string
+	for i := 0; i < 24; i++ {
+		last = csvID(t, uploadMany(t, h, pngBytes).Body.String())
+	}
+
+	assert.Equal(t, http.StatusNotFound, getCSV(h, first).Code, "pushed out by newer ones")
+	assert.Equal(t, http.StatusOK, getCSV(h, last).Code)
+	now = now.Add(31 * time.Minute)
+	assert.Equal(t, http.StatusNotFound, getCSV(h, last).Code, "expired")
+}
+
+func TestEntries_NothingIsWrittenToTheTempDirWhileProcessingOrDownloading(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("TMPDIR", tmp)
+	h := newHandler(t, &fakeExtractor{inv: good()}, func(c *demo.Config) { c.MaxUpload = 8 << 20 })
+	big := append(append([]byte{}, pngBytes...), bytes.Repeat([]byte("z"), 2<<20)...)
+
+	id := csvID(t, uploadMany(t, h, big, pngBytes).Body.String())
+	getCSV(h, id)
+
+	entries, err := os.ReadDir(tmp)
+	require.NoError(t, err)
+	assert.Empty(t, entries)
+}
+
+// Parsing an upload costs memory before the one-at-a-time model gate is
+// reached (about 23 MB per 8 MB upload), so parses are bounded on their own.
+func TestUploads_AThirdUploadThatIsStillArrivingIsRefusedAtOnce(t *testing.T) {
+	srv := httptest.NewServer(newHandler(t, &fakeExtractor{inv: good()}))
+	defer srv.Close()
+
+	var held []*io.PipeWriter
+	for i := 0; i < 2; i++ {
+		pr, pw := io.Pipe()
+		held = append(held, pw)
+		req, err := http.NewRequest(http.MethodPost, srv.URL+"/process", pr)
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "multipart/form-data; boundary=xyz")
+		go func() {
+			resp, err := http.DefaultClient.Do(req)
+			if err == nil {
+				_ = resp.Body.Close()
+			}
+		}()
+		_, _ = pw.Write([]byte("--xyz\r\nContent-Disposition: form-data; name=\"image\"; filename=\"a.png\"\r\n\r\n")) // never finished
+	}
+
+	var code int
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		resp, err := http.PostForm(srv.URL+"/process", url.Values{"sample": {"001.png"}})
+		require.NoError(t, err)
+		code = resp.StatusCode
+		_ = resp.Body.Close()
+		if code == http.StatusServiceUnavailable {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	for _, pw := range held {
+		_ = pw.CloseWithError(errors.New("done"))
+	}
+
+	assert.Equal(t, http.StatusServiceUnavailable, code)
+}
+
+func TestBatch_InvoicesThatDoNotFitInTheSharedDeadlineAreSkippedNotSentToTheModel(t *testing.T) {
+	ex := &fakeExtractor{inv: good(), gate: make(chan struct{})} // the model hangs until the deadline
+	h := newHandler(t, ex, func(c *demo.Config) { c.ModelTimeout = 80 * time.Millisecond })
+
+	rec := uploadMany(t, h, pngBytes, pngBytes, pngBytes)
+
+	assert.Equal(t, http.StatusBadGateway, rec.Code, "nothing was read")
+	assert.Equal(t, int32(1), ex.started.Load(), "only the first invoice reached the model")
+	assert.Equal(t, 2, strings.Count(rec.Body.String(), "ran out of time"))
+}
+
+func TestEntries_EverySubmitGetsADifferentUnguessableId(t *testing.T) {
+	h := newHandler(t, &fakeExtractor{inv: good()})
+	seen := map[string]bool{}
+	for i := 0; i < 10; i++ {
+		id := csvID(t, uploadMany(t, h, pngBytes).Body.String())
+		assert.False(t, seen[id], "id %s repeated", id)
+		assert.NotEqual(t, strings.Repeat("0", 32), id)
+		seen[id] = true
+	}
 }
