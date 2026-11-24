@@ -37,10 +37,17 @@ func Run(ctx context.Context, image []byte, ex Extractor, p *booking.Proposer) (
 	if err != nil {
 		return Result{}, fmt.Errorf("read invoice: %w", err)
 	}
+	return Assess(inv, p), nil
+}
+
+// Assess proposes a booking for an invoice that has already been read. It is
+// split from Run so a caller can do the slow model call without holding a lock
+// that the proposer's memory needs.
+func Assess(inv extract.Invoice, p *booking.Proposer) Result {
 	return Result{
 		Invoice:    inv,
 		Proposal:   p.Propose(inv.Supplier),
 		Warnings:   inv.Warnings(),
 		DoNotTrust: !inv.Reconciled(),
-	}, nil
+	}
 }
