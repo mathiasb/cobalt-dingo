@@ -13,6 +13,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -60,9 +61,15 @@ func run(dir, model, url string, limit int) error {
 	if err := readJSON(filepath.Join(dir, "truth.json"), &truth); err != nil {
 		return err
 	}
+	// history.json is optional: public datasets carry no booking history, and
+	// then the proposer stages are skipped rather than reported as zero.
 	var vouchers []domain.Voucher
+	hasHistory := true
 	if err := readJSON(filepath.Join(dir, "history.json"), &vouchers); err != nil {
-		return err
+		if !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		hasHistory = false
 	}
 	if limit > 0 && limit < len(truth) {
 		truth = truth[:limit]
@@ -70,12 +77,17 @@ func run(dir, model, url string, limit int) error {
 
 	history := booking.ExamplesFromVouchers(vouchers)
 	proposer := booking.NewProposer(history)
-	held := booking.Evaluate(history, 0.2)
-	fmt.Printf("HISTORY  %d past bookings. Held-out (latest 20%% by date): top-1 %s, top-3 %s, unseen suppliers %d\n\n",
-		len(history), pct(held.Top1, held.Test), pct(held.Top3, held.Test), held.Unseen)
+	if hasHistory {
+		held := booking.Evaluate(history, 0.2)
+		fmt.Printf("HISTORY  %d past bookings. Held-out (latest 20%% by date): top-1 %s, top-3 %s, unseen suppliers %d\n\n",
+			len(history), pct(held.Top1, held.Test), pct(held.Top3, held.Test), held.Unseen)
+	} else {
+		fmt.Printf("HISTORY  none in %s: booking stages skipped\n\n", dir)
+	}
 
 	client := &extract.Client{BaseURL: url, Model: model}
 	fieldRight := map[string]int{}
+	fieldLabelled := map[string]int{}
 	var read, fieldsRight, fieldsTotal, e2eTop1, e2eTop3, e2eUnseen, e2eN int
 	var elapsed time.Duration
 
@@ -95,20 +107,23 @@ func run(dir, model, url string, limit int) error {
 		s := extract.Score(tr, inv)
 		fieldsRight += s.Right
 		fieldsTotal += s.Fields
-		wrong := map[string]bool{}
-		for _, w := range s.Wrong {
-			wrong[w] = true
+		for _, f := range s.RightFields {
+			fieldRight[f]++
+			fieldLabelled[f]++
 		}
-		for _, f := range []string{"supplier", "invoice_number", "invoice_date", "due_date", "currency", "total", "vat_amount"} {
-			if !wrong[f] {
-				fieldRight[f]++
-			}
+		for _, f := range s.Wrong {
+			fieldLabelled[f]++
 		}
 
-		got := proposer.Propose(inv.Supplier)
-		e2eN++
-		verdict := "unseen"
+		verdict := ""
+		got := booking.Proposal{}
+		if hasHistory {
+			got = proposer.Propose(inv.Supplier)
+			e2eN++
+			verdict = "unseen"
+		}
 		switch {
+		case !hasHistory:
 		case len(got.Candidates) == 0:
 			e2eUnseen++
 		default:
@@ -135,11 +150,13 @@ func run(dir, model, url string, limit int) error {
 
 	fmt.Printf("\nEXTRACTION  model %s, %d/%d images read, mean %.1fs per image\n", model, read, len(truth), elapsed.Seconds()/float64(len(truth)))
 	for _, f := range []string{"supplier", "invoice_number", "invoice_date", "due_date", "currency", "total", "vat_amount"} {
-		fmt.Printf("  %-15s %s\n", f, pct(fieldRight[f], read))
+		fmt.Printf("  %-15s %s\n", f, pct(fieldRight[f], fieldLabelled[f]))
 	}
 	fmt.Printf("  all fields      %s\n", pct(fieldsRight, fieldsTotal))
-	fmt.Printf("\nEND TO END  image -> read supplier -> proposed account vs the account booked\n")
-	fmt.Printf("  top-1 %s, top-3 %s, unseen suppliers %d\n", pct(e2eTop1, e2eN), pct(e2eTop3, e2eN), e2eUnseen)
-	fmt.Println("\nDATA IS SYNTHETIC. These numbers are not a claim about any real company's books.")
+	if hasHistory {
+		fmt.Printf("\nEND TO END  image -> read supplier -> proposed account vs the account booked\n")
+		fmt.Printf("  top-1 %s, top-3 %s, unseen suppliers %d\n", pct(e2eTop1, e2eN), pct(e2eTop3, e2eN), e2eUnseen)
+	}
+	fmt.Println("\nThese numbers describe this dataset only. They are not a claim about any real company's books.")
 	return nil
 }
