@@ -30,9 +30,19 @@ func main() {
 	model := flag.String("model", "qwen2.5vl:7b", "vision model name")
 	url := flag.String("url", "http://iguana:11434", "Ollama-compatible base URL (local network only)")
 	limit := flag.Int("limit", 0, "evaluate only the first N images (0 = all)")
+	dateOrder := flag.String("date-order", "dmy", "how 02.11.2026 is read when both readings are valid: dmy or mdy")
 	flag.Parse()
 
-	if err := run(*dir, *model, *url, *limit); err != nil {
+	order := extract.DMY
+	switch *dateOrder {
+	case "dmy":
+	case "mdy":
+		order = extract.MDY
+	default:
+		fmt.Fprintln(os.Stderr, "extract-eval: -date-order must be dmy or mdy")
+		os.Exit(2)
+	}
+	if err := run(*dir, *model, *url, *limit, order); err != nil {
 		fmt.Fprintln(os.Stderr, "extract-eval:", err)
 		os.Exit(1)
 	}
@@ -56,7 +66,7 @@ func pct(n, d int) string {
 	return fmt.Sprintf("%.1f%% (%d/%d)", 100*float64(n)/float64(d), n, d)
 }
 
-func run(dir, model, url string, limit int) error {
+func run(dir, model, url string, limit int, order extract.DateOrder) error {
 	var truth []extract.Truth
 	if err := readJSON(filepath.Join(dir, "truth.json"), &truth); err != nil {
 		return err
@@ -85,16 +95,20 @@ func run(dir, model, url string, limit int) error {
 		fmt.Printf("HISTORY  none in %s: booking stages skipped\n\n", dir)
 	}
 
-	client := &extract.Client{BaseURL: url, Model: model}
+	client := &extract.Client{BaseURL: url, Model: model, DateOrder: order}
 	fieldRight := map[string]int{}
 	fieldLabelled := map[string]int{}
 	var read, fieldsRight, fieldsTotal, e2eTop1, e2eTop3, e2eUnseen, e2eN int
 	var elapsed time.Duration
+	var totalWrong, totalWrongCaught, totalRightFlagged, totalRight int
+	var dateAmbiguous, dateAmbiguousWrong, dateClearWrong, dateClear int
 
 	for _, tr := range truth {
 		img, err := os.ReadFile(filepath.Join(dir, tr.File))
 		if err != nil {
-			return fmt.Errorf("read image: %w", err)
+			// .gitignore excludes *.png, so images are never in the repo: the
+			// synthetic set is regenerated, and public sets are prepared.
+			return fmt.Errorf("read image %s: %w (synthetic: uv run scripts/gen-synthetic-invoices.py; public: uv run scripts/prep-dataset.py)", tr.File, err)
 		}
 		start := time.Now()
 		inv, err := client.Extract(context.Background(), img)
@@ -113,6 +127,36 @@ func run(dir, model, url string, limit int) error {
 		}
 		for _, f := range s.Wrong {
 			fieldLabelled[f]++
+		}
+
+		// Does the net + VAT = total check earn its keep, and are ambiguous
+		// dates the ones that go wrong?
+		if tr.Total != "" {
+			if contains(s.Wrong, "total") {
+				totalWrong++
+				if !inv.Reconciled() {
+					totalWrongCaught++
+				}
+			} else {
+				totalRight++
+				if !inv.Reconciled() {
+					totalRightFlagged++
+				}
+			}
+		}
+		if tr.InvoiceDate != "" {
+			wrongDate := contains(s.Wrong, "invoice_date")
+			if inv.InvoiceDateAmbiguous {
+				dateAmbiguous++
+				if wrongDate {
+					dateAmbiguousWrong++
+				}
+			} else {
+				dateClear++
+				if wrongDate {
+					dateClearWrong++
+				}
+			}
 		}
 
 		verdict := ""
@@ -153,10 +197,25 @@ func run(dir, model, url string, limit int) error {
 		fmt.Printf("  %-15s %s\n", f, pct(fieldRight[f], fieldLabelled[f]))
 	}
 	fmt.Printf("  all fields      %s\n", pct(fieldsRight, fieldsTotal))
+	fmt.Printf("\nTOTAL CHECK (net + VAT = total, within 0.50)\n")
+	fmt.Printf("  wrong totals caught as unreconciled: %s\n", pct(totalWrongCaught, totalWrong))
+	fmt.Printf("  correct totals wrongly flagged:      %s\n", pct(totalRightFlagged, totalRight))
+	fmt.Printf("\nDATE CHECK (order %s)\n", map[extract.DateOrder]string{extract.DMY: "dmy", extract.MDY: "mdy"}[order])
+	fmt.Printf("  flagged ambiguous: %d, of which wrong: %s\n", dateAmbiguous, pct(dateAmbiguousWrong, dateAmbiguous))
+	fmt.Printf("  not ambiguous:     %d, of which wrong: %s\n", dateClear, pct(dateClearWrong, dateClear))
 	if hasHistory {
 		fmt.Printf("\nEND TO END  image -> read supplier -> proposed account vs the account booked\n")
 		fmt.Printf("  top-1 %s, top-3 %s, unseen suppliers %d\n", pct(e2eTop1, e2eN), pct(e2eTop3, e2eN), e2eUnseen)
 	}
 	fmt.Println("\nThese numbers describe this dataset only. They are not a claim about any real company's books.")
 	return nil
+}
+
+func contains(xs []string, x string) bool {
+	for _, v := range xs {
+		if v == x {
+			return true
+		}
+	}
+	return false
 }
