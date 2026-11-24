@@ -27,6 +27,15 @@ const prompt = "Extract from this invoice image as JSON with exactly these keys:
 	"vat_amount (plain decimal with dot), total (amount to pay including VAT, plain decimal with dot). " +
 	"Use null if absent."
 
+// MaxAmountMinor is the largest amount accepted, ten billion in major units.
+// A reading near the top of int64 makes sums wrap, and a wrapped sum can pass
+// the net + VAT = total check, so an absurd reading is refused instead.
+const MaxAmountMinor int64 = 1_000_000_000_000
+
+// maxTextLen bounds the supplier and invoice number the model may return. They
+// flow into a page, a journal text and a CSV.
+const maxTextLen = 200
+
 // Invoice is what the model read from the image. Amounts are minor units.
 // DueDate is empty when the invoice states none.
 type Invoice struct {
@@ -177,8 +186,13 @@ func parseInvoice(content string, order DateOrder) (Invoice, error) {
 		}
 		inv.DueDate, inv.DueDateAmbiguous = dd.ISO, dd.Ambiguous
 	}
-	if len(inv.Currency) != 3 || strings.ToUpper(inv.Currency) != inv.Currency {
+	if !isCurrencyCode(inv.Currency) {
 		return Invoice{}, fmt.Errorf("field currency is not an ISO code: %q", inv.Currency)
+	}
+	for _, f := range []struct{ name, v string }{{"supplier", inv.Supplier}, {"invoice_number", inv.InvoiceNumber}} {
+		if len(f.v) > maxTextLen {
+			return Invoice{}, fmt.Errorf("field %s is longer than %d characters", f.name, maxTextLen)
+		}
 	}
 
 	if inv.Total, err = ParseAmount(string(raw.Total)); err != nil {
@@ -219,6 +233,21 @@ func ParseAmount(s string) (int64, error) {
 	var n int64
 	for _, r := range whole + frac {
 		n = n*10 + int64(r-'0')
+		if n > MaxAmountMinor {
+			return 0, fmt.Errorf("amount %q is larger than the %d minor units accepted", s, MaxAmountMinor)
+		}
 	}
 	return n, nil
+}
+
+func isCurrencyCode(s string) bool {
+	if len(s) != 3 {
+		return false
+	}
+	for _, r := range s {
+		if r < 'A' || r > 'Z' {
+			return false
+		}
+	}
+	return true
 }

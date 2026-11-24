@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/mathiasb/cobalt-dingo/internal/extract"
@@ -254,4 +255,52 @@ func TestExtract_DoesNotFollowARedirectOffTheConfiguredHost(t *testing.T) {
 
 	require.Error(t, err)
 	assert.False(t, elsewhereHit, "the image must not be sent to the redirect target")
+}
+
+// An amount near the top of int64 makes sums wrap, so a garbled or hostile
+// reading could pass the net + VAT = total check and look clean.
+func TestParseAmount_RefusesAnAmountAboveTheCeiling(t *testing.T) {
+	_, err := extract.ParseAmount("92233720368547758.07")
+	require.Error(t, err)
+
+	_, err = extract.ParseAmount("10000000000.01") // one minor unit over ten billion
+	require.Error(t, err)
+
+	got, err := extract.ParseAmount("10000000000.00")
+	require.NoError(t, err)
+	assert.Equal(t, extract.MaxAmountMinor, got)
+}
+
+func TestExtract_RefusesACurrencyThatIsNotThreeCapitalLetters(t *testing.T) {
+	for _, cur := range []string{"=1+", "S3K", "SE ", "S-K"} {
+		t.Run(cur, func(t *testing.T) {
+			srv := stub(t, `{"supplier":"A","invoice_number":"1","invoice_date":"2026-11-11","due_date":null,"currency":"`+cur+`","total":"1.00","vat_amount":"0.00"}`, nil)
+			defer srv.Close()
+			c := &extract.Client{BaseURL: srv.URL, Model: "m"}
+
+			_, err := c.Extract(context.Background(), []byte("x"))
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "currency")
+		})
+	}
+}
+
+func TestExtract_RefusesASupplierOrInvoiceNumberLongerThan200Characters(t *testing.T) {
+	long := strings.Repeat("a", 201)
+	for field, reply := range map[string]string{
+		"supplier":       `{"supplier":"` + long + `","invoice_number":"1","invoice_date":"2026-11-11","due_date":null,"currency":"SEK","total":"1.00","vat_amount":"0.00"}`,
+		"invoice_number": `{"supplier":"A","invoice_number":"` + long + `","invoice_date":"2026-11-11","due_date":null,"currency":"SEK","total":"1.00","vat_amount":"0.00"}`,
+	} {
+		t.Run(field, func(t *testing.T) {
+			srv := stub(t, reply, nil)
+			defer srv.Close()
+			c := &extract.Client{BaseURL: srv.URL, Model: "m"}
+
+			_, err := c.Extract(context.Background(), []byte("x"))
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), field)
+		})
+	}
 }
