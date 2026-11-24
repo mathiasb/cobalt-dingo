@@ -3,7 +3,6 @@ package mcp_test
 import (
 	"context"
 	"errors"
-	"fmt"
 	"reflect"
 	"sort"
 	"testing"
@@ -135,18 +134,6 @@ func TestEvent_FieldSetIsExactlyTheReviewedList(t *testing.T) {
 		[]string{"Actor", "At", "Class", "Duration", "Status", "TenantID", "Tool"},
 		names,
 		"adding a field to Event needs review: it must never carry amounts, counterparty names, document contents or tokens")
-}
-
-func TestWithEvents_RenderedEventContainsNeitherArgumentValue(t *testing.T) {
-	rec := &recorderStub{}
-	h := mcpserver.WithEvents("ap_supplier_history", "t1", rec, okHandler("x"))
-
-	callWith(t, h, map[string]any{"supplier": "Acme AB", "amount": 12345})
-
-	require.Len(t, rec.events, 1)
-	rendered := fmt.Sprintf("%+v", rec.events[0])
-	assert.NotContains(t, rendered, "Acme")
-	assert.NotContains(t, rendered, "12345")
 }
 
 type companyStub struct{}

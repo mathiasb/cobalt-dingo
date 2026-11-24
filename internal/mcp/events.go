@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -57,7 +58,9 @@ type EventRecorder interface {
 
 // WithEvents wraps next so each call records exactly one Event. Recording is
 // best effort: a failing recorder is logged and never changes the tool result.
-// A nil recorder passes the call straight through.
+// A nil recorder passes the call straight through. A handler that panics
+// records no event: there is no defer, so a panicking tool is invisible to the
+// log. Known and accepted for now.
 func WithEvents(tool string, tenant domain.TenantID, rec EventRecorder, next server.ToolHandlerFunc) server.ToolHandlerFunc {
 	if rec == nil {
 		return next
@@ -74,10 +77,41 @@ func WithEvents(tool string, tenant domain.TenantID, rec EventRecorder, next ser
 			Status:   statusOf(res, err),
 			Duration: time.Since(start),
 		}
-		if rerr := rec.Record(ctx, e); rerr != nil {
-			slog.Warn("event log write failed", "tool", tool, "error", rerr)
-		}
+		record(ctx, rec, e)
 		return res, err
+	}
+}
+
+// recordTimeout bounds how long a tool call waits for the recorder. A variable
+// so a test can shorten it.
+var recordTimeout = 2 * time.Second
+
+// record hands e to rec without letting the recorder harm the call: it runs on
+// its own goroutine, a panic is recovered, a recorder that does not return is
+// abandoned after recordTimeout, and the context is detached from the request
+// so a client disconnect does not drop the event. A recorder that never
+// returns leaks its goroutine; that is accepted over blocking the tool call.
+func record(ctx context.Context, rec EventRecorder, e Event) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), recordTimeout)
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				done <- fmt.Errorf("recorder panicked: %v", r)
+			}
+		}()
+		done <- rec.Record(ctx, e)
+	}()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			slog.Warn("event log write failed", "tool", e.Tool, "error", err)
+		}
+	case <-ctx.Done():
+		slog.Warn("event log write abandoned", "tool", e.Tool, "reason", ctx.Err())
 	}
 }
 
