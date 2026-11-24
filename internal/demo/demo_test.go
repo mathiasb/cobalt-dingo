@@ -8,10 +8,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/mathiasb/cobalt-dingo/internal/booking"
 	"github.com/mathiasb/cobalt-dingo/internal/demo"
@@ -28,9 +31,18 @@ type fakeExtractor struct {
 	err  error
 	gate chan struct{} // when set, Extract blocks until it is closed
 	in   chan struct{} // when set, signalled once Extract has started
+
+	onExtract func()      // when set, runs inside Extract
+	panicOnce atomic.Bool // when armed, the next Extract panics (and disarms)
 }
 
 func (f *fakeExtractor) Extract(ctx context.Context, _ []byte) (extract.Invoice, error) {
+	if f.panicOnce.CompareAndSwap(true, false) {
+		panic("extractor blew up")
+	}
+	if f.onExtract != nil {
+		f.onExtract()
+	}
 	if f.in != nil {
 		select {
 		case f.in <- struct{}{}:
@@ -165,7 +177,8 @@ func TestProcess_ShowsAnErrorAndNoProposalWhenExtractionFails(t *testing.T) {
 	rec := upload(t, h, pngBytes)
 
 	assert.Equal(t, http.StatusBadGateway, rec.Code)
-	assert.Contains(t, rec.Body.String(), "model down")
+	assert.Contains(t, rec.Body.String(), "Could not read the invoice")
+	assert.NotContains(t, rec.Body.String(), "model down", "the raw error is logged, not shown")
 	assert.NotContains(t, rec.Body.String(), "6540")
 }
 
@@ -273,7 +286,7 @@ func TestProcess_EscapesUntrustedTextFromTheModel(t *testing.T) {
 	assert.Contains(t, rec.Body.String(), "&lt;script&gt;")
 }
 
-func TestAuth_EveryRouteNeedsBasicAuthWhenCredentialsAreSet(t *testing.T) {
+func TestAuth_FourRoutesNeedBasicAuthAndAWrongPasswordIsRefused(t *testing.T) {
 	h := newHandler(t, &fakeExtractor{inv: good()}, func(c *demo.Config) { c.User, c.Pass = "demo", "s3cret" })
 
 	for _, tc := range []struct{ method, path string }{
@@ -324,7 +337,7 @@ func TestValidateExposure_RefusesANonLoopbackBindWithoutCredentials(t *testing.T
 	}
 }
 
-func TestSamples_ServesOnlyKnownSampleImages(t *testing.T) {
+func TestSamples_AKnownSampleIsServedAndFourOtherPathsAreNot200(t *testing.T) {
 	h := newHandler(t, &fakeExtractor{inv: good()})
 
 	ok := httptest.NewRecorder()
@@ -338,7 +351,10 @@ func TestSamples_ServesOnlyKnownSampleImages(t *testing.T) {
 	}
 }
 
-func TestValidateModelURL_AllowsOnlyAddressesOnThisNetwork(t *testing.T) {
+// It reads the text of the URL. It cannot know what a single-label name resolves
+// to (a search domain could make "evil" public), so this is a guard against a
+// mistyped or pasted cloud URL, not a boundary against someone who controls DNS.
+func TestValidateModelURL_JudgesTheHostTextAndNotWhereItResolves(t *testing.T) {
 	tests := []struct {
 		url     string
 		wantErr bool
@@ -358,6 +374,11 @@ func TestValidateModelURL_AllowsOnlyAddressesOnThisNetwork(t *testing.T) {
 		{"http://100.128.0.1:11434", true},
 		{"http://example.com:11434", true},
 		{"http://iguana.example.com:11434", true},
+		{"http://134744072", true},   // decimal form of 8.8.8.8
+		{"http://0x08080808", true},  // hex form
+		{"http://01002004010", true}, // octal form
+		{"http://0", true},
+		{"http://evil。com", true}, // ideographic full stop
 		{"not a url", true},
 		{"", true},
 	}
@@ -368,4 +389,148 @@ func TestValidateModelURL_AllowsOnlyAddressesOnThisNetwork(t *testing.T) {
 			assert.Equal(t, tt.wantErr, err != nil)
 		})
 	}
+}
+
+// net/http spills multipart parts above the in-memory limit to os.TempDir() for
+// the length of the handler. The page promises uploads are never stored.
+func TestProcess_AnUploadOverOneMegabyteIsNotSpooledToDisk(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("TMPDIR", tmp)
+	var seen []string
+	ex := &fakeExtractor{inv: good(), onExtract: func() {
+		entries, _ := os.ReadDir(tmp)
+		for _, e := range entries {
+			seen = append(seen, e.Name())
+		}
+	}}
+	h := newHandler(t, ex, func(c *demo.Config) { c.MaxUpload = 8 << 20 })
+	big := append(append([]byte{}, pngBytes...), bytes.Repeat([]byte("z"), 3<<20)...)
+
+	rec := upload(t, h, big)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.Empty(t, seen, "no temp file may exist while the model is reading the image")
+}
+
+func TestCrossSite_APostFromAnotherOriginIsRefusedAndASameOriginPostIsNot(t *testing.T) {
+	h := newHandler(t, &fakeExtractor{inv: good()})
+	form := url.Values{"supplier": {"Hetzner Online GmbH"}, "account": {"5420"}}
+	post := func(mutate func(*http.Request)) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/feedback", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		mutate(req)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		return rec
+	}
+
+	cross := post(func(r *http.Request) {
+		r.Header.Set("Origin", "https://evil.example")
+		r.Header.Set("Sec-Fetch-Site", "cross-site")
+	})
+	same := post(func(r *http.Request) { r.Header.Set("Sec-Fetch-Site", "same-origin") })
+
+	assert.Equal(t, http.StatusForbidden, cross.Code)
+	assert.Equal(t, http.StatusOK, same.Code)
+}
+
+func TestFeedback_LearningStopsAtTheCapAndTheResultPageStaysSmall(t *testing.T) {
+	h := newHandler(t, &fakeExtractor{inv: good()}, func(c *demo.Config) { c.MaxLearned = 50 })
+	var refused int
+	for i := 0; i < 500; i++ {
+		rec := postForm(h, "/feedback", url.Values{"supplier": {"Hetzner Online GmbH"}, "account": {"6540"}})
+		if rec.Code == http.StatusTooManyRequests {
+			refused++
+		}
+	}
+
+	rec := upload(t, h, pngBytes)
+
+	assert.Equal(t, 450, refused, "every correction past the cap is refused, none silently dropped")
+	assert.Less(t, rec.Body.Len(), 30_000, "past bookings shown are bounded however many exist")
+	assert.Contains(t, rec.Body.String(), "more", "the page says how many were left out")
+}
+
+func TestProcess_DoesNotRevealTheModelEndpointOrErrorTextToTheBrowser(t *testing.T) {
+	h := newHandler(t, &fakeExtractor{err: errors.New(`call model: Post "http://iguana:11434/api/chat": dial tcp 10.0.1.10:11434: refused`)})
+
+	rec := upload(t, h, pngBytes)
+
+	assert.Equal(t, http.StatusBadGateway, rec.Code)
+	assert.NotContains(t, rec.Body.String(), "iguana")
+	assert.NotContains(t, rec.Body.String(), "11434")
+	assert.NotContains(t, rec.Body.String(), "10.0.1.10")
+	assert.Contains(t, rec.Body.String(), "Could not read the invoice")
+}
+
+func TestAuth_AWrongUserWithTheRightPasswordIsRefusedOnEveryMethod(t *testing.T) {
+	h := newHandler(t, &fakeExtractor{inv: good()}, func(c *demo.Config) { c.User, c.Pass = "demo", "s3cret" })
+
+	for _, method := range []string{http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodPatch} {
+		for _, path := range []string{"/", "/process", "/feedback", "/samples/001.png", "/nope"} {
+			t.Run(method+" "+path, func(t *testing.T) {
+				req := httptest.NewRequest(method, path, nil)
+				req.SetBasicAuth("someone-else", "s3cret")
+				rec := httptest.NewRecorder()
+				h.ServeHTTP(rec, req)
+
+				assert.Equal(t, http.StatusUnauthorized, rec.Code)
+			})
+		}
+	}
+}
+
+func TestHeaders_EveryResponseCarriesTheCSPNosniffAndNoStore(t *testing.T) {
+	h := newHandler(t, &fakeExtractor{inv: good()})
+	rec := httptest.NewRecorder()
+
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+
+	assert.Contains(t, rec.Header().Get("Content-Security-Policy"), "default-src 'none'")
+	assert.Equal(t, "nosniff", rec.Header().Get("X-Content-Type-Options"))
+	assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
+}
+
+func TestFeedback_ASupplierLongerThanTheLimitIsRefused(t *testing.T) {
+	h := newHandler(t, &fakeExtractor{inv: good()})
+
+	rec := postForm(h, "/feedback", url.Values{"supplier": {strings.Repeat("a", 201)}, "account": {"6540"}})
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestProcess_AHungModelIsCutOffAtTheModelTimeoutAndTheSlotIsFreed(t *testing.T) {
+	ex := &fakeExtractor{inv: good(), gate: make(chan struct{})} // never closed: the model hangs
+	h := newHandler(t, ex, func(c *demo.Config) { c.ModelTimeout = 50 * time.Millisecond })
+
+	start := time.Now()
+	first := upload(t, h, pngBytes)
+
+	assert.Equal(t, http.StatusBadGateway, first.Code)
+	assert.Less(t, time.Since(start), 5*time.Second)
+	ex.gate = nil
+	second := upload(t, h, pngBytes)
+	assert.Equal(t, http.StatusOK, second.Code, "the busy slot was released after the timeout")
+}
+
+func TestProcess_APanicInTheExtractorDoesNotLeaveTheModelSlotTaken(t *testing.T) {
+	ex := &fakeExtractor{inv: good()}
+	srv := httptest.NewServer(newHandler(t, ex))
+	defer srv.Close()
+	post := func() (int, error) {
+		resp, err := http.PostForm(srv.URL+"/process", url.Values{"sample": {"001.png"}})
+		if err != nil {
+			return 0, err
+		}
+		defer func() { _ = resp.Body.Close() }()
+		return resp.StatusCode, nil
+	}
+	ex.panicOnce.Store(true)
+
+	_, err := post()
+	require.Error(t, err, "the connection is dropped when the handler panics")
+	code, err := post()
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, code, "not 503: the slot was released")
 }

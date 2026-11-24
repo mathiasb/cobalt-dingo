@@ -30,11 +30,14 @@ import (
 )
 
 const (
-	modelTimeout = 3 * time.Minute
 	// multipartOverhead is slack for form framing above the file limit; the
 	// file itself is checked against MaxUpload exactly.
 	multipartOverhead = 64 << 10
 	maxSupplierLen    = 200
+
+	defaultModelTimeout = 3 * time.Minute
+	defaultMaxLearned   = 200
+	becauseShown        = 5
 )
 
 var (
@@ -50,20 +53,30 @@ type Config struct {
 	MaxUpload int64 // largest accepted upload in bytes
 	User      string
 	Pass      string // both empty disables auth; ValidateExposure guards when that is allowed
+
+	ModelTimeout time.Duration // zero means the default
+	MaxLearned   int           // zero means the default
 }
 
 type server struct {
 	cfg  Config
 	busy chan struct{} // capacity one: a second model call is refused, not queued
 
-	mu   sync.RWMutex // guards prop: Learn writes, Propose reads
-	prop *booking.Proposer
+	mu      sync.RWMutex // guards prop and learned: Learn writes, Propose reads
+	prop    *booking.Proposer
+	learned int
 
 	page *template.Template
 }
 
 // New returns the demo handler.
 func New(cfg Config) http.Handler {
+	if cfg.ModelTimeout <= 0 {
+		cfg.ModelTimeout = defaultModelTimeout
+	}
+	if cfg.MaxLearned <= 0 {
+		cfg.MaxLearned = defaultMaxLearned
+	}
 	s := &server{
 		cfg:  cfg,
 		busy: make(chan struct{}, 1),
@@ -77,7 +90,9 @@ func New(cfg Config) http.Handler {
 	mux.HandleFunc("POST /process", s.processHandler)
 	mux.HandleFunc("POST /feedback", s.feedback)
 	mux.HandleFunc("GET /samples/{name}", s.sample)
-	return s.guard(mux)
+	// Browsers send cached basic-auth credentials on cross-site form posts, so
+	// state-changing requests from another origin are refused.
+	return s.guard(http.NewCrossOriginProtection().Handler(mux))
 }
 
 // ValidateExposure refuses to serve beyond loopback without credentials, and
@@ -130,7 +145,8 @@ func (s *server) guard(next http.Handler) http.Handler {
 type view struct {
 	Samples  []string
 	Result   *process.Result
-	Because  []booking.Example
+	Because  []booking.Example // the most recent few, not all of them
+	More     int               // how many past bookings were left out of Because
 	Notice   string
 	Error    string
 	Supplier string
@@ -183,7 +199,9 @@ func (s *server) sample(w http.ResponseWriter, r *http.Request) {
 // in memory. On refusal it has already written the response.
 func (s *server) image(w http.ResponseWriter, r *http.Request) (data []byte, sample string, ok bool) {
 	r.Body = http.MaxBytesReader(w, r.Body, s.cfg.MaxUpload+multipartOverhead)
-	if err := r.ParseMultipartForm(1 << 20); err != nil {
+	// The memory limit must cover the largest accepted upload: above it, net/http
+	// spools parts to os.TempDir(), and uploads are never to touch disk.
+	if err := r.ParseMultipartForm(s.cfg.MaxUpload + multipartOverhead); err != nil {
 		var tooBig *http.MaxBytesError
 		if errors.As(err, &tooBig) {
 			s.render(w, http.StatusRequestEntityTooLarge, view{Error: "That upload is too large."})
@@ -245,18 +263,26 @@ func (s *server) processHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), modelTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), s.cfg.ModelTimeout)
 	defer cancel()
 	inv, err := s.cfg.Extractor.Extract(ctx, data)
 	if err != nil {
-		s.render(w, http.StatusBadGateway, view{Error: fmt.Sprintf("Could not read the invoice: %v", err)})
+		// The detail names the model host and its error text: log it, do not show it.
+		slog.Warn("demo: extraction failed", "error", err)
+		s.render(w, http.StatusBadGateway, view{Error: "Could not read the invoice. The model may be busy or unreachable; try again."})
 		return
 	}
 
 	s.mu.RLock()
 	res := process.Assess(inv, s.prop)
 	s.mu.RUnlock()
-	s.render(w, http.StatusOK, view{Result: &res, Because: res.Proposal.Because, Sample: sample, Supplier: inv.Supplier})
+	shown := res.Proposal.Because
+	more := 0
+	if len(shown) > becauseShown {
+		more = len(shown) - becauseShown
+		shown = shown[len(shown)-becauseShown:]
+	}
+	s.render(w, http.StatusOK, view{Result: &res, Because: shown, More: more, Sample: sample, Supplier: inv.Supplier})
 }
 
 func (s *server) feedback(w http.ResponseWriter, r *http.Request) {
@@ -273,7 +299,13 @@ func (s *server) feedback(w http.ResponseWriter, r *http.Request) {
 	n, _ := strconv.Atoi(account)
 
 	s.mu.Lock()
+	if s.learned >= s.cfg.MaxLearned {
+		s.mu.Unlock()
+		s.render(w, http.StatusTooManyRequests, view{Error: "This demo has reached its limit of corrections. Restart it to clear them."})
+		return
+	}
 	s.prop.Learn(booking.Example{Supplier: supplier, Account: n})
+	s.learned++
 	s.mu.Unlock()
 
 	s.render(w, http.StatusOK, view{Notice: fmt.Sprintf("Learned: %s is booked to %d. Process it again to see the proposal change.", supplier, n)})
@@ -345,7 +377,8 @@ and never stored.</p>
  <input type="hidden" name="account" value="{{.Account}}"><button>Accept {{.Account}}</button></form></td></tr>{{end}}
 </table>
 <p>Why: the same supplier was booked this way before:</p>
-<ul>{{range .Proposal.Because}}<li>voucher {{.Series}}{{.Number}}{{if .Date}}, {{.Date}}{{end}}: account {{.Account}}</li>{{end}}</ul>
+<ul>{{range $.Because}}<li>voucher {{.Series}}{{.Number}}{{if .Date}}, {{.Date}}{{end}}: account {{.Account}}</li>{{end}}
+{{if $.More}}<li>and {{$.More}} more like these</li>{{end}}</ul>
 </div>
 <form method="post" action="/feedback"><input type="hidden" name="supplier" value="{{.Invoice.Supplier}}">
  <label>Or correct it to account <input name="account" size="5" inputmode="numeric" pattern="[1-8][0-9]{3}"></label>
