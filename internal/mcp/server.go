@@ -2,6 +2,9 @@
 package mcp
 
 import (
+	"context"
+
+	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/mathiasb/cobalt-dingo/internal/domain"
 )
@@ -56,7 +59,11 @@ func DispatchTool(name string, deps Deps) server.ToolHandlerFunc {
 		"sales_vs_purchases": salesVsPurchasesHandler(deps),
 		"company_info":       companyInfoHandler(deps),
 	}
-	return dispatch[name]
+	h, ok := dispatch[name]
+	if !ok {
+		return nil
+	}
+	return WithEvents(name, deps.TenantID, deps.Events, h)
 }
 
 // Deps holds all ledger dependencies the MCP tools need.
@@ -69,6 +76,10 @@ type Deps struct {
 	CostCtrLdg  domain.CostCenterLedger
 	AssetReg    domain.AssetRegister
 	CompanyInf  domain.CompanyInfo
+
+	// Events, when set, receives one metadata-only Event per tool call on both
+	// the MCP and chat paths (#140). Nil disables the log.
+	Events EventRecorder
 }
 
 // NewServer creates an MCP server with all tools registered. The version is
@@ -79,6 +90,11 @@ func NewServer(deps Deps, version string) *server.MCPServer {
 		"cobalt-dingo",
 		version,
 		server.WithToolCapabilities(true),
+		server.WithToolHandlerMiddleware(func(next server.ToolHandlerFunc) server.ToolHandlerFunc {
+			return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return WithEvents(req.Params.Name, deps.TenantID, deps.Events, next)(ctx, req)
+			}
+		}),
 	)
 	registerAPTools(s, deps)
 	registerARTools(s, deps)

@@ -148,3 +148,37 @@ func TestWithEvents_RenderedEventContainsNeitherArgumentValue(t *testing.T) {
 	assert.NotContains(t, rendered, "Acme")
 	assert.NotContains(t, rendered, "12345")
 }
+
+type companyStub struct{}
+
+func (companyStub) Info(context.Context, domain.TenantID) (domain.Company, error) {
+	return domain.Company{Name: "Test AB"}, nil
+}
+
+func TestDispatchTool_RecordsOneEventWhenDepsCarryARecorder(t *testing.T) {
+	rec := &recorderStub{}
+	deps := mcpserver.Deps{TenantID: "t1", CompanyInf: companyStub{}, Events: rec}
+
+	h := mcpserver.DispatchTool("company_info", deps)
+	require.NotNil(t, h)
+	callWith(t, h, nil)
+
+	require.Len(t, rec.events, 1)
+	assert.Equal(t, "company_info", rec.events[0].Tool)
+	assert.Equal(t, mcpserver.StatusOK, rec.events[0].Status)
+}
+
+func TestNewServer_RecordsOneEventForAToolsCallOverTheProtocol(t *testing.T) {
+	rec := &recorderStub{}
+	srv := mcpserver.NewServer(mcpserver.Deps{TenantID: "t1", CompanyInf: companyStub{}, Events: rec}, "test")
+
+	resp := srv.HandleMessage(context.Background(), []byte(`{
+		"jsonrpc": "2.0", "id": 2, "method": "tools/call",
+		"params": {"name": "company_info", "arguments": {}}
+	}`))
+	require.NotNil(t, resp)
+
+	require.Len(t, rec.events, 1)
+	assert.Equal(t, "company_info", rec.events[0].Tool)
+	assert.Equal(t, domain.TenantID("t1"), rec.events[0].TenantID)
+}
