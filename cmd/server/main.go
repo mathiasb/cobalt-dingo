@@ -232,6 +232,13 @@ func main() {
 			log.Error("refusing to start", "err", err)
 			os.Exit(1)
 		}
+		// Evidence trail for bet #139 (#140). Without a database the log is
+		// simply off; it never blocks startup or a tool call.
+		if pgStore != nil {
+			mcpDeps.Events = postgres.NewToolEventStore(pgStore)
+		} else {
+			log.Info("tool event log disabled", "reason", "no database")
+		}
 		chatHandler := ui.NewChatHandler(mcpDeps, llmCfg, cfg.Mode, cfg.AllowsWrites, log)
 		mux.HandleFunc("GET /chat", chatHandler.PageHandler)
 		mux.HandleFunc("POST /chat", chatHandler.MessageHandler)
