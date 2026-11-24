@@ -70,7 +70,7 @@ func TestExtract_RejectsAReplyThatIsNotUsableAndNamesTheField(t *testing.T) {
 		{"not json", `sorry, I cannot read this`, "json"},
 		{"supplier null", `{"supplier":null,"invoice_number":"1","invoice_date":"2026-11-11","due_date":"2026-12-11","currency":"SEK","total":"1.00","vat_amount":"0.00"}`, "supplier"},
 		{"invoice number missing", `{"supplier":"A","invoice_date":"2026-11-11","due_date":"2026-12-11","currency":"SEK","total":"1.00","vat_amount":"0.00"}`, "invoice_number"},
-		{"date not ISO", `{"supplier":"A","invoice_number":"1","invoice_date":"11/11/2026","due_date":"2026-12-11","currency":"SEK","total":"1.00","vat_amount":"0.00"}`, "invoice_date"},
+		{"date not a date", `{"supplier":"A","invoice_number":"1","invoice_date":"sometime in May","due_date":"2026-12-11","currency":"SEK","total":"1.00","vat_amount":"0.00"}`, "invoice_date"},
 		{"currency not a code", `{"supplier":"A","invoice_number":"1","invoice_date":"2026-11-11","due_date":"2026-12-11","currency":"kronor","total":"1.00","vat_amount":"0.00"}`, "currency"},
 		{"currency lower case", `{"supplier":"A","invoice_number":"1","invoice_date":"2026-11-11","due_date":"2026-12-11","currency":"sek","total":"1.00","vat_amount":"0.00"}`, "currency"},
 		{"total not a number", `{"supplier":"A","invoice_number":"1","invoice_date":"2026-11-11","due_date":"2026-12-11","currency":"SEK","total":"abc","vat_amount":"0.00"}`, "total"},
@@ -172,4 +172,65 @@ func TestExtract_StillRejectsAMalformedDueDateThatIsPresent(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "due_date")
+}
+
+func replyWithDates(invoice, due string) string {
+	return `{"supplier":"A","invoice_number":"1","invoice_date":"` + invoice + `","due_date":` + due +
+		`,"currency":"USD","total":"1.00","vat_amount":"0.00"}`
+}
+
+// The model returns the date as printed; the code decides what it means.
+func TestExtract_ReadsAPrintedDateWithTheClientsDateOrderAndFlagsAmbiguity(t *testing.T) {
+	tests := []struct {
+		name          string
+		order         extract.DateOrder
+		printed       string
+		wantISO       string
+		wantAmbiguous bool
+	}{
+		{"us invoice read month first", extract.MDY, "06/02/2015", "2015-06-02", true},
+		{"same text read day first", extract.DMY, "06/02/2015", "2015-02-06", true},
+		{"unambiguous day over twelve", extract.MDY, "18/09/2015", "2015-09-18", false},
+		{"iso passes through", extract.DMY, "2026-11-11", "2026-11-11", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srv := stub(t, replyWithDates(tt.printed, "null"), nil)
+			defer srv.Close()
+			c := &extract.Client{BaseURL: srv.URL, Model: "m", DateOrder: tt.order}
+
+			inv, err := c.Extract(context.Background(), []byte("x"))
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantISO, inv.InvoiceDate)
+			assert.Equal(t, tt.wantAmbiguous, inv.InvoiceDateAmbiguous)
+		})
+	}
+}
+
+func TestExtract_FlagsAnAmbiguousDueDateSeparately(t *testing.T) {
+	srv := stub(t, replyWithDates("2026-11-11", `"02.12.2026"`), nil)
+	defer srv.Close()
+	c := &extract.Client{BaseURL: srv.URL, Model: "m"}
+
+	inv, err := c.Extract(context.Background(), []byte("x"))
+
+	require.NoError(t, err)
+	assert.False(t, inv.InvoiceDateAmbiguous)
+	assert.True(t, inv.DueDateAmbiguous)
+	assert.Equal(t, "2026-12-02", inv.DueDate)
+}
+
+func TestExtract_AsksTheModelForDatesAsPrintedNotReformatted(t *testing.T) {
+	var got map[string]any
+	srv := stub(t, goodReply, &got)
+	defer srv.Close()
+	c := &extract.Client{BaseURL: srv.URL, Model: "m"}
+
+	_, err := c.Extract(context.Background(), []byte("x"))
+
+	require.NoError(t, err)
+	prompt := got["messages"].([]any)[0].(map[string]any)["content"].(string)
+	assert.Contains(t, prompt, "exactly as printed")
+	assert.NotContains(t, prompt, "YYYY-MM-DD", "the model must not be asked to convert dates")
 }

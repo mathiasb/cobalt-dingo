@@ -21,9 +21,11 @@ import (
 )
 
 const prompt = "Extract from this invoice image as JSON with exactly these keys: " +
-	"supplier, invoice_number, invoice_date (YYYY-MM-DD), due_date (YYYY-MM-DD), " +
-	"currency (ISO code), total (amount to pay, plain decimal with dot), " +
-	"vat_amount (plain decimal with dot). Use null if absent."
+	"supplier, invoice_number, invoice_date (exactly as printed, do not reformat), " +
+	"due_date (exactly as printed, do not reformat), " +
+	"currency (ISO code), net_total (amount excluding VAT, plain decimal with dot), " +
+	"vat_amount (plain decimal with dot), total (amount to pay including VAT, plain decimal with dot). " +
+	"Use null if absent."
 
 // Invoice is what the model read from the image. Amounts are minor units.
 // DueDate is empty when the invoice states none.
@@ -32,9 +34,19 @@ type Invoice struct {
 	InvoiceNumber string
 	InvoiceDate   string // YYYY-MM-DD
 	DueDate       string // YYYY-MM-DD
-	Currency      string // ISO 4217
-	Total         int64
-	VATAmount     int64
+
+	// InvoiceDateAmbiguous and DueDateAmbiguous are true when the printed date
+	// could be read two ways and the client's DateOrder chose one.
+	InvoiceDateAmbiguous bool
+	DueDateAmbiguous     bool
+	Currency             string // ISO 4217
+	Total                int64
+	VATAmount            int64
+
+	// NetTotal is the amount excluding VAT. NetKnown is false when the model
+	// did not read one; the invoice then cannot be cross-checked.
+	NetTotal int64
+	NetKnown bool
 }
 
 // Client talks to an Ollama-compatible /api/chat endpoint.
@@ -42,6 +54,10 @@ type Client struct {
 	BaseURL string
 	Model   string
 	HTTP    *http.Client // optional; defaults to a client with a 5 minute timeout
+
+	// DateOrder resolves numeric dates such as 02.11.2026. The zero value is
+	// DMY. It is a setting of the deployment, not something the model guesses.
+	DateOrder DateOrder
 }
 
 // Extract sends the image to the model and parses its reply. A reply that is
@@ -94,7 +110,7 @@ func (c *Client) Extract(ctx context.Context, image []byte) (Invoice, error) {
 	if err := json.Unmarshal(body, &envelope); err != nil {
 		return Invoice{}, fmt.Errorf("parse model envelope as json: %w", err)
 	}
-	return parseInvoice(envelope.Message.Content)
+	return parseInvoice(envelope.Message.Content, c.DateOrder)
 }
 
 // amountText accepts a JSON string or a JSON number.
@@ -110,13 +126,14 @@ func (a *amountText) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func parseInvoice(content string) (Invoice, error) {
+func parseInvoice(content string, order DateOrder) (Invoice, error) {
 	var raw struct {
 		Supplier      *string    `json:"supplier"`
 		InvoiceNumber *string    `json:"invoice_number"`
 		InvoiceDate   *string    `json:"invoice_date"`
 		DueDate       *string    `json:"due_date"`
 		Currency      *string    `json:"currency"`
+		NetTotal      amountText `json:"net_total"`
 		Total         amountText `json:"total"`
 		VATAmount     amountText `json:"vat_amount"`
 	}
@@ -140,33 +157,35 @@ func parseInvoice(content string) (Invoice, error) {
 		}
 		*f.dst = strings.TrimSpace(*f.src)
 	}
-	// The due date is optional: many real invoices carry none and the booking
-	// proposal does not need it. A due date that is present must still parse.
-	if raw.DueDate != nil && strings.TrimSpace(*raw.DueDate) != "" {
-		inv.DueDate = strings.TrimSpace(*raw.DueDate)
+	d, err := ParseDate(inv.InvoiceDate, order)
+	if err != nil {
+		return Invoice{}, fmt.Errorf("field invoice_date: %w", err)
 	}
-	for _, d := range []struct {
-		name     string
-		v        string
-		optional bool
-	}{{"invoice_date", inv.InvoiceDate, false}, {"due_date", inv.DueDate, true}} {
-		if d.optional && d.v == "" {
-			continue
+	inv.InvoiceDate, inv.InvoiceDateAmbiguous = d.ISO, d.Ambiguous
+
+	// The due date is optional: many real invoices carry none and the booking
+	// proposal does not need one. A due date that is present must still parse.
+	if raw.DueDate != nil && strings.TrimSpace(*raw.DueDate) != "" {
+		dd, err := ParseDate(*raw.DueDate, order)
+		if err != nil {
+			return Invoice{}, fmt.Errorf("field due_date: %w", err)
 		}
-		if _, err := time.Parse("2006-01-02", d.v); err != nil {
-			return Invoice{}, fmt.Errorf("field %s is not YYYY-MM-DD: %q", d.name, d.v)
-		}
+		inv.DueDate, inv.DueDateAmbiguous = dd.ISO, dd.Ambiguous
 	}
 	if len(inv.Currency) != 3 || strings.ToUpper(inv.Currency) != inv.Currency {
 		return Invoice{}, fmt.Errorf("field currency is not an ISO code: %q", inv.Currency)
 	}
 
-	var err error
 	if inv.Total, err = ParseAmount(string(raw.Total)); err != nil {
 		return Invoice{}, fmt.Errorf("field total: %w", err)
 	}
 	if inv.VATAmount, err = ParseAmount(string(raw.VATAmount)); err != nil {
 		return Invoice{}, fmt.Errorf("field vat_amount: %w", err)
+	}
+	// An unreadable net total is not fatal: the invoice is still returned, but
+	// it cannot reconcile, and Warnings says so.
+	if n, nerr := ParseAmount(string(raw.NetTotal)); nerr == nil {
+		inv.NetTotal, inv.NetKnown = n, true
 	}
 	return inv, nil
 }
