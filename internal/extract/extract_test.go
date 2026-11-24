@@ -301,6 +301,7 @@ func TestExtract_RefusesASupplierOrInvoiceNumberLongerThan200Characters(t *testi
 
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), field)
+			assert.Contains(t, err.Error(), "200 bytes", "len() counts bytes, so the message must not say characters")
 		})
 	}
 }

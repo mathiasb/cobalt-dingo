@@ -392,3 +392,9 @@ func TestBalanced_DoesNotWrapAroundOnLargeAmounts(t *testing.T) {
 	assert.False(t, wraps.Balanced())
 	assert.True(t, fine.Balanced())
 }
+
+func TestBuild_ANegativeTotalAloneIsACreditNoteNotAnUnbalancedEntry(t *testing.T) {
+	_, err := apentry.Build(read(100, 0, -100, "SEK"))
+
+	require.ErrorIs(t, err, apentry.ErrCreditNote)
+}

@@ -966,6 +966,6 @@ func TestBatch_AnAmbiguousDateIsWarnedOnceNotOncePerPlaceItIsComputed(t *testing
 
 // A hung model call ends at ModelTimeout; the read of the upload and the write
 // of the answer share the server's write timeout, so the three must fit.
-func TestTimeouts_TheUploadReadPlusTheModelDeadlineFitInsideTheWriteTimeout(t *testing.T) {
+func TestTimeouts_TheConstantsForReadModelAndWriteFitTogether(t *testing.T) {
 	assert.Less(t, demo.ReadTimeout+demo.DefaultModelTimeout, demo.WriteTimeout)
 }

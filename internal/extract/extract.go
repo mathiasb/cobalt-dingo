@@ -32,7 +32,7 @@ const prompt = "Extract from this invoice image as JSON with exactly these keys:
 // the net + VAT = total check, so an absurd reading is refused instead.
 const MaxAmountMinor int64 = 1_000_000_000_000
 
-// maxTextLen bounds the supplier and invoice number the model may return. They
+// maxTextLen bounds, in bytes, the supplier and invoice number the model may return. They
 // flow into a page, a journal text and a CSV.
 const maxTextLen = 200
 
@@ -191,7 +191,7 @@ func parseInvoice(content string, order DateOrder) (Invoice, error) {
 	}
 	for _, f := range []struct{ name, v string }{{"supplier", inv.Supplier}, {"invoice_number", inv.InvoiceNumber}} {
 		if len(f.v) > maxTextLen {
-			return Invoice{}, fmt.Errorf("field %s is longer than %d characters", f.name, maxTextLen)
+			return Invoice{}, fmt.Errorf("field %s is longer than %d bytes", f.name, maxTextLen)
 		}
 	}
 
