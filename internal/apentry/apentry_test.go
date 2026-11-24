@@ -79,14 +79,22 @@ func TestBuild_ARoundingGapWithinFiftyMinorUnitsIsBalancedOn3740(t *testing.T) {
 		net, vat, total int64
 		want            []line
 	}{
-		{"total above net plus VAT: the extra is a debit", 10000, 2480, 12500,
-			[]line{{6540, 10000, 0}, {2641, 2480, 0}, {3740, 20, 0}, {2440, 0, 12500}}},
-		{"total below net plus VAT: the shortfall is a credit", 10000, 2500, 12480,
-			[]line{{6540, 10000, 0}, {2641, 2500, 0}, {2440, 0, 12480}, {3740, 0, 20}}},
-		{"exactly fifty over is still rounding", 10000, 2500, 12550,
-			[]line{{6540, 10000, 0}, {2641, 2500, 0}, {3740, 50, 0}, {2440, 0, 12550}}},
-		{"exactly fifty under is still rounding", 10000, 2500, 12450,
-			[]line{{6540, 10000, 0}, {2641, 2500, 0}, {2440, 0, 12450}, {3740, 0, 50}}},
+		{
+			"total above net plus VAT: the extra is a debit", 10000, 2480, 12500,
+			[]line{{6540, 10000, 0}, {2641, 2480, 0}, {3740, 20, 0}, {2440, 0, 12500}},
+		},
+		{
+			"total below net plus VAT: the shortfall is a credit", 10000, 2500, 12480,
+			[]line{{6540, 10000, 0}, {2641, 2500, 0}, {2440, 0, 12480}, {3740, 0, 20}},
+		},
+		{
+			"exactly fifty over is still rounding", 10000, 2500, 12550,
+			[]line{{6540, 10000, 0}, {2641, 2500, 0}, {3740, 50, 0}, {2440, 0, 12550}},
+		},
+		{
+			"exactly fifty under is still rounding", 10000, 2500, 12450,
+			[]line{{6540, 10000, 0}, {2641, 2500, 0}, {2440, 0, 12450}, {3740, 0, 50}},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
