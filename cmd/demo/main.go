@@ -93,8 +93,8 @@ func run(log *slog.Logger) error {
 		Addr:              addr,
 		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
-		ReadTimeout:       60 * time.Second,
-		WriteTimeout:      4 * time.Minute, // a model call may take up to 3
+		ReadTimeout:       demo.ReadTimeout,
+		WriteTimeout:      demo.WriteTimeout, // covers the read plus the model deadline; see demo.DefaultModelTimeout
 		IdleTimeout:       2 * time.Minute,
 	}
 

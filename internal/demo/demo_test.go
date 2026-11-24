@@ -841,7 +841,7 @@ func TestBatch_InvoicesThatDoNotFitInTheSharedDeadlineAreSkippedNotSentToTheMode
 	assert.Equal(t, 2, strings.Count(rec.Body.String(), "ran out of time"))
 }
 
-func TestEntries_EverySubmitGetsADifferentUnguessableId(t *testing.T) {
+func TestEntries_EverySubmitGetsADifferentNonZeroId(t *testing.T) {
 	h := newHandler(t, &fakeExtractor{inv: good()})
 	seen := map[string]bool{}
 	for i := 0; i < 10; i++ {
@@ -850,4 +850,122 @@ func TestEntries_EverySubmitGetsADifferentUnguessableId(t *testing.T) {
 		assert.NotEqual(t, strings.Repeat("0", 32), id)
 		seen[id] = true
 	}
+}
+
+// panicFS panics on its first reads, to prove a panic while reading an upload
+// does not leave the parse slot taken for good.
+type panicFS struct {
+	fstest.MapFS
+	left atomic.Int32
+}
+
+func (p *panicFS) ReadFile(name string) ([]byte, error) {
+	if p.left.Add(-1) >= 0 {
+		panic("filesystem blew up")
+	}
+	return p.MapFS.ReadFile(name)
+}
+
+func TestUploads_APanicWhileReadingTheInputsDoesNotLeaveTheParseSlotTakenForGood(t *testing.T) {
+	samples := &panicFS{MapFS: fstest.MapFS{"001.png": {Data: pngBytes}}}
+	samples.left.Store(2)
+	srv := httptest.NewServer(newHandler(t, &fakeExtractor{inv: good()}, func(c *demo.Config) { c.Samples = samples }))
+	defer srv.Close()
+	post := func() (int, error) {
+		resp, err := http.PostForm(srv.URL+"/process", url.Values{"sample": {"001.png"}})
+		if err != nil {
+			return 0, err
+		}
+		defer func() { _ = resp.Body.Close() }()
+		return resp.StatusCode, nil
+	}
+
+	_, err1 := post()
+	_, err2 := post()
+	code, err3 := post()
+
+	require.Error(t, err1)
+	require.Error(t, err2)
+	require.NoError(t, err3)
+	assert.Equal(t, http.StatusOK, code, "two panics must not use up both parse slots")
+}
+
+func TestProcess_TwoFilesThatAreEachUnderTheLimitButTogetherOverItLeaveNoTempFile(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("TMPDIR", tmp)
+	var seen []string
+	ex := &fakeExtractor{inv: good(), onExtract: func() {
+		entries, _ := os.ReadDir(tmp)
+		for _, e := range entries {
+			seen = append(seen, e.Name())
+		}
+	}}
+	h := newHandler(t, ex, func(c *demo.Config) { c.MaxUpload = 1 << 20 }) // total defaults to 2 MB
+	f := append(append([]byte{}, pngBytes...), bytes.Repeat([]byte("k"), 700<<10)...)
+
+	rec := uploadMany(t, h, f, f)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.Empty(t, seen, "1.4 MB together is over MaxUpload, so the memory limit must be the total, not the file limit")
+}
+
+func TestBatch_FilesAndSamplesTogetherCountTowardTheLimit(t *testing.T) {
+	ex := &fakeExtractor{inv: good()}
+	h := newHandler(t, ex)
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+	for i := 0; i < 2; i++ {
+		fw, err := w.CreateFormFile("image", "inv.png")
+		require.NoError(t, err)
+		_, _ = fw.Write(pngBytes)
+	}
+	for _, name := range []string{"001.png", "002.png", "001.png"} {
+		require.NoError(t, w.WriteField("sample", name))
+	}
+	require.NoError(t, w.Close())
+	req := httptest.NewRequest(http.MethodPost, "/process", &buf)
+	req.Header.Set("Content-Type", w.FormDataContentType())
+	rec := httptest.NewRecorder()
+
+	h.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.Equal(t, int32(0), ex.started.Load())
+}
+
+func TestProcess_RefusesAPlainTextUploadAndNamesNoModelCall(t *testing.T) {
+	ex := &fakeExtractor{inv: good()}
+	h := newHandler(t, ex)
+
+	rec := upload(t, h, []byte("hello, this is just text and not an image at all"))
+
+	assert.Equal(t, http.StatusUnsupportedMediaType, rec.Code)
+	assert.Equal(t, int32(0), ex.started.Load())
+}
+
+func TestEntries_TheTwentyFirstNewestSubmitIsTheFirstToBePushedOut(t *testing.T) {
+	h := newHandler(t, &fakeExtractor{inv: good()})
+	var ids []string
+	for i := 0; i < 21; i++ {
+		ids = append(ids, csvID(t, uploadMany(t, h, pngBytes).Body.String()))
+	}
+
+	assert.Equal(t, http.StatusNotFound, getCSV(h, ids[0]).Code, "the oldest of 21 is gone")
+	assert.Equal(t, http.StatusOK, getCSV(h, ids[1]).Code, "the 20 newest are kept")
+}
+
+func TestBatch_AnAmbiguousDateIsWarnedOnceNotOncePerPlaceItIsComputed(t *testing.T) {
+	inv := good()
+	inv.InvoiceDateAmbiguous = true
+	h := newHandler(t, &fakeExtractor{inv: inv})
+
+	body := uploadMany(t, h, pngBytes).Body.String()
+
+	assert.Equal(t, 1, strings.Count(body, "invoice date could be read two ways; read as"))
+}
+
+// A hung model call ends at ModelTimeout; the read of the upload and the write
+// of the answer share the server's write timeout, so the three must fit.
+func TestTimeouts_TheUploadReadPlusTheModelDeadlineFitInsideTheWriteTimeout(t *testing.T) {
+	assert.Less(t, demo.ReadTimeout+demo.DefaultModelTimeout, demo.WriteTimeout)
 }

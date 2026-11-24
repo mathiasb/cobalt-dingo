@@ -34,19 +34,27 @@ import (
 	"github.com/mathiasb/cobalt-dingo/internal/process"
 )
 
+// Server timeouts, here so a test can check they fit together: a request's body
+// read (ReadTimeout) and the model deadline (DefaultModelTimeout) both happen
+// before the answer is written, and all of it must finish inside WriteTimeout,
+// which net/http counts from the end of the request headers.
 const (
-	// multipartOverhead is slack for form framing above the file limit; the
+	ReadTimeout         = 60 * time.Second
+	WriteTimeout        = 4 * time.Minute
+	DefaultModelTimeout = 150 * time.Second
+)
+
+const ( // multipartOverhead is slack for form framing above the file limit; the
 	// file itself is checked against MaxUpload exactly.
 	multipartOverhead = 64 << 10
 	maxSupplierLen    = 200
 
-	defaultModelTimeout = 3 * time.Minute
-	defaultMaxLearned   = 200
-	defaultMaxFiles     = 4
-	defaultMaxParsing   = 2
-	entryStoreMax       = 20
-	entryStoreTTL       = 30 * time.Minute
-	becauseShown        = 5
+	defaultMaxLearned = 200
+	defaultMaxFiles   = 4
+	defaultMaxParsing = 2
+	entryStoreMax     = 20
+	entryStoreTTL     = 30 * time.Minute
+	becauseShown      = 5
 )
 
 var (
@@ -92,7 +100,7 @@ type server struct {
 // New returns the demo handler.
 func New(cfg Config) http.Handler {
 	if cfg.ModelTimeout <= 0 {
-		cfg.ModelTimeout = defaultModelTimeout
+		cfg.ModelTimeout = DefaultModelTimeout
 	}
 	if cfg.MaxLearned <= 0 {
 		cfg.MaxLearned = defaultMaxLearned
@@ -332,8 +340,11 @@ func (s *server) processHandler(w http.ResponseWriter, r *http.Request) {
 		s.render(w, http.StatusServiceUnavailable, view{Error: "Too many uploads are arriving at once. Try again in a moment."})
 		return
 	}
-	ins, ok := s.inputs(w, r)
-	<-s.parsing
+	// The slot is released by defer so a panic while reading cannot keep it.
+	ins, ok := func() ([]input, bool) {
+		defer func() { <-s.parsing }()
+		return s.inputs(w, r)
+	}()
 	if !ok {
 		return
 	}
