@@ -285,7 +285,13 @@ func (s *server) processHandler(w http.ResponseWriter, r *http.Request) {
 	s.render(w, http.StatusOK, view{Result: &res, Because: shown, More: more, Sample: sample, Supplier: inv.Supplier})
 }
 
+// maxFeedbackBody bounds a correction form: a supplier and a four-digit account
+// need a few hundred bytes. Without it a junk field is parsed up to net/http's
+// 10 MB default and the supplier is still learned.
+const maxFeedbackBody = 8 << 10
+
 func (s *server) feedback(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxFeedbackBody)
 	if err := r.ParseForm(); err != nil {
 		s.render(w, http.StatusBadRequest, view{Error: "Could not read the form."})
 		return
@@ -377,7 +383,7 @@ and never stored.</p>
  <input type="hidden" name="account" value="{{.Account}}"><button>Accept {{.Account}}</button></form></td></tr>{{end}}
 </table>
 <p>Why: the same supplier was booked this way before:</p>
-<ul>{{range $.Because}}<li>voucher {{.Series}}{{.Number}}{{if .Date}}, {{.Date}}{{end}}: account {{.Account}}</li>{{end}}
+<ul>{{range $.Because}}<li>{{if .Series}}voucher {{.Series}}{{.Number}}{{if .Date}}, {{.Date}}{{end}}{{else}}your correction{{end}}: account {{.Account}}</li>{{end}}
 {{if $.More}}<li>and {{$.More}} more like these</li>{{end}}</ul>
 </div>
 <form method="post" action="/feedback"><input type="hidden" name="supplier" value="{{.Invoice.Supplier}}">

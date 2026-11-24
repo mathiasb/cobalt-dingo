@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -533,4 +534,58 @@ func TestProcess_APanicInTheExtractorDoesNotLeaveTheModelSlotTaken(t *testing.T)
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, code, "not 503: the slot was released")
+}
+
+// With no cap on the request body, net/http spools everything above the memory
+// limit to os.TempDir. A recorder-driven call has no server cleanup afterwards,
+// so a leaked spool file is still visible when ServeHTTP returns.
+func TestProcess_ABodyFarOverTheUploadLimitLeavesNoFileInTheTempDir(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("TMPDIR", tmp)
+	h := newHandler(t, &fakeExtractor{inv: good()}, func(c *demo.Config) { c.MaxUpload = 1 << 20 })
+	huge := append(append([]byte{}, pngBytes...), bytes.Repeat([]byte("q"), 3<<20)...)
+
+	rec := upload(t, h, huge)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
+	entries, err := os.ReadDir(tmp)
+	require.NoError(t, err)
+	assert.Empty(t, entries)
+}
+
+func TestProcess_TheBecauseListShowsTheNewestMatchesAndNotTheOldest(t *testing.T) {
+	var many []booking.Example
+	for i := 1; i <= 9; i++ {
+		many = append(many, booking.Example{Supplier: "Hetzner Online GmbH", Account: 6540, Series: "A", Number: i * 100, Date: "2026-0" + strconv.Itoa(i) + "-01"})
+	}
+	h := newHandler(t, &fakeExtractor{inv: good()}, func(c *demo.Config) { c.History = many })
+
+	body := upload(t, h, pngBytes).Body.String()
+
+	for _, newest := range []string{"A900", "A800", "A700", "A600", "A500"} {
+		assert.Contains(t, body, newest)
+	}
+	for _, oldest := range []string{"A100", "A200", "A300", "A400"} {
+		assert.NotContains(t, body, oldest)
+	}
+	assert.Contains(t, body, "and 4 more")
+}
+
+func TestProcess_ALearnedCorrectionIsLabelledAsOneAndNotAsAVoucher(t *testing.T) {
+	h := newHandler(t, &fakeExtractor{inv: good()})
+	postForm(h, "/feedback", url.Values{"supplier": {"Hetzner Online GmbH"}, "account": {"6540"}})
+
+	body := upload(t, h, pngBytes).Body.String()
+
+	assert.Contains(t, body, "your correction")
+	assert.NotContains(t, body, "voucher 0")
+}
+
+func TestFeedback_AnOversizeFormBodyIsRefusedBeforeItIsParsed(t *testing.T) {
+	h := newHandler(t, &fakeExtractor{inv: good()})
+
+	rec := postForm(h, "/feedback", url.Values{"supplier": {"Hetzner Online GmbH"}, "account": {"6540"}, "junk": {strings.Repeat("j", 64<<10)}})
+
+	assert.GreaterOrEqual(t, rec.Code, 400)
+	assert.Less(t, rec.Code, 500)
 }

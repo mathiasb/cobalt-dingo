@@ -91,7 +91,7 @@ func TestRun_AnUnseenSupplierGetsNoCandidatesRatherThanAGuess(t *testing.T) {
 	assert.Empty(t, res.Proposal.Candidates)
 }
 
-func TestAssess_GivesTheSameVerdictAsRunForAnInvoiceAlreadyRead(t *testing.T) {
+func TestAssess_MarksAnUnreconciledInvoiceDoNotTrustAndStillProposes(t *testing.T) {
 	inv := reconciled()
 	inv.Total = 1250
 
