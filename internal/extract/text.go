@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -12,6 +13,10 @@ import (
 // is a few kilobytes; more than this is not an invoice, and text past a cut would
 // drop the totals, which sit at the end.
 const MaxTextBytes = 48 << 10
+
+// ErrTextTooLong is a document whose text is more than MaxTextBytes: the document's
+// fault, not the model's.
+var ErrTextTooLong = errors.New("document text is too long to read")
 
 const textPrompt = "Extract from the invoice text between the document fences as JSON with exactly these keys: " +
 	"supplier, invoice_number, invoice_date (exactly as printed, do not reformat), " +
@@ -44,7 +49,7 @@ func (c *Client) ExtractText(ctx context.Context, text string) (Invoice, error) 
 		return Invoice{}, fmt.Errorf("no text to read")
 	}
 	if len(text) > MaxTextBytes {
-		return Invoice{}, fmt.Errorf("document text is longer than %d bytes", MaxTextBytes)
+		return Invoice{}, fmt.Errorf("%w: it is longer than %d bytes", ErrTextTooLong, MaxTextBytes)
 	}
 	model := c.TextModel
 	if model == "" {

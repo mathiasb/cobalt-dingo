@@ -353,3 +353,43 @@ func TestMarkitdown_AMissingConverterBehindTheLimitWrapperIsStillNotTheDocuments
 	assert.NotErrorIs(t, err, ingest.ErrRefused)
 	assert.Contains(t, err.Error(), "could not run")
 }
+
+// If the shell cannot set a limit it says so with 126 and the converter never
+// runs. 126 is what Convert reads as "ours to fix", not "the document's fault".
+func TestMarkitdown_TheWrapperExits126AndRunsNothingWhenALimitCannotBeSet(t *testing.T) {
+	marker := filepath.Join(t.TempDir(), "ran")
+	argv := ingest.WrapperArgv("not-a-number", "10", script(t, `touch `+marker))
+
+	err := exec.Command(argv[0], argv[1:]...).Run()
+
+	var ee *exec.ExitError
+	require.ErrorAs(t, err, &ee)
+	assert.Equal(t, 126, ee.ExitCode())
+	_, statErr := os.Stat(marker)
+	assert.True(t, os.IsNotExist(statErr))
+}
+
+// A CPU limit of half a second must become one whole second, never zero: a limit
+// of zero seconds would kill the converter at once.
+func TestMarkitdown_ASubSecondCPULimitIsRoundedUpToOneSecond(t *testing.T) {
+	c := conv(t, `ulimit -t`)
+	c.MaxCPU = 500 * time.Millisecond
+
+	out, err := c.Convert(context.Background(), ingest.KindPDF, []byte("x"))
+
+	require.NoError(t, err)
+	assert.Equal(t, "1", strings.TrimSpace(out))
+}
+
+// A descendant that keeps the output pipe open after the converter exits must not
+// hold the call until the descendant ends.
+func TestMarkitdown_ADescendantHoldingTheOutputPipeOpenDoesNotHoldTheCallPastTheWaitDelay(t *testing.T) {
+	c := conv(t, `sleep 30 &
+echo done`)
+	c.Timeout = 25 * time.Second
+
+	start := time.Now()
+	_, _ = c.Convert(context.Background(), ingest.KindPDF, []byte("x"))
+
+	assert.Less(t, time.Since(start), 10*time.Second)
+}

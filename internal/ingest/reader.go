@@ -103,7 +103,11 @@ func (r *Reader) fromText(ctx context.Context, kind Kind, doc []byte) (extract.I
 	case err != nil:
 		return extract.Invoice{}, fmt.Errorf("convert %s: %w", kind, err)
 	}
-	return r.Text.ExtractText(ctx, text)
+	inv, err := r.Text.ExtractText(ctx, text)
+	if errors.Is(err, extract.ErrTextTooLong) {
+		return extract.Invoice{}, fmt.Errorf("%w: %v", ErrRefused, err)
+	}
+	return inv, err
 }
 
 // checkDocxSize refuses a zip that is small as sent and large when read. The

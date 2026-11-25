@@ -280,3 +280,14 @@ func TestReader_AMediaPartLargerThanTheXMLCapIsStillAccepted(t *testing.T) {
 	require.NoError(t, err, "a logo is not text")
 	assert.Equal(t, "from text", inv.Supplier)
 }
+
+// A long but real invoice (30 pages is about 67 KB of text) is the document's
+// fault, not a model outage, so it must not be shown as "the model may be busy".
+func TestReader_TextTheModelCannotTakeIsRefusedAsTheDocumentsFaultNotAnOutage(t *testing.T) {
+	r, _, tx, _ := newReader()
+	tx.err = extract.ErrTextTooLong
+
+	_, err := r.Extract(context.Background(), fixture(t, "invoice-text-layer.pdf"))
+
+	require.ErrorIs(t, err, ingest.ErrRefused)
+}

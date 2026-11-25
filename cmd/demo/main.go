@@ -10,7 +10,7 @@
 //	DEMO_MODEL_URL   Ollama-compatible endpoint on the local network (default http://iguana:11434)
 //	DEMO_MODEL       vision model (default qwen2.5vl:7b)
 //	DEMO_TEXT_MODEL  model that reads text from PDF and Word files (default: DEMO_MODEL)
-//	DEMO_MARKITDOWN  converter command for PDF and Word (default: uvx --quiet --from markitdown[docx,pdf] markitdown)
+//	DEMO_MARKITDOWN  path of the markitdown binary for PDF and Word (default: markitdown on PATH; install it in a virtualenv, see docs/demo-runbook.md)
 //	DEMO_DATE_ORDER  dmy (default) or mdy: how 02.11.2026 is read when both readings are valid
 //
 // It has no accounting-system access and writes nothing to disk. Uploads are

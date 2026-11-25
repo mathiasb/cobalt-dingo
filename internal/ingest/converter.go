@@ -86,6 +86,11 @@ func childVars() []string {
 	return vars
 }
 
+// wrapperScript sets the limits and replaces the shell with the converter. If a
+// limit cannot be set the shell exits 126, which Convert reads as a problem with
+// the server, not the document, and the converter is never started.
+const wrapperScript = `ulimit -v "$1" && ulimit -t "$2" || exit 126; shift 2; exec "$@"`
+
 // limited wraps argv so the shell sets the limits and then replaces itself with
 // the converter. With no limit configured argv is returned as it is.
 func (m *Markitdown) limited(argv []string) []string {
@@ -99,7 +104,7 @@ func (m *Markitdown) limited(argv []string) []string {
 	if m.MaxCPU > 0 {
 		cpu = strconv.FormatInt(int64((m.MaxCPU+time.Second-1)/time.Second), 10)
 	}
-	return append([]string{"sh", "-c", `ulimit -v "$1" && ulimit -t "$2" && shift 2 && exec "$@"`, "sh", mem, cpu}, argv...)
+	return append([]string{"sh", "-c", wrapperScript, "sh", mem, cpu}, argv...)
 }
 
 // Convert implements Converter for PDF and DOCX.

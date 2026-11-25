@@ -59,6 +59,8 @@ func ParseUBL(data []byte) (extract.Invoice, error) {
 		fields   = map[string]string{}
 		taxTotal = map[string]string{} // currencyID -> first TaxTotal/TaxAmount
 		taxCur   string
+		amtCur   = map[string]string{} // field -> currencyID of its first element
+		curAttr  string
 	)
 	want := map[string]string{
 		"ID":                   "number",
@@ -92,6 +94,9 @@ func ParseUBL(data []byte) (extract.Invoice, error) {
 			if len(path) >= maxXMLDepth {
 				return extract.Invoice{}, fmt.Errorf("e-invoice nests deeper than %d elements", maxXMLDepth)
 			}
+			if sawRoot && len(path) == 0 {
+				return extract.Invoice{}, errors.New("more than one document in the file")
+			}
 			if !sawRoot {
 				sawRoot = true
 				if ublRoots[t.Name.Space] != t.Name.Local {
@@ -102,13 +107,14 @@ func ParseUBL(data []byte) (extract.Invoice, error) {
 			path = append(path, t.Name.Local)
 			rel := strings.Join(path[1:], "/")
 			key, capture = want[rel]
-			if capture && key == "tax" {
-				taxCur = ""
-				for _, a := range t.Attr {
-					if a.Name.Local == "currencyID" {
-						taxCur = a.Value
-					}
+			curAttr = ""
+			for _, a := range t.Attr {
+				if a.Name.Local == "currencyID" {
+					curAttr = a.Value
 				}
+			}
+			if capture && key == "tax" {
+				taxCur = curAttr
 			}
 			text.Reset()
 		case xml.CharData:
@@ -127,6 +133,7 @@ func ParseUBL(data []byte) (extract.Invoice, error) {
 					}
 				} else if _, seen := fields[key]; !seen {
 					fields[key] = v
+					amtCur[key] = curAttr
 				}
 			}
 			capture = false
@@ -169,6 +176,13 @@ func ParseUBL(data []byte) (extract.Invoice, error) {
 		return extract.Invoice{}, errors.New("the document type code is missing")
 	case credit != creditTypeCodes[code]:
 		return extract.Invoice{}, fmt.Errorf("the document type code %q does not match a %s", code, map[bool]string{true: "CreditNote", false: "Invoice"}[credit])
+	}
+	// An amount stated in another currency than the document's is not one this
+	// parser can add to the others.
+	for _, k := range []string{"PayableAmount", "net", "netAlt"} {
+		if c := amtCur[k]; fields[k] != "" && c != "" && c != inv.Currency {
+			return extract.Invoice{}, fmt.Errorf("%s currencyID %q differs from the document currency %q", k, c, inv.Currency)
+		}
 	}
 	sign := int64(1)
 	if credit {

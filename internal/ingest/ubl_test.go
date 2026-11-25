@@ -135,3 +135,39 @@ func TestParseUBL_RefusesADocumentThatIsHostileOrMalformed(t *testing.T) {
 		})
 	}
 }
+
+// A document that repeats an element is read by its first occurrence. A later one
+// must not be able to replace what the first said.
+func TestParseUBL_AnElementRepeatedLaterDoesNotReplaceTheFirst(t *testing.T) {
+	doc := edit(t, fixture(t, "ubl-invoice-mixed-vat.xml"), `<cbc:IssueDate>`, `<cbc:ID>EVIL-1</cbc:ID><cbc:IssueDate>`)
+	doc = edit(t, doc, `</cac:LegalMonetaryTotal>`, `<cbc:PayableAmount currencyID="SEK">1.00</cbc:PayableAmount></cac:LegalMonetaryTotal>`)
+
+	inv, err := ingest.ParseUBL(doc)
+
+	require.NoError(t, err)
+	assert.Equal(t, "91260121", inv.InvoiceNumber)
+	assert.Equal(t, int64(462230), inv.Total)
+}
+
+func TestParseUBL_AnAmountInADifferentCurrencyThanTheDocumentIsRefused(t *testing.T) {
+	base := fixture(t, "ubl-invoice-mixed-vat.xml")
+	for name, doc := range map[string][]byte{
+		"payable amount": edit(t, base, `<cbc:PayableAmount currencyID="SEK">`, `<cbc:PayableAmount currencyID="USD">`),
+		"net amount":     edit(t, base, `<cbc:TaxExclusiveAmount currencyID="SEK">`, `<cbc:TaxExclusiveAmount currencyID="USD">`),
+	} {
+		_, err := ingest.ParseUBL(doc)
+
+		require.Error(t, err, name)
+		assert.Contains(t, err.Error(), "currencyID", name)
+	}
+}
+
+func TestParseUBL_ASecondDocumentAfterTheFirstIsRefused(t *testing.T) {
+	doc := fixture(t, "ubl-invoice-mixed-vat.xml")
+	two := append(append([]byte{}, doc...), doc...)
+
+	_, err := ingest.ParseUBL(two)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "more than one")
+}

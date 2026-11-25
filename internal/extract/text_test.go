@@ -124,7 +124,7 @@ func TestExtractText_RefusesTextOverTheLimitWithoutCallingTheModel(t *testing.T)
 
 	_, err := c.ExtractText(context.Background(), strings.Repeat("a", extract.MaxTextBytes+1))
 
-	require.Error(t, err)
+	require.ErrorIs(t, err, extract.ErrTextTooLong)
 	assert.Contains(t, err.Error(), "longer")
 	assert.False(t, called)
 }
