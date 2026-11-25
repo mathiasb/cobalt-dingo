@@ -27,6 +27,12 @@ const prompt = "Extract from this invoice image as JSON with exactly these keys:
 	"vat_amount (plain decimal with dot), total (amount to pay including VAT, plain decimal with dot). " +
 	"Use null if absent."
 
+// totalPrompt is the second read. It asks one narrow question and shows the model
+// nothing of the first answer: the broad prompt above was seen to read a discount
+// as VAT and invent a total, where this one gave the printed total every time.
+const totalPrompt = "What is the final amount the customer has to pay on this invoice, exactly as printed? " +
+	`Return JSON {"total_label": "<the words printed next to it>", "total": "<plain decimal with dot>"}.`
+
 // MaxAmountMinor is the largest amount accepted, ten billion in major units.
 // A reading near the top of int64 makes sums wrap, and a wrapped sum can pass
 // the net + VAT = total check, so an absurd reading is refused instead.
@@ -56,6 +62,15 @@ type Invoice struct {
 	// did not read one; the invoice then cannot be cross-checked.
 	NetTotal int64
 	NetKnown bool
+
+	// TotalDisputed is true when a second, independent read of the total did not
+	// give the same amount, or gave none. Net + VAT = total can hold while all
+	// three are wrong together (a discount read as VAT, with a made-up total), so
+	// the arithmetic alone cannot vouch for the total. TotalReread is the second
+	// reading, valid only when TotalRereadKnown.
+	TotalDisputed    bool
+	TotalReread      int64
+	TotalRereadKnown bool
 }
 
 // Client talks to an Ollama-compatible /api/chat endpoint.
@@ -81,7 +96,31 @@ func (c *Client) Extract(ctx context.Context, image []byte) (Invoice, error) {
 	if err != nil {
 		return Invoice{}, err
 	}
-	return parseInvoice(content, c.DateOrder)
+	inv, err := parseInvoice(content, c.DateOrder)
+	if err != nil {
+		return Invoice{}, err
+	}
+	c.confirmTotal(ctx, image, &inv)
+	return inv, nil
+}
+
+// confirmTotal reads the total a second time, from the image and with a different
+// question, and marks the invoice disputed unless the two readings are equal. A
+// second read that fails or cannot be parsed also disputes: an unconfirmed total
+// is not a confirmed one.
+func (c *Client) confirmTotal(ctx context.Context, image []byte, inv *Invoice) {
+	content, err := c.chat(ctx, c.Model, totalPrompt, []string{base64.StdEncoding.EncodeToString(image)})
+	if err == nil {
+		var raw struct {
+			Total amountText `json:"total"`
+		}
+		if json.Unmarshal([]byte(content), &raw) == nil {
+			if v, perr := ParseAmount(string(raw.Total)); perr == nil {
+				inv.TotalReread, inv.TotalRereadKnown = v, true
+			}
+		}
+	}
+	inv.TotalDisputed = !inv.TotalRereadKnown || inv.TotalReread != inv.Total
 }
 
 // chat sends one user message to the model and returns the reply's content. The

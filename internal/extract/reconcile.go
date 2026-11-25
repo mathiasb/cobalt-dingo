@@ -17,7 +17,7 @@ const reconcileTolerance = 50
 // This catches a misread of the total alone. It does not catch the net, VAT and
 // total being misread consistently, and it has not been measured against that.
 func (i Invoice) Reconciled() bool {
-	if !i.NetKnown {
+	if !i.NetKnown || i.TotalDisputed {
 		return false
 	}
 	// Big integers: an Invoice is a plain struct, and a hand-built one with
@@ -33,6 +33,11 @@ func (i Invoice) Reconciled() bool {
 func (i Invoice) Warnings() []string {
 	var w []string
 	switch {
+	case i.TotalDisputed && i.TotalRereadKnown:
+		w = append(w, fmt.Sprintf("the total was read as %s and, on a second read, as %s",
+			minor(i.Total), minor(i.TotalReread)))
+	case i.TotalDisputed:
+		w = append(w, "the total could not be confirmed by a second read")
 	case !i.NetKnown:
 		w = append(w, "net total was not read, so the total cannot be cross-checked")
 	case !i.Reconciled():
