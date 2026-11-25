@@ -16,7 +16,7 @@ Bet #142 (placed 2026-11-24), slice #147, PR #148. Demo date: Friday 2026-11-27.
 
 ## Which build is running
 
-`~/invoice-demo/bin/demo` was built from the head of PR #151 (`ccf72b4`, branch `feat/ap-entries`), which is **stacked on PR #148**; neither is merged, so this is **not `main`**. Both PRs were independently reviewed (#148 twice, #151 twice). After the merges, rebuild from `main`:
+`~/invoice-demo/bin/demo` is built from **`main`** at `5dbabcf` (the merge of PR #148, which carries #151). Rebuild after any later change:
 
 ```
 cd <a clean checkout of main>
@@ -63,4 +63,6 @@ The learning cap is global; `*.ts.net` model hosts are accepted for any tailnet;
 
 PR #148: round 1 BLOCK (uploads spooled to disk over 1 MB, no CSRF protection, unbounded learning, URL guard bypasses, error reflection); round 2 APPROVE-WITH-CONDITIONS, conditions met in `292691e`.
 
-PR #151: round 1 BLOCK (an int64 overflow built an unbalanced entry that reported itself balanced, reachable through the real parser; zero-valued lines; a parse slot leaked on a panic; test gaps), all fixed test-first; round 2 APPROVE on `02532da`, non-blocking findings taken in `ccf72b4`. Reviews are recorded independent agent passes, not four-eyes. The rubric review job (ADR-0010 lane) returned "no usable verdict" and so counts as **unreviewed by that lane**, not clean.
+PR #151: round 1 BLOCK (an int64 overflow built an unbalanced entry that reported itself balanced, reachable through the real parser; zero-valued lines; a parse slot leaked on a panic; test gaps), all fixed test-first; round 2 APPROVE on `02532da`, non-blocking findings taken in `ccf72b4`. Reviews are recorded independent agent passes, not four-eyes.
+
+Merge: both PRs went to `main` as one merge by Mathias on 2026-11-25 06:45 (the agent merge gate refused because Build & Import, Deploy and Mirror are skipped by design on pull_request events, #153). Post-merge run 13522, read by job: Lint / Test / Vet, Build & Import, Deploy via GitOps, E2E, Mirror all success. The rubric review of the combined head returned BLOCKED on one line the author reads as a false positive (R-AGENT-02 at `apentry_test.go:397`, a credit-note test); advisory on this lane, unanswered by Mathias at the time of writing. The rubric review job (ADR-0010 lane) returned "no usable verdict" and so counts as **unreviewed by that lane**, not clean.
