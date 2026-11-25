@@ -16,7 +16,7 @@ Bet #142 (placed 2026-11-24), slice #147, PR #148. Demo date: Friday 2026-11-27.
 
 ## Which build is running
 
-`~/invoice-demo/bin/demo` is built from **`main`** at `5dbabcf` (the merge of PR #148, which carries #151). Rebuild after any later change:
+`~/invoice-demo/bin/demo` is built from **`main`** at `2810d07` (the merge of PR #162, multi-format ingestion, which sits on top of #148/#151), deployed 2026-11-25 and checked live: every sample format, a multipart PDF upload, a PDF renamed to .png, a PDF+DOCX batch, the scan refusal, an unsupported file and a hostile XML. `run.sh` sets `DEMO_MARKITDOWN` to the converter virtualenv (see below). Rebuild after any later change:
 
 ```
 cd <a clean checkout of main>
