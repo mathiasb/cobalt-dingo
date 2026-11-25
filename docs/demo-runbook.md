@@ -40,7 +40,7 @@ Do not install `markitdown[all]`: it pulls cloud document-intelligence converter
 
 Other settings: `DEMO_TEXT_MODEL` (default `DEMO_MODEL`). If the converter is missing the demo starts with a warning and images and e-invoice XML still work; a PDF or Word upload then fails. A converter failure that a document causes (timeout, over the limits, crash) shows "This file could not be read" with status 422; a converter that cannot start is logged as `converter could not run` and shows the model-busy sentence.
 
-Samples of every format: copy the generated documents next to the PNGs, named `NNN.pdf`, `NNN.docx`, `NNN.xml` (three digits), into `~/invoice-demo-data/invoices/`. Other names are ignored. Generate with `uv run scripts/gen-variety.py <dir>`; the files are fictional.
+Samples of every format: copy the generated documents next to the PNGs, named `NNN.pdf`, `NNN.docx`, `NNN.xml` (three digits), into `~/invoice-demo-data/invoices/`. Other names are ignored. Generate with `uv run scripts/gen-variety.py <dir>`; the files are fictional. Real third-party layouts (FATURA2, CC-BY-4.0, attribution in `docs/research/2026-11-25-real-layout-samples.md`) sit at `201`-`210.png`; their supplier history is synthetic.
 
 ## Exchange rates (SEK conversion)
 
