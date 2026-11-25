@@ -11,6 +11,7 @@ image-only PDF (a "scan": no text layer), a DOCX, and a Peppol BIS 3.0 UBL XML
 (Invoice and CreditNote). Written under outdir (default testdata/variety):
 
   files/NNN.<ext>   the documents
+  history-extra.json  past bookings for the suppliers this set adds, to merge into the demo history
   truth.json        ground truth per file: format, layout, kind (invoice|credit), supplier,
                     number, dates, currency, net, vat, total (signed: credit notes are
                     negative), expected_account, and new_supplier
@@ -289,6 +290,35 @@ def render_ubl(path: Path, inv):
     path.write_text("".join(out), encoding="utf-8")
 
 
+# Approximate SEK per unit, only to size past bookings; never used to convert an invoice.
+APPROX_SEK = {"SEK": 1, "EUR": 11, "USD": 10, "DKK": 1.5, "NOK": 1.05}
+
+
+def extra_history(seed: int):
+    """Past bookings, as domain.Voucher JSON, for the suppliers this set introduces.
+
+    The demo's history (gen-synthetic-invoices.py) knows only the original twelve
+    suppliers, so an invoice from any of these eight would get no proposed account.
+    Merge this file into the demo's history.json to cover them. Its own random
+    stream, so truth.json is unchanged by it. Series B, numbers from 1.
+    """
+    rng = random.Random(seed + 1)
+    out, num = [], 1
+    d = synth.HISTORY_START
+    while d <= synth.HISTORY_END:
+        for sup in EXTRA:
+            name, _a, _c, cur, rates, main, alt, _id, _lang, lo, hi, _tax, _new = sup
+            if rng.random() < 0.75:  # most months, so every supplier has well over ten bookings
+                acct = alt if rng.random() < 0.08 else main
+                net = round(rng.randint(lo, hi) * 100 * APPROX_SEK[cur])
+                desc = name if rng.random() < 0.6 else f"{name} faktura {rng.randint(1000, 9999)}"
+                out.append(synth.voucher("B", num, d + timedelta(days=rng.randint(0, 25)), desc, acct, net, rng.choice(rates)))
+                num += 1
+        d = (d.replace(day=1) + timedelta(days=32)).replace(day=1)
+    out.sort(key=lambda v: (v["TransactionDate"], v["Number"]))
+    return out
+
+
 PLAN = [("pdf", 60, render_pdf), ("scan.pdf", 20, render_scan), ("docx", 40, render_docx), ("xml", 40, render_ubl)]
 
 
@@ -309,6 +339,7 @@ def main():
             truth.append(row)
             idx += 1
     (out / "truth.json").write_text(json.dumps(truth, ensure_ascii=False, indent=1) + "\n")
+    (out / "history-extra.json").write_text(json.dumps(extra_history(seed), ensure_ascii=False, indent=1) + "\n")
     kinds = {}
     for r in truth:
         kinds[r["format"]] = kinds.get(r["format"], 0) + 1

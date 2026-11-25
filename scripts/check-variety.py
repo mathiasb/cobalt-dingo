@@ -7,7 +7,7 @@
     uv run scripts/check-variety.py
 
 Generates twice into temporary directories and asserts: the same seed gives a byte-identical
-truth.json, at least 150 documents, all four formats, at least 8 layouts, credit notes,
+truth.json and history-extra.json, at least 150 documents, all four formats, at least 8 layouts, credit notes,
 more than one currency, text PDFs have extractable text and scans have none, every UBL
 file is well-formed XML whose payable amount matches the truth, and each DOCX opens.
 Exits non-zero on the first failed assertion, printing which.
@@ -67,4 +67,22 @@ with tempfile.TemporaryDirectory() as a, tempfile.TemporaryDirectory() as b:
                 fail(f"{r['file']} payable amount does not match truth")
             if (root.tag.endswith("CreditNote")) != (r["kind"] == "credit"):
                 fail(f"{r['file']} document type does not match kind")
+    # Past bookings for the suppliers the documents introduce, so a demo history can
+    # cover every supplier whose invoices it is shown.
+    hx = json.loads((Path(a) / "history-extra.json").read_text())
+    new_suppliers = {r["supplier"] for r in ta if r["new_supplier"]}
+    booked = {}
+    for v in hx:
+        booked.setdefault(v["Description"].split(" faktura")[0], []).append(v)
+        debit = sum(r["Debit"]["MinorUnits"] for r in v["Rows"])
+        credit = sum(r["Credit"]["MinorUnits"] for r in v["Rows"])
+        if debit != credit:
+            fail(f"history-extra voucher {v['Series']}{v['Number']} does not balance")
+    if set(booked) != new_suppliers:
+        fail(f"history-extra covers {sorted(booked)}, the documents introduce {sorted(new_suppliers)}")
+    if min(len(v) for v in booked.values()) < 10:
+        fail("history-extra has fewer than 10 bookings for a supplier")
+    with open(Path(a) / "history-extra.json", "rb") as fa, open(Path(b) / "history-extra.json", "rb") as fb:
+        if fa.read() != fb.read():
+            fail("same seed gave different history-extra.json")
 print(f"OK {len(ta)} documents, {len({r['layout'] for r in ta})} layouts, formats {sorted(fmts)}")
