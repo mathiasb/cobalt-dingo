@@ -28,6 +28,9 @@ func SafeError(err error) string {
 			return "a Fortnox response could not be decoded"
 		}
 	}
+	if strings.Contains(msg, "redirects") {
+		return "Fortnox answered with a redirect loop"
+	}
 	for _, w := range []string{"dial tcp", "no such host", "connection refused", "timeout", "deadline exceeded", "EOF"} {
 		if strings.Contains(msg, w) {
 			return "network error talking to Fortnox"

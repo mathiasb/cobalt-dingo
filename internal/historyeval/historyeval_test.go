@@ -447,3 +447,10 @@ func TestRender_SuppressesAFractionWhoseDenominatorIsOneOrTwo(t *testing.T) {
 
 	assert.Contains(t, out, "VAT number: <3\n", "two suppliers in total identifies them, whatever the numerator")
 }
+
+func TestRender_DoesNotClaimAnonymityItDoesNotHave(t *testing.T) {
+	out := historyeval.Render(historyeval.Report{})
+
+	assert.Contains(t, out, "not anonymisation", "a total and its parts can still subtract to a suppressed count")
+	assert.NotContains(t, out, "no single supplier or invoice can be picked out")
+}

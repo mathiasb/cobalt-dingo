@@ -15,7 +15,7 @@ func Render(r Report) string {
 
 	line("HISTORY EVALUATION (aggregates only: no names, numbers, amounts or accounts are printed)")
 	line("")
-	line("Counts below 3 are printed as <3 so that no single supplier or invoice can be picked out.")
+	line("Counts below 3 are printed as <3. This reduces what a reader can pick out; it is not anonymisation: a total and its parts can still subtract to a suppressed count.")
 	line("INVOICES: invoices: %s, dated %s to %s", cnt(r.Invoices.Total), dash(r.Invoices.FirstDate), dash(r.Invoices.LastDate))
 	line("  booked: %s", pct(r.Invoices.Booked, r.Invoices.Total))
 	line("  cancelled: %s", pct(r.Invoices.Cancelled, r.Invoices.Total))

@@ -91,3 +91,18 @@ func TestSafeError_OfTheRealFortnoxClientsFailuresLeaksNothingFromTheServersAnsw
 		})
 	}
 }
+
+// The status code is the only part of the message that is kept, and it is three
+// digits. Text after it, which a server may choose, must not come along.
+func TestSafeError_KeepsOnlyThreeDigitsOfTheStatusAndNothingThatFollowsIt(t *testing.T) {
+	got := historyeval.SafeError(errors.New("GET x: unexpected status 500 body=SENTINEL_NAME and more SENTINEL_AMT"))
+
+	assert.Equal(t, "Fortnox returned HTTP 500", got)
+}
+
+func TestSafeError_ARedirectLoopIsNamedAsOneAndNotLeftUnclassified(t *testing.T) {
+	got := historyeval.SafeError(errors.New(`Get "http://x/3/suppliers": stopped after 10 redirects`))
+
+	assert.Contains(t, got, "redirect")
+	assert.NotContains(t, got, "http://")
+}

@@ -87,7 +87,9 @@ func run(log *slog.Logger) error {
 	}
 	store, err := postgres.NewStore(dsn)
 	if err != nil {
-		return fmt.Errorf("connect to postgres: %w", err)
+		// Fixed text on purpose: a malformed DSN is echoed back by the driver,
+		// password included, and this error is logged.
+		return errors.New("connect to postgres failed (details withheld: the driver's error can contain the DSN)")
 	}
 	defer func() { _ = store.Close() }()
 
@@ -97,10 +99,12 @@ func run(log *slog.Logger) error {
 	}
 	tenant, err := clitoken.SelectTenant(all, string(cfg.Mode), os.Getenv("FORTNOX_COMPANY"))
 	if err != nil {
-		return safe("select tenant", err)
+		// The detail lists company names; say what to do without them.
+		return errors.New("select tenant failed: no single tenant could be chosen for this mode (set FORTNOX_COMPANY to the company name, or check that exactly one tenant is connected)")
 	}
-	// The tenant id and mode, not the company name: names stay out of Job logs (#94).
-	log.Info("reading", "tenant", tenant.ID, "mode", cfg.Mode)
+	// The mode only. The tenant id embeds the organisation number, a registry
+	// lookup away from the company name, and names stay out of Job logs (#94).
+	log.Info("reading", "mode", cfg.Mode)
 
 	tokens := adapterfortnox.NewFortnoxRefreshingTokenStore(
 		postgres.NewTokenStore(store, cipher), cfg, tokenHeadroom, log).
