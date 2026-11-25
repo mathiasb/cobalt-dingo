@@ -33,8 +33,15 @@ func Render(r Report) string {
 	line("  predefined account: %s", pct(r.Suppliers.WithPredefinedAccount, r.Suppliers.Total))
 	line("  invoiced suppliers booked to more than one account: %s", pct(r.Diversity.WithMoreThanOneAccount, r.Diversity.Suppliers))
 	line("")
-	line("EVALUATION: usable invoices %s (no derivable expense account, such as credit notes and asset purchases: %s; cancelled: %s; no supplier number: %s); trained on %s",
-		cnt(r.Eval.Usable), cnt(r.Eval.NoAccount), cnt(r.Eval.CancelledSkipped), cnt(r.Eval.NoSupplier), cnt(r.Eval.Train))
+	// usable, trained and held out are one sum: when one or two are held out,
+	// printing both of the others exactly would give that count back.
+	if held := r.Eval.Usable - r.Eval.Train; held > 0 && held < k {
+		line("EVALUATION: usable and trained-on counts withheld, because fewer than %d invoices are held out (no derivable expense account: %s; cancelled: %s; no supplier number: %s)",
+			k, cnt(r.Eval.NoAccount), cnt(r.Eval.CancelledSkipped), cnt(r.Eval.NoSupplier))
+	} else {
+		line("EVALUATION: usable invoices %s (no derivable expense account, such as credit notes and asset purchases: %s; cancelled: %s; no supplier number: %s); trained on %s",
+			cnt(r.Eval.Usable), cnt(r.Eval.NoAccount), cnt(r.Eval.CancelledSkipped), cnt(r.Eval.NoSupplier), cnt(r.Eval.Train))
+	}
 	line("held-out = the latest invoices by date, never a random split.")
 	result := func(name string, res booking.Result) {
 		line("  %s: tested %s, top-1 %s, top-3 %s, unseen suppliers %s", name, cnt(res.Test), pct(res.Top1, res.Test), pct(res.Top3, res.Test), cnt(res.Unseen))

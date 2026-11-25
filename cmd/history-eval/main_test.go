@@ -35,13 +35,22 @@ func violations(t *testing.T, src string) []string {
 		out = append(out, fmt.Sprintf("%s: %s", fset.Position(n.Pos()), fmt.Sprintf(format, a...)))
 	}
 
-	errorfAllowed := map[string]bool{
-		"config: %w":                           true, // config.Load echoes the FORTNOX_MODE the operator set
-		"FORTNOX_INTEGRATION_KEY unusable: %w": true, // crypto.NewCipher reports a length, never the key
-		"list tenants: %w":                     true, // a plain SQL error; carries no row
-		"%s: %s":                               true, // safe(): fixed class text only
+	// Format -> the exact arguments that follow it. The format alone is not
+	// enough: the same format around a tenant name leaks just as well.
+	errorfAllowed := map[string]string{
+		"config: %w":                           "err",                              // config.Load echoes the FORTNOX_MODE the operator set
+		"FORTNOX_INTEGRATION_KEY unusable: %w": "err",                              // crypto.NewCipher reports a length, never the key
+		"list tenants: %w":                     "err",                              // a plain SQL error; carries no row
+		"%s: %s":                               "what, historyeval.SafeError(err)", // safe(): fixed class text only
 	}
-	sprintfAllowed := map[string]bool{"read invoice %d of %d": true}
+	sprintfAllowed := map[string]string{"read invoice %d of %d": "i + 1, len(heads)"}
+	args := func(es []ast.Expr) string {
+		parts := make([]string, len(es))
+		for i, e := range es {
+			parts[i] = types.ExprString(e)
+		}
+		return strings.Join(parts, ", ")
+	}
 	// Attribute key -> the only expressions that may be its value.
 	logValues := map[string]map[string]bool{
 		"mode":  {"cfg.Mode": true},
@@ -73,6 +82,20 @@ func violations(t *testing.T, src string) []string {
 		if !ok {
 			return true
 		}
+		if id, ok := call.Fun.(*ast.Ident); ok {
+			switch id.Name {
+			case "panic", "print", "println":
+				bad(call, "%s() writes or carries text the guard cannot follow", id.Name)
+			case "safe":
+				// The label is a literal or the one reviewed Sprintf; the error is err.
+				label := types.ExprString(call.Args[0])
+				_, lit := stringLit(call.Args[0])
+				if !lit && label != `fmt.Sprintf("read invoice %d of %d", i + 1, len(heads))` || len(call.Args) != 2 || types.ExprString(call.Args[1]) != "err" {
+					bad(call, "safe(%s) is not a reviewed call", args(call.Args))
+				}
+			}
+			return true
+		}
 		sel, ok := call.Fun.(*ast.SelectorExpr)
 		if !ok {
 			return true
@@ -82,6 +105,9 @@ func violations(t *testing.T, src string) []string {
 		switch {
 		case pkg != nil && pkg.Name == "log" && (name == "Info" || name == "Warn" || name == "Error"):
 			logRecv[pkg] = true
+			if _, ok := stringLit(call.Args[0]); !ok {
+				bad(call, "log.%s message is not a literal", name)
+			}
 			for i := 1; i < len(call.Args); i += 2 {
 				key, ok := stringLit(call.Args[i])
 				if !ok || logValues[key] == nil {
@@ -98,13 +124,15 @@ func violations(t *testing.T, src string) []string {
 			switch name {
 			case "Errorf":
 				format, ok := stringLit(call.Args[0])
-				if !ok || !errorfAllowed[format] {
-					bad(call, "fmt.Errorf(%q) is not on the reviewed list", format)
+				want, listed := errorfAllowed[format]
+				if !ok || !listed || args(call.Args[1:]) != want {
+					bad(call, "fmt.Errorf(%q, %s) is not a reviewed call", format, args(call.Args[1:]))
 				}
 			case "Sprintf":
 				format, ok := stringLit(call.Args[0])
-				if !ok || !sprintfAllowed[format] {
-					bad(call, "fmt.Sprintf(%q) is not on the reviewed list", format)
+				want, listed := sprintfAllowed[format]
+				if !ok || !listed || args(call.Args[1:]) != want {
+					bad(call, "fmt.Sprintf(%q, %s) is not a reviewed call", format, args(call.Args[1:]))
 				}
 			case "Print":
 				if len(call.Args) != 1 || types.ExprString(call.Args[0]) != "historyeval.Render(historyeval.Analyse(invoices, suppliers, testFraction))" {
@@ -117,6 +145,8 @@ func violations(t *testing.T, src string) []string {
 			default:
 				bad(call, "fmt.%s is not on the reviewed list", name)
 			}
+		case pkg != nil && pkg.Name == "errors" && name == "Join":
+			bad(call, "errors.Join wraps an error the guard cannot follow")
 		case pkg != nil && pkg.Name == "errors" && name == "New":
 			if _, ok := stringLit(call.Args[0]); !ok {
 				bad(call, "errors.New takes a non-literal")
@@ -197,6 +227,14 @@ func TestMain_GuardObjectsToTheRouteEachCaseOpens(t *testing.T) {
 		{"error formatted with %v", `return safe("load token", err)`, `return fmt.Errorf("load token: %v", err)`},
 		{"error formatted with %s", `return safe("confirm company", err)`, `return fmt.Errorf("confirm company: %s", err)`},
 		{"errors.New with a variable", `return errors.New("DATABASE_URL is required: the stored token lives in postgres")`, `return errors.New(dsn)`},
+		{"safe() given a tenant name as its label", `return safe("load token", err)`, `return safe(tenant.Name, err)`},
+		{"safe() formats a tenant name instead of the class", `what, historyeval.SafeError(err))`, `what, tenant.Name)`},
+		{"allowed wrap format around another value", `fmt.Errorf("list tenants: %w", err)`, `fmt.Errorf("list tenants: %w", errors.New(tenant.Name))`},
+		{"invoice counter replaced by a given number", `fmt.Sprintf("read invoice %d of %d", i+1, len(heads))`, `fmt.Sprintf("read invoice %d of %d", h.GivenNumber, len(heads))`},
+		{"log message carries the tenant id", `log.Info("reading", "mode", cfg.Mode)`, `log.Info(tenant.ID, "mode", cfg.Mode)`},
+		{"panic with the tenant id", `fmt.Println("company confirmed with Fortnox: yes")`, `panic(tenant.ID)`},
+		{"println builtin", `fmt.Println("company confirmed with Fortnox: yes")`, `println(tenant.Name)`},
+		{"errors.Join around the raw error", `return safe("load token", err)`, `return errors.Join(err)`},
 		{"report printed with something extra", `fmt.Print(historyeval.Render(historyeval.Analyse(invoices, suppliers, testFraction)))`, `fmt.Print(historyeval.Render(historyeval.Analyse(invoices, suppliers, testFraction)), tenant.Name)`},
 	}
 	for _, c := range cases {

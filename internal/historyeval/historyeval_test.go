@@ -1,7 +1,9 @@
 package historyeval_test
 
 import (
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/mathiasb/cobalt-dingo/internal/historyeval"
@@ -477,6 +479,32 @@ func TestRender_SuppressesARateWhoseComplementIsOneOrTwo(t *testing.T) {
 			r.Suppliers.WithVATNumber = c.n
 
 			assert.Contains(t, historyeval.Render(r), c.want)
+		})
+	}
+}
+
+// usable, trained and tested are one sum. Printing two of them exactly while
+// the third is suppressed would hand the third back (#157 review round 3).
+func TestRender_DoesNotPrintUsableAndTrainedWhenTheirDifferenceIsOneOrTwo(t *testing.T) {
+	cases := []struct {
+		name          string
+		usable, train int
+		printed       bool
+	}{
+		{"held out one", 11, 10, false},
+		{"held out two", 12, 10, false},
+		{"held out three", 13, 10, true},
+		{"nothing held out", 10, 10, true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var r historyeval.Report
+			r.Eval.Usable, r.Eval.Train = c.usable, c.train
+
+			out := historyeval.Render(r)
+
+			assert.Equal(t, c.printed, strings.Contains(out, fmt.Sprintf("trained on %d", c.train)))
+			assert.Equal(t, c.printed, strings.Contains(out, fmt.Sprintf("usable invoices %d", c.usable)))
 		})
 	}
 }
