@@ -15,15 +15,17 @@ func Render(r Report) string {
 
 	line("HISTORY EVALUATION (aggregates only: no names, numbers, amounts or accounts are printed)")
 	line("")
-	line("INVOICES: invoices: %d, dated %s to %s", r.Invoices.Total, dash(r.Invoices.FirstDate), dash(r.Invoices.LastDate))
+	line("Counts below 3 are printed as <3 so that no single supplier or invoice can be picked out.")
+	line("INVOICES: invoices: %s, dated %s to %s", cnt(r.Invoices.Total), dash(r.Invoices.FirstDate), dash(r.Invoices.LastDate))
 	line("  booked: %s", pct(r.Invoices.Booked, r.Invoices.Total))
 	line("  cancelled: %s", pct(r.Invoices.Cancelled, r.Invoices.Total))
 	line("  with rows: %s", pct(r.Invoices.WithRows, r.Invoices.Total))
 	line("  with voucher link: %s", pct(r.Invoices.WithVoucherLink, r.Invoices.Total))
 	line("  with cost centre or project on a row: %s", pct(r.Invoices.WithCostCenterOrProject, r.Invoices.Total))
 	line("  not in SEK: %s", pct(r.Invoices.NonSEK, r.Invoices.Total))
+	line("  dates not in YYYY-MM-DD, left out: %s", cnt(r.Invoices.BadDate))
 	line("")
-	line("SUPPLIERS: suppliers: %d", r.Suppliers.Total)
+	line("SUPPLIERS: suppliers: %s", cnt(r.Suppliers.Total))
 	line("  organisation number: %s", pct(r.Suppliers.WithOrganisationNumber, r.Suppliers.Total))
 	line("  VAT number: %s", pct(r.Suppliers.WithVATNumber, r.Suppliers.Total))
 	line("  bank account number: %s", pct(r.Suppliers.WithBankAccount, r.Suppliers.Total))
@@ -31,22 +33,43 @@ func Render(r Report) string {
 	line("  predefined account: %s", pct(r.Suppliers.WithPredefinedAccount, r.Suppliers.Total))
 	line("  invoiced suppliers booked to more than one account: %s", pct(r.Diversity.WithMoreThanOneAccount, r.Diversity.Suppliers))
 	line("")
-	line("EVALUATION: usable invoices %d (no derivable expense account: %d, cancelled and skipped: %d); trained on %d", r.Eval.Usable, r.Eval.NoAccount, r.Eval.CancelledSkipped, r.Eval.Train)
+	line("EVALUATION: usable invoices %s (no derivable expense account, such as credit notes and asset purchases: %s; cancelled: %s; no supplier number: %s); trained on %s",
+		cnt(r.Eval.Usable), cnt(r.Eval.NoAccount), cnt(r.Eval.CancelledSkipped), cnt(r.Eval.NoSupplier), cnt(r.Eval.Train))
 	line("held-out = the latest invoices by date, never a random split.")
 	result := func(name string, res booking.Result) {
-		line("  %s: tested %d, top-1 %s, top-3 %s, unseen suppliers %d", name, res.Test, pct(res.Top1, res.Test), pct(res.Top3, res.Test), res.Unseen)
+		line("  %s: tested %s, top-1 %s, top-3 %s, unseen suppliers %s", name, cnt(res.Test), pct(res.Top1, res.Test), pct(res.Top3, res.Test), cnt(res.Unseen))
 	}
 	result("keyed by the ERP's supplier number", r.ByNumber)
 	result("keyed by supplier name (the demo's method)", r.ByName)
-	line("  the supplier's predefined account as a baseline: %s of the %d test invoices whose supplier has one", pct(r.Predefined.Right, r.Predefined.Covered), r.Predefined.Covered)
+	line("  the supplier's predefined account as a baseline: %s of the %s test invoices whose supplier has one", pct(r.Predefined.Right, r.Predefined.Covered), cnt(r.Predefined.Covered))
 	line("")
 	line("A held-out rate is a measurement on this company's past, not a guarantee about the next invoice.")
 	return b.String()
 }
 
+// k is the smallest count that may be printed. A count of one or two can be a
+// single supplier or invoice.
+const k = 3
+
+// cnt prints a count, or "<3" for one or two.
+func cnt(n int) string {
+	if n > 0 && n < k {
+		return fmt.Sprintf("<%d", k)
+	}
+	return fmt.Sprint(n)
+}
+
+// pct prints a rate with its counts. A numerator or denominator of one or two
+// is suppressed; zero is printed as it is, because an empty category identifies
+// nobody.
 func pct(n, d int) string {
-	if d <= 0 {
+	switch {
+	case d <= 0:
 		return "n/a"
+	case d < k:
+		return fmt.Sprintf("<%d", k)
+	case n > 0 && n < k:
+		return fmt.Sprintf("<%d of %d", k, d)
 	}
 	return fmt.Sprintf("%.1f%% (%d/%d)", 100*float64(n)/float64(d), n, d)
 }

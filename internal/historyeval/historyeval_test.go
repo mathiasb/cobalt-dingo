@@ -176,10 +176,11 @@ func TestAnalyse_OnNoInputItReturnsAZeroReportWithoutPanicking(t *testing.T) {
 	assert.Equal(t, historyeval.Report{}, r)
 }
 
-// The report is what leaves the cluster. Its type can hold counts and two
-// dates (the first and last invoice date) and nothing else, so no supplier
-// name, number, amount or account can be carried out through it.
-func TestReport_HoldsOnlyCountsAndTwoDatesAndNoSupplierDataOfAnyKind(t *testing.T) {
+// The report is what leaves the cluster. Its type holds ints and two named
+// date strings and nothing else, so no supplier name can be carried out through
+// it. This is a type check: an int can still carry a number, so what Analyse
+// writes into each int is covered by the tests of Analyse, not by this one.
+func TestReport_HoldsOnlyIntsAndTwoNamedStrings(t *testing.T) {
 	var walk func(t reflect.Type, path string)
 	walk = func(rt reflect.Type, path string) {
 		k := rt.Kind()
@@ -288,4 +289,161 @@ func TestRender_SaysPlainlyWhatTheNumbersAreAndAreNot(t *testing.T) {
 	assert.Contains(t, out, "aggregates only")
 	assert.Contains(t, out, "held-out")
 	assert.Contains(t, out, "not a guarantee")
+}
+
+// ---- review round 1 -------------------------------------------------------
+
+func TestAnalyse_OnlyAccountsFrom4000To8999CountAsExpense_AtBothEdgesAndForTheRoundingAccount(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		account int
+		want    bool
+	}{
+		{"3999 is revenue", 3999, false},
+		{"3740 is the rounding account", 3740, false},
+		{"4000 is the first expense account", 4000, true},
+		{"8999 is the last", 8999, true},
+		{"9000 is outside", 9000, false},
+		{"1930 is bank", 1930, false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			i := historyeval.Invoice{
+				SupplierNumber: 1, SupplierName: "A", Date: "2026-01-01", Currency: "SEK", Booked: true,
+				Rows: []historyeval.Row{{Account: tt.account, Debit: 500}, {Account: 2440, Credit: 500}},
+			}
+
+			r := historyeval.Analyse([]historyeval.Invoice{i}, nil, 0)
+
+			assert.Equal(t, tt.want, r.Eval.Usable == 1)
+			assert.Equal(t, !tt.want, r.Eval.NoAccount == 1)
+		})
+	}
+}
+
+func TestAnalyse_AnEqualDebitIsBrokenByTheLowerAccountWhateverTheRowOrder(t *testing.T) {
+	a := historyeval.Invoice{
+		SupplierNumber: 1, SupplierName: "A", Date: "2026-01-01", Booked: true,
+		Rows: []historyeval.Row{{Account: 6540, Debit: 500}, {Account: 5460, Debit: 500}},
+	}
+	b := a
+	b.Rows = []historyeval.Row{{Account: 5460, Debit: 500}, {Account: 6540, Debit: 500}}
+	later := inv(1, "A", "2026-02-01", 5460)
+
+	ra := historyeval.Analyse([]historyeval.Invoice{a, later}, nil, 0.5)
+	rb := historyeval.Analyse([]historyeval.Invoice{b, later}, nil, 0.5)
+
+	assert.Equal(t, 1, ra.ByNumber.Top1, "5460 wins the tie")
+	assert.Equal(t, ra.ByNumber, rb.ByNumber, "row order must not matter")
+}
+
+func TestAnalyse_ACreditOnAnExpenseRowIsACreditNoteAndHasNoDerivableAccount(t *testing.T) {
+	creditNote := historyeval.Invoice{
+		SupplierNumber: 1, SupplierName: "A", Date: "2026-01-01", Booked: true,
+		Rows: []historyeval.Row{{Account: 5460, Credit: 800}, {Account: 2440, Debit: 800}},
+	}
+
+	r := historyeval.Analyse([]historyeval.Invoice{creditNote}, nil, 0)
+
+	assert.Equal(t, 1, r.Eval.NoAccount)
+	assert.Equal(t, 0, r.Eval.Usable)
+}
+
+func TestAnalyse_InvoicesWithNoSupplierNumberAreCountedAndLeftOutSoTheyCannotMergeIntoOneSupplier(t *testing.T) {
+	noSupplier := inv(0, "Någon", "2026-01-01", 6540)
+	other := inv(0, "Annan", "2026-01-02", 6540)
+	ok := inv(1, "Alfa", "2026-01-03", 6540)
+
+	r := historyeval.Analyse([]historyeval.Invoice{noSupplier, other, ok}, nil, 0)
+
+	assert.Equal(t, 2, r.Eval.NoSupplier)
+	assert.Equal(t, 1, r.Eval.Usable)
+	assert.Equal(t, 1, r.Diversity.Suppliers, "not a fictional supplier 0")
+}
+
+func TestAnalyse_ADateThatIsNotAnISODateIsCountedNeverPrintedAndNeverUsedToOrderTheSplit(t *testing.T) {
+	bad := inv(1, "Alfa", "SENTINEL_NAME", 6540)
+	empty := inv(2, "Beta", "", 6540)
+	ok := inv(3, "Gamma", "2026-01-03", 6540)
+
+	r := historyeval.Analyse([]historyeval.Invoice{bad, empty, ok}, nil, 0)
+
+	assert.Equal(t, 2, r.Invoices.BadDate)
+	assert.Equal(t, "2026-01-03", r.Invoices.FirstDate)
+	assert.Equal(t, "2026-01-03", r.Invoices.LastDate)
+	assert.Equal(t, 1, r.Eval.Usable, "an invoice that cannot be placed in time cannot be split by time")
+	assert.NotContains(t, historyeval.Render(r), "SENTINEL")
+}
+
+func TestAnalyse_InvoicesOnTheSameDateAreOrderedTheSameWhateverOrderTheyArriveIn(t *testing.T) {
+	x := inv(1, "A", "2026-02-01", 5460)
+	y := inv(2, "B", "2026-02-01", 5810)
+	z := inv(3, "C", "2026-02-01", 6540)
+	train := inv(1, "A", "2026-01-01", 5460)
+
+	r1 := historyeval.Analyse([]historyeval.Invoice{train, x, y, z}, nil, 0.5)
+	r2 := historyeval.Analyse([]historyeval.Invoice{z, y, x, train}, nil, 0.5)
+
+	assert.Equal(t, r1, r2)
+}
+
+// Counts of one or two identify a single supplier or invoice. They are printed
+// as "<3" so a reader of the Job log cannot pick out one counterparty.
+func TestRender_SuppressesEveryCountBelowThreeAndPrintsZeroAndLargerCountsAsTheyAre(t *testing.T) {
+	var r historyeval.Report
+	r.Invoices.Total = 2
+	r.Suppliers.Total = 100
+	r.Suppliers.WithPredefinedAccount = 1
+	r.Suppliers.WithOrganisationNumber = 0
+	r.Suppliers.WithVATNumber = 100
+	r.ByNumber.Test, r.ByNumber.Top1, r.ByNumber.Unseen = 50, 2, 1
+
+	out := historyeval.Render(r)
+
+	assert.Contains(t, out, "invoices: <3")
+	assert.Contains(t, out, "predefined account: <3 of 100")
+	assert.Contains(t, out, "organisation number: 0.0% (0/100)", "an empty category identifies nobody")
+	assert.Contains(t, out, "VAT number: 100.0% (100/100)")
+	assert.Contains(t, out, "unseen suppliers <3")
+	assert.Contains(t, out, "top-1 <3 of 50")
+}
+
+// Same-day invoices are ordered by supplier number, then by account, so which
+// of them is held out never depends on the order the API returned them in.
+func TestAnalyse_TheLastInvoiceOfADayByAccountIsTheOneHeldOut(t *testing.T) {
+	all := []historyeval.Invoice{
+		inv(1, "A", "2026-01-01", 5460),
+		inv(1, "A", "2026-02-01", 5810),
+		inv(1, "A", "2026-02-01", 5460),
+	}
+
+	r := historyeval.Analyse(all, nil, 1.0/3.0)
+
+	// Ordered 5460 then 5810, so 5810 is held out and was never seen: a miss.
+	// Ordered the other way 5460 would be held out, and a hit.
+	assert.Equal(t, 0, r.ByNumber.Top1)
+	assert.Equal(t, 0, r.ByNumber.Top3)
+}
+
+func TestAnalyse_TheLastInvoiceOfADayBySupplierNumberIsTheOneHeldOut(t *testing.T) {
+	all := []historyeval.Invoice{
+		inv(2, "B", "2026-01-01", 5460),
+		inv(1, "A", "2026-02-01", 5810),
+		inv(2, "B", "2026-02-01", 5460),
+	}
+
+	r := historyeval.Analyse(all, nil, 1.0/3.0)
+
+	// Ordered supplier 1 then 2, so supplier 2 is held out, and it was seen in training.
+	assert.Equal(t, 0, r.ByNumber.Unseen)
+	assert.Equal(t, 1, r.ByNumber.Top1)
+}
+
+func TestRender_SuppressesAFractionWhoseDenominatorIsOneOrTwo(t *testing.T) {
+	var r historyeval.Report
+	r.Suppliers.Total = 2
+	r.Suppliers.WithVATNumber = 2
+
+	out := historyeval.Render(r)
+
+	assert.Contains(t, out, "VAT number: <3\n", "two suppliers in total identifies them, whatever the numerator")
 }

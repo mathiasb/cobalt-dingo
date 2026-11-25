@@ -58,6 +58,14 @@ func env(key, def string) string {
 	return def
 }
 
+// safe turns an error from Fortnox or the tenant lookup into one that names
+// only a class of failure. Those errors can carry an invoice number in a URL, a
+// raw value that failed to decode, or a company name, and the Job log is read by
+// agent sessions and ingested into a brain wiki (#94).
+func safe(what string, err error) error {
+	return fmt.Errorf("%s: %s", what, historyeval.SafeError(err))
+}
+
 func run(log *slog.Logger) error {
 	ctx := context.Background()
 
@@ -89,7 +97,7 @@ func run(log *slog.Logger) error {
 	}
 	tenant, err := clitoken.SelectTenant(all, string(cfg.Mode), os.Getenv("FORTNOX_COMPANY"))
 	if err != nil {
-		return err
+		return safe("select tenant", err)
 	}
 	// The tenant id and mode, not the company name: names stay out of Job logs (#94).
 	log.Info("reading", "tenant", tenant.ID, "mode", cfg.Mode)
@@ -99,12 +107,12 @@ func run(log *slog.Logger) error {
 		WithRefreshLock(postgres.NewRefreshLock(store, log))
 	tok, err := tokens.Load(ctx, tenant.ID)
 	if err != nil {
-		return fmt.Errorf("load token for %s: %w", tenant.ID, err)
+		return safe("load token", err)
 	}
 	// Ask Fortnox whose books this token opens and refuse if it disagrees with
 	// the record selected on: a report describing the wrong company is silent.
 	if err := fortnox.AssertCompany(cfg.BaseURL(), tok.AccessToken, tenant.Name); err != nil {
-		return fmt.Errorf("confirm company for tenant %s: %w", tenant.ID, err)
+		return safe("confirm company", err)
 	}
 	fmt.Println("company confirmed with Fortnox: yes")
 
@@ -115,7 +123,7 @@ func run(log *slog.Logger) error {
 
 	heads, err := client.ListSupplierInvoiceHeads(from, to)
 	if err != nil {
-		return fmt.Errorf("list supplier invoices: %w", err)
+		return safe("list supplier invoices", err)
 	}
 	log.Info("supplier invoices listed", "count", len(heads), "from", from, "to", to)
 
@@ -129,7 +137,7 @@ func run(log *slog.Logger) error {
 		if !h.Cancelled {
 			rows, err := client.GetSupplierInvoiceRows(h.GivenNumber)
 			if err != nil {
-				return fmt.Errorf("invoice %d of %d: %w", i+1, len(heads), err)
+				return safe(fmt.Sprintf("read invoice %d of %d", i+1, len(heads)), err)
 			}
 			for _, r := range rows {
 				inv.Rows = append(inv.Rows, historyeval.Row{
@@ -146,7 +154,7 @@ func run(log *slog.Logger) error {
 
 	ids, err := client.ListSupplierIdentities()
 	if err != nil {
-		return fmt.Errorf("list suppliers: %w", err)
+		return safe("list suppliers", err)
 	}
 	suppliers := make([]historyeval.Supplier, 0, len(ids))
 	for _, id := range ids {

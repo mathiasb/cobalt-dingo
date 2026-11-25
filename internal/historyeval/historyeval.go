@@ -10,6 +10,7 @@ package historyeval
 
 import (
 	"sort"
+	"time"
 
 	"github.com/mathiasb/cobalt-dingo/internal/booking"
 )
@@ -59,6 +60,7 @@ type Report struct {
 		WithVoucherLink         int
 		WithCostCenterOrProject int
 		NonSEK                  int
+		BadDate                 int // dates that are not YYYY-MM-DD: counted, never printed, never used
 		FirstDate               string
 		LastDate                string
 	}
@@ -74,6 +76,7 @@ type Report struct {
 		Usable           int // invoices with a derivable expense account, not cancelled
 		NoAccount        int // not cancelled, but no expense account could be derived
 		CancelledSkipped int
+		NoSupplier       int // no supplier number: left out, so they cannot merge into one fictional supplier
 		Train            int
 	}
 	ByNumber   booking.Result // keyed by the ERP's supplier number
@@ -114,11 +117,15 @@ func Analyse(invoices []Invoice, suppliers []Supplier, testFraction float64) Rep
 		if inv.Currency != "" && inv.Currency != "SEK" {
 			r.Invoices.NonSEK++
 		}
-		if inv.Date != "" && (r.Invoices.FirstDate == "" || inv.Date < r.Invoices.FirstDate) {
-			r.Invoices.FirstDate = inv.Date
-		}
-		if inv.Date > r.Invoices.LastDate {
-			r.Invoices.LastDate = inv.Date
+		if !validDate(inv.Date) {
+			r.Invoices.BadDate++
+		} else {
+			if r.Invoices.FirstDate == "" || inv.Date < r.Invoices.FirstDate {
+				r.Invoices.FirstDate = inv.Date
+			}
+			if inv.Date > r.Invoices.LastDate {
+				r.Invoices.LastDate = inv.Date
+			}
 		}
 	}
 
@@ -145,6 +152,13 @@ func Analyse(invoices []Invoice, suppliers []Supplier, testFraction float64) Rep
 			r.Eval.CancelledSkipped++
 			continue
 		}
+		if !validDate(inv.Date) {
+			continue // counted as BadDate above; it cannot be placed in time
+		}
+		if inv.SupplierNumber == 0 {
+			r.Eval.NoSupplier++
+			continue
+		}
 		acct := expenseAccount(inv.Rows)
 		if acct == 0 {
 			r.Eval.NoAccount++
@@ -153,7 +167,17 @@ func Analyse(invoices []Invoice, suppliers []Supplier, testFraction float64) Rep
 		u = append(u, usable{inv, acct})
 	}
 	r.Eval.Usable = len(u)
-	sort.SliceStable(u, func(i, j int) bool { return u[i].inv.Date < u[j].inv.Date })
+	// Date, then supplier, then account: the order must not depend on the order
+	// the API happened to return invoices in.
+	sort.SliceStable(u, func(i, j int) bool {
+		if u[i].inv.Date != u[j].inv.Date {
+			return u[i].inv.Date < u[j].inv.Date
+		}
+		if u[i].inv.SupplierNumber != u[j].inv.SupplierNumber {
+			return u[i].inv.SupplierNumber < u[j].inv.SupplierNumber
+		}
+		return u[i].account < u[j].account
+	})
 
 	accountsBySupplier := map[int]map[int]bool{}
 	for _, x := range u {
@@ -257,11 +281,21 @@ func rank(counts map[int]int) []int {
 func expenseAccount(rows []Row) int {
 	best, bestDebit := 0, int64(0)
 	for _, row := range rows {
-		if row.Account >= expenseFirst && row.Account <= expenseLast && row.Debit > bestDebit {
+		if row.Account < expenseFirst || row.Account > expenseLast || row.Debit <= 0 {
+			continue
+		}
+		// The largest debit; an equal debit goes to the lower account so the
+		// result never depends on row order.
+		if row.Debit > bestDebit || (row.Debit == bestDebit && row.Account < best) {
 			best, bestDebit = row.Account, row.Debit
 		}
 	}
 	return best
+}
+
+func validDate(s string) bool {
+	_, err := time.Parse("2006-01-02", s)
+	return err == nil
 }
 
 func hasCostCenterOrProject(rows []Row) bool {
