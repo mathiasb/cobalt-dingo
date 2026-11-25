@@ -31,6 +31,7 @@ import (
 
 	"github.com/mathiasb/cobalt-dingo/internal/apentry"
 	"github.com/mathiasb/cobalt-dingo/internal/booking"
+	"github.com/mathiasb/cobalt-dingo/internal/fx"
 	"github.com/mathiasb/cobalt-dingo/internal/ingest"
 	"github.com/mathiasb/cobalt-dingo/internal/process"
 )
@@ -68,6 +69,9 @@ var (
 type Config struct {
 	History   []booking.Example
 	Extractor process.Extractor
+	// FX converts foreign-currency entries to SEK. Nil leaves them in the invoice
+	// currency, with a warning saying so.
+	FX        *fx.Table
 	Samples   fs.FS // flat directory of NNN.png|pdf|docx|xml sample invoices; may be nil
 	MaxUpload int64 // largest accepted upload in bytes
 	User      string
@@ -411,7 +415,7 @@ func (s *server) processHandler(w http.ResponseWriter, r *http.Request) {
 			it.More = len(it.Because) - becauseShown
 			it.Because = it.Because[len(it.Because)-becauseShown:]
 		}
-		if e, err := apentry.Build(res); err != nil {
+		if e, err := s.buildEntry(res); err != nil {
 			it.NoEntry = err.Error()
 		} else {
 			it.Entry = &e
@@ -435,6 +439,25 @@ func (s *server) processHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	s.render(w, code, v)
+}
+
+// buildEntry builds the entry and, for a foreign currency with a rate table
+// loaded, converts it to SEK. No usable rate means no entry, with the reason: a
+// foreign amount is never shown as if it were SEK.
+func (s *server) buildEntry(res process.Result) (apentry.Entry, error) {
+	e, err := apentry.Build(res)
+	if err != nil || e.Currency == "SEK" || s.cfg.FX == nil {
+		return e, err
+	}
+	rate, err := s.cfg.FX.Lookup(e.Currency, e.Date)
+	if err != nil {
+		return apentry.Entry{}, fmt.Errorf("no entry: %w", err)
+	}
+	conv, err := e.ToSEK(rate)
+	if err != nil {
+		return apentry.Entry{}, err
+	}
+	return conv, nil
 }
 
 // readFailure is the sentence shown for a document that could not be read, and
@@ -676,8 +699,8 @@ the CSV is a file you choose what to do with.</p>
 {{if $it.Entry}}
 {{range $it.EntryWarnings}}<p class="warn">{{.}}</p>{{end}}
 <p>{{$it.Entry.Date}}: {{$it.Entry.Text}} ({{$it.Entry.Currency}})</p>
-<table><tr><th>Account</th><th>Debit</th><th>Credit</th></tr>
-{{range $it.Entry.Lines}}<tr><td>{{.Account}}</td><td>{{amt .Debit}}</td><td>{{amt .Credit}}</td></tr>{{end}}
+<table><tr><th>Account</th><th>Debit</th><th>Credit</th>{{with $it.Entry.Original}}<th>Debit {{.Currency}}</th><th>Credit {{.Currency}}</th>{{end}}</tr>
+{{range $i, $l := $it.Entry.Lines}}<tr><td>{{$l.Account}}</td><td>{{amt $l.Debit}}</td><td>{{amt $l.Credit}}</td>{{with $it.Entry.Original}}{{with index .Lines $i}}<td>{{amt .Debit}}</td><td>{{amt .Credit}}</td>{{end}}{{end}}</tr>{{end}}
 </table>
 {{else}}<p class="warn">{{$it.NoEntry}}</p>{{end}}
 {{end}}

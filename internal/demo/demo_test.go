@@ -25,6 +25,7 @@ import (
 	"github.com/mathiasb/cobalt-dingo/internal/booking"
 	"github.com/mathiasb/cobalt-dingo/internal/demo"
 	"github.com/mathiasb/cobalt-dingo/internal/extract"
+	"github.com/mathiasb/cobalt-dingo/internal/fx"
 	"github.com/mathiasb/cobalt-dingo/internal/ingest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1145,4 +1146,107 @@ func TestProcess_ClickingASampleOfAnotherFormatHandsItsBytesToTheExtractor(t *te
 
 	require.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, int32(1), ex.started.Load())
+}
+
+const fxDoc = `{"source":"Riksbanken test","fetched":"2026-11-25","currencies":{"EUR":[{"date":"2026-10-30","rate":"11.0000"},{"date":"2026-11-02","rate":"11.2000"}]}}`
+
+func withFX(t *testing.T) func(*demo.Config) {
+	t.Helper()
+	tb, err := fx.Load(strings.NewReader(fxDoc))
+	require.NoError(t, err)
+	return func(c *demo.Config) { c.FX = tb }
+}
+
+func TestProcess_AForeignInvoiceBecomesASEKEntryShownWithTheRateItsDateAndTheForeignAmounts(t *testing.T) {
+	h := newHandler(t, &fakeExtractor{inv: good()}, withFX(t)) // 17.50 EUR on 2026-11-02
+
+	rec := upload(t, h, pngBytes)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	body := rec.Body.String()
+	assert.Contains(t, body, "(SEK)", "the entry is posted in SEK")
+	assert.Contains(t, body, "196.00", "17.50 EUR × 11.2000")
+	assert.Contains(t, body, "<th>Debit EUR</th><th>Credit EUR</th>", "the entry table carries the foreign amounts next to the SEK ones")
+	assert.Contains(t, body, "converted from EUR to SEK at 11.2000")
+	assert.Contains(t, body, "Riksbanken test")
+	assert.Contains(t, body, "2026-11-02")
+	assert.Contains(t, body, "indicative")
+	assert.NotContains(t, body, "not converted to SEK")
+}
+
+func TestProcess_AWeekendInvoiceUsesTheLatestEarlierRateAndSaysWhichDay(t *testing.T) {
+	inv := good()
+	inv.InvoiceDate = "2026-11-01" // a Sunday
+	h := newHandler(t, &fakeExtractor{inv: inv}, withFX(t))
+
+	rec := upload(t, h, pngBytes)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	body := rec.Body.String()
+	assert.Contains(t, body, "11.0000")
+	assert.Contains(t, body, "rate of 2026-10-30")
+}
+
+func TestProcess_NoRateForTheDateMeansNoEntryAndTheReasonIsStated(t *testing.T) {
+	inv := good()
+	inv.InvoiceDate = "2026-11-20" // more than seven days after the last rate
+	h := newHandler(t, &fakeExtractor{inv: inv}, withFX(t))
+
+	rec := upload(t, h, pngBytes)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	body := rec.Body.String()
+	assert.Contains(t, body, "no exchange rate for EUR on 2026-11-20")
+	assert.NotContains(t, body, "<th>Debit</th>", "no entry table when no rate")
+}
+
+func TestProcess_WithoutARateTableAForeignEntryStaysInTheInvoiceCurrencyAndSaysSo(t *testing.T) {
+	h := newHandler(t, &fakeExtractor{inv: good()})
+
+	rec := upload(t, h, pngBytes)
+
+	body := rec.Body.String()
+	assert.Contains(t, body, "(EUR)")
+	assert.Contains(t, body, "not converted to SEK")
+	assert.NotContains(t, body, "converted from EUR")
+}
+
+func TestProcess_ASEKInvoiceIsUntouchedWhenARateTableIsLoaded(t *testing.T) {
+	inv := good()
+	inv.Currency = "SEK"
+	h := newHandler(t, &fakeExtractor{inv: inv}, withFX(t))
+
+	rec := upload(t, h, pngBytes)
+
+	body := rec.Body.String()
+	assert.Contains(t, body, "(SEK)")
+	assert.NotContains(t, body, "converted from")
+}
+
+func TestProcess_ACreditNoteInAForeignCurrencyStillGetsNoEntryWhateverTheRate(t *testing.T) {
+	inv := good()
+	inv.Total, inv.NetTotal = -1750, -1750
+	h := newHandler(t, &fakeExtractor{inv: inv}, withFX(t))
+
+	rec := upload(t, h, pngBytes)
+
+	assert.Contains(t, rec.Body.String(), "credit notes are not supported")
+}
+
+func TestEntries_TheDownloadedCSVCarriesTheRateAndTheForeignAmountsOfAConvertedEntry(t *testing.T) {
+	h := newHandler(t, &fakeExtractor{inv: good()}, withFX(t))
+	rec := upload(t, h, pngBytes)
+	m := regexp.MustCompile(`/entries/[0-9a-f]{32}\.csv`).FindString(rec.Body.String())
+	require.NotEmpty(t, m, "a CSV link is offered")
+
+	csvRec := httptest.NewRecorder()
+	h.ServeHTTP(csvRec, httptest.NewRequest(http.MethodGet, m, nil))
+
+	require.Equal(t, http.StatusOK, csvRec.Code)
+	rows, err := csv.NewReader(csvRec.Body).ReadAll()
+	require.NoError(t, err)
+	assert.Contains(t, rows[0], "original_currency")
+	assert.Equal(t, "11.2000", rows[1][11])
+	assert.Equal(t, "SEK", rows[1][6])
+	assert.Equal(t, "EUR", rows[1][8])
 }
