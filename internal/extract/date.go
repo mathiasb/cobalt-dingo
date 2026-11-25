@@ -30,7 +30,7 @@ type Date struct {
 var (
 	isoRe     = regexp.MustCompile(`^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$`)
 	numericRe = regexp.MustCompile(`^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4}|\d{2})$`)
-	dayNameRe = regexp.MustCompile(`^(\d{1,2})\.?\s+([A-Za-zåäöÅÄÖ]+)\.?,?\s+(\d{4})$`)
+	dayNameRe = regexp.MustCompile(`^(\d{1,2})\.?[\s\-/]+([A-Za-zåäöÅÄÖ]+)\.?,?[\s\-/]+(\d{4})$`)
 	nameDayRe = regexp.MustCompile(`^([A-Za-zåäöÅÄÖ]+)\.?\s+(\d{1,2}),?\s+(\d{4})$`)
 )
 

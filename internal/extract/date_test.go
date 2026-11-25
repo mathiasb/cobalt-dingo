@@ -30,6 +30,10 @@ func TestParseDate_ResolvesByTheGivenOrderAndFlagsWhenBothReadingsAreValid(t *te
 		{"month name first", "November 2, 2026", extract.DMY, "2026-11-02", false},
 		{"short month name first", "Nov 2, 2026", extract.DMY, "2026-11-02", false},
 		{"surrounding space", "  2026-11-02 ", extract.DMY, "2026-11-02", false},
+		// Printed this way on many real invoices (found when real third-party samples failed).
+		{"day-month name-year with dashes", "09-Feb-2000", extract.DMY, "2000-02-09", false},
+		{"day month name year with slashes", "9/Feb/2000", extract.MDY, "2000-02-09", false},
+		{"dashed swedish month name", "02-nov-2026", extract.DMY, "2026-11-02", false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -43,7 +47,7 @@ func TestParseDate_ResolvesByTheGivenOrderAndFlagsWhenBothReadingsAreValid(t *te
 }
 
 func TestParseDate_RejectsTextThatIsNotADate(t *testing.T) {
-	for _, text := range []string{"", "sometime in May", "32/13/2026", "31.02.2026", "2026-13-01", "11/2026"} {
+	for _, text := range []string{"", "sometime in May", "32/13/2026", "31.02.2026", "2026-13-01", "11/2026", "09-Fev-2000", "09-Feb-", "31-Feb-2000"} {
 		t.Run(text, func(t *testing.T) {
 			_, err := extract.ParseDate(text, extract.DMY)
 
