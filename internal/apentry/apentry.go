@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/mathiasb/cobalt-dingo/internal/extract"
+	"github.com/mathiasb/cobalt-dingo/internal/fx"
 	"github.com/mathiasb/cobalt-dingo/internal/process"
 )
 
@@ -55,6 +56,19 @@ type Entry struct {
 	Currency string
 	Lines    []Line
 	Warnings []string
+
+	// Original is set when the entry was converted to SEK: the foreign amounts and
+	// the rate it was converted with, kept alongside so the conversion can be audited.
+	Original *Original
+}
+
+// Original is the foreign-currency side of an entry that was converted to SEK.
+type Original struct {
+	Currency string
+	// Lines are the foreign amounts in the same order as the entry's lines. A line
+	// the conversion added (rounding) has no foreign amount.
+	Lines []Line
+	Rate  fx.Rate
 }
 
 // check is the last guard, independent of how the lines were derived: every
@@ -152,18 +166,93 @@ func Build(res process.Result) (Entry, error) {
 	return e, nil
 }
 
+// ToSEK converts a foreign-currency entry to SEK with the given rate. Each line
+// is converted on its own, exactly, rounded half away from zero; the small
+// difference that creates (at most one minor unit per line) goes to 3740 and
+// larger is an error, never silently absorbed. The entry keeps the foreign
+// amounts and the rate, and the supplier ledger is credited the converted total.
+func (e Entry) ToSEK(r fx.Rate) (Entry, error) {
+	switch {
+	case e.Original != nil:
+		return Entry{}, errors.New("the entry is already converted")
+	case e.Currency == "SEK":
+		return Entry{}, errors.New("a SEK entry has nothing to convert")
+	case r.Currency != e.Currency:
+		return Entry{}, fmt.Errorf("the %s rate cannot convert a %s entry", r.Currency, e.Currency)
+	}
+	out := Entry{Date: e.Date, Text: e.Text, Currency: "SEK"}
+	orig := &Original{Currency: e.Currency, Rate: r}
+	d, c := new(big.Int), new(big.Int)
+	for _, l := range e.Lines {
+		cl := Line{Account: l.Account}
+		var err error
+		if l.Debit > 0 {
+			if cl.Debit, err = r.Convert(l.Debit); err != nil {
+				return Entry{}, fmt.Errorf("%w: %v", ErrUnbalanced, err)
+			}
+		} else if cl.Credit, err = r.Convert(l.Credit); err != nil {
+			return Entry{}, fmt.Errorf("%w: %v", ErrUnbalanced, err)
+		}
+		d.Add(d, big.NewInt(cl.Debit))
+		c.Add(c, big.NewInt(cl.Credit))
+		out.Lines = append(out.Lines, cl)
+		orig.Lines = append(orig.Lines, l)
+	}
+	if diff := new(big.Int).Sub(d, c); diff.Sign() != 0 {
+		abs := new(big.Int).Abs(diff)
+		if abs.Cmp(big.NewInt(int64(len(e.Lines)))) > 0 {
+			return Entry{}, fmt.Errorf("%w: converting the lines left a difference of %s minor units", ErrUnbalanced, abs)
+		}
+		add := Line{Account: roundingAccount}
+		if diff.Sign() > 0 {
+			add.Credit = abs.Int64()
+		} else {
+			add.Debit = abs.Int64()
+		}
+		out.Lines = append(out.Lines, add)
+		orig.Lines = append(orig.Lines, Line{Account: roundingAccount})
+	}
+	for _, w := range e.Warnings {
+		if strings.HasPrefix(w, "amounts are in ") && strings.HasSuffix(w, "not converted to SEK") {
+			continue
+		}
+		out.Warnings = append(out.Warnings, w)
+	}
+	out.Warnings = append(out.Warnings, fmt.Sprintf(
+		"converted from %s to SEK at %s (%s, rate of %s); indicative, not necessarily the rate your accountant uses",
+		e.Currency, r.String(), r.Source, r.Date))
+	out.Original = orig
+	if err := out.check(); err != nil {
+		return Entry{}, err
+	}
+	return out, nil
+}
+
 // WriteCSV writes entries, one row per line, numbered from 1 in the order given.
 func WriteCSV(w io.Writer, entries []Entry) error {
 	cw := csv.NewWriter(w)
-	if err := cw.Write([]string{"entry", "date", "text", "account", "debit", "credit", "currency", "warnings"}); err != nil {
+	// The foreign-currency columns exist only when at least one entry was converted,
+	// so a file of SEK entries is exactly what it was before conversion existed.
+	converted := false
+	for _, e := range entries {
+		converted = converted || e.Original != nil
+	}
+	header := []string{"entry", "date", "text", "account", "debit", "credit", "currency", "warnings"}
+	if converted {
+		header = append(header, "original_currency", "original_debit", "original_credit", "rate", "rate_date", "rate_source")
+	}
+	if err := cw.Write(header); err != nil {
 		return fmt.Errorf("write csv header: %w", err)
 	}
 	for i, e := range entries {
 		warn := safe(strings.Join(e.Warnings, "; "))
-		for _, l := range e.Lines {
+		for j, l := range e.Lines {
 			row := []string{
 				fmt.Sprint(i + 1), safe(e.Date), safe(e.Text), fmt.Sprint(l.Account),
 				amount(l.Debit), amount(l.Credit), safe(e.Currency), warn,
+			}
+			if converted {
+				row = append(row, foreignCells(e, j)...)
 			}
 			if err := cw.Write(row); err != nil {
 				return fmt.Errorf("write csv row: %w", err)
@@ -175,6 +264,19 @@ func WriteCSV(w io.Writer, entries []Entry) error {
 		return fmt.Errorf("flush csv: %w", err)
 	}
 	return nil
+}
+
+// foreignCells are the six foreign-currency cells of line j, empty for an entry
+// that was not converted and for a line the conversion added.
+func foreignCells(e Entry, j int) []string {
+	if e.Original == nil || j >= len(e.Original.Lines) {
+		return make([]string, 6)
+	}
+	o := e.Original
+	return []string{
+		safe(o.Currency), amount(o.Lines[j].Debit), amount(o.Lines[j].Credit),
+		safe(o.Rate.String()), safe(o.Rate.Date), safe(o.Rate.Source),
+	}
 }
 
 func amount(minor int64) string {

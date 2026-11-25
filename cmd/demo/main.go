@@ -9,6 +9,9 @@
 //	DEMO_DATA        directory made by scripts/gen-synthetic-invoices.py (default testdata/synthetic)
 //	DEMO_MODEL_URL   Ollama-compatible endpoint on the local network (default http://iguana:11434)
 //	DEMO_MODEL       vision model (default qwen2.5vl:7b)
+//	DEMO_FX          exchange-rate file for SEK conversion (default <DEMO_DATA>/fx-rates.json), made by
+//	                 scripts/fetch-riksbank-rates.py; absent or invalid means foreign entries stay in
+//	                 the invoice currency and say so
 //	DEMO_TEXT_MODEL  model that reads text from PDF and Word files (default: DEMO_MODEL)
 //	DEMO_MARKITDOWN  path of the markitdown binary for PDF and Word (default: markitdown on PATH; install it in a virtualenv, see docs/demo-runbook.md)
 //	DEMO_DATE_ORDER  dmy (default) or mdy: how 02.11.2026 is read when both readings are valid
@@ -36,8 +39,28 @@ import (
 	"github.com/mathiasb/cobalt-dingo/internal/demo"
 	"github.com/mathiasb/cobalt-dingo/internal/domain"
 	"github.com/mathiasb/cobalt-dingo/internal/extract"
+	"github.com/mathiasb/cobalt-dingo/internal/fx"
 	"github.com/mathiasb/cobalt-dingo/internal/ingest"
 )
+
+// loadRates reads the exchange-rate file. A missing file is normal (conversion is
+// off); an invalid one is refused whole and logged, and conversion stays off: a
+// partly trusted rate table would be worse than none.
+func loadRates(log *slog.Logger, path string) *fx.Table {
+	f, err := os.Open(path)
+	if err != nil {
+		log.Info("no exchange-rate file: foreign-currency entries stay in the invoice currency", "path", path)
+		return nil
+	}
+	defer func() { _ = f.Close() }()
+	tb, err := fx.Load(f)
+	if err != nil {
+		log.Error("exchange-rate file refused: foreign-currency entries stay in the invoice currency", "path", path, "reason", err.Error())
+		return nil
+	}
+	log.Info("exchange rates loaded", "path", path, "currencies", tb.Currencies())
+	return tb
+}
 
 func env(key, def string) string {
 	if v := os.Getenv(key); v != "" {
@@ -96,8 +119,11 @@ func run(log *slog.Logger) error {
 	}
 	reader := &extract.Client{BaseURL: modelURL, Model: model, TextModel: textModel, DateOrder: order}
 
+	rates := loadRates(log, env("DEMO_FX", filepath.Join(data, "fx-rates.json")))
+
 	handler := demo.New(demo.Config{
 		History:   history,
+		FX:        rates,
 		Extractor: &ingest.Reader{Vision: reader, Text: reader, Convert: converter},
 		Samples:   os.DirFS(filepath.Join(data, "invoices")),
 		MaxUpload: 8 << 20,

@@ -1,0 +1,369 @@
+// Package fx holds published exchange rates and converts amounts to SEK with them.
+//
+// Rates come from a local file, made by scripts/fetch-riksbank-rates.py from
+// Riksbanken's published daily rates. Nothing here makes a network call: the
+// demo's bet guardrail is that no document or booking data leaves the local
+// network, and a lookup keyed on an invoice's currency and date is a small leak
+// that a file avoids.
+//
+// A rate is an exact integer of micro-SEK per one unit of the currency, never a
+// float, and conversion is big-integer arithmetic rounded half away from zero.
+// The rate is data with a source and a date; no model chooses it.
+package fx
+
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"math/big"
+	"regexp"
+	"sort"
+	"strings"
+	"time"
+)
+
+const (
+	// MaxFileBytes bounds the rate file. A year of six currencies is ~60 KB.
+	MaxFileBytes = 1 << 20
+	// MaxObservations bounds the rates in the file in total.
+	MaxObservations = 20000
+
+	maxSourceLen = 120
+	maxLookback  = 7 * 24 * time.Hour
+
+	// microPerUnit: a rate is stored as millionths of a krona per unit.
+	microPerUnit = 1_000_000
+	minMicro     = 100             // 0.0001 SEK per unit
+	maxMicro     = 100_000_000_000 // 100000 SEK per unit
+
+	// maxConvertible is the largest amount, in minor units, converted: the same
+	// bound as extract.MaxAmountMinor, kept here so the package stands alone.
+	maxConvertible = 1_000_000_000_000
+)
+
+// ErrNoRate means no rate could be found; the message says why and is safe to show.
+var ErrNoRate = errors.New("no exchange rate")
+
+// Rate is one currency's rate for one day.
+type Rate struct {
+	Currency string
+	Date     string // the day the rate was published for; may be earlier than the invoice date
+	Micro    int64  // millionths of a SEK per one unit of Currency
+	Source   string
+}
+
+type obs struct {
+	date  time.Time
+	iso   string
+	micro int64
+}
+
+// Table is a validated set of rates.
+type Table struct {
+	source string
+	byCur  map[string][]obs // ascending by date
+}
+
+type file struct {
+	Source     string            `json:"source"`
+	Fetched    string            `json:"fetched"`
+	Currencies map[string][]item `json:"currencies"`
+}
+
+type item struct {
+	Date string `json:"date"`
+	Rate string `json:"rate"`
+}
+
+var (
+	currencyRe = regexp.MustCompile(`^[A-Z]{3}$`)
+	rateRe     = regexp.MustCompile(`^[0-9]{1,6}(\.[0-9]{1,6})?$`)
+)
+
+// Load reads and validates a rate file. Any problem refuses the whole file: a
+// half-trusted table would be worse than none.
+func Load(r io.Reader) (*Table, error) {
+	raw, err := io.ReadAll(io.LimitReader(r, MaxFileBytes+1))
+	if err != nil {
+		return nil, fmt.Errorf("read rate file: %w", err)
+	}
+	if len(raw) > MaxFileBytes {
+		return nil, fmt.Errorf("rate file is larger than %d bytes", MaxFileBytes)
+	}
+	// Go's decoder keeps the last of a repeated key and says nothing, so a second
+	// "EUR" list could replace a validated one. Refuse any repeated key first.
+	if err := rejectDuplicateKeys(raw); err != nil {
+		return nil, err
+	}
+	f, err := decodeFile(raw)
+	if err != nil {
+		return nil, err
+	}
+	if f.Source == "" || len(f.Source) > maxSourceLen {
+		return nil, fmt.Errorf("rate file source must be 1 to %d characters", maxSourceLen)
+	}
+	if len(f.Currencies) == 0 {
+		return nil, errors.New("rate file has no rates")
+	}
+	total := 0
+	for _, items := range f.Currencies {
+		total += len(items)
+	}
+	if total > MaxObservations {
+		return nil, fmt.Errorf("rate file has too many rates (more than %d)", MaxObservations)
+	}
+
+	t := &Table{source: f.Source, byCur: map[string][]obs{}}
+	for cur, items := range f.Currencies {
+		if !currencyRe.MatchString(cur) {
+			return nil, fmt.Errorf("rate file currency %q is not a three-letter code", cur)
+		}
+		if cur == "SEK" {
+			return nil, errors.New("rate file must not contain SEK: it is the posting currency")
+		}
+		var prev time.Time
+		list := make([]obs, 0, len(items))
+		for _, it := range items {
+			d, err := time.Parse("2006-01-02", it.Date)
+			if err != nil || d.Format("2006-01-02") != it.Date {
+				return nil, fmt.Errorf("rate file %s: %q is not a YYYY-MM-DD date", cur, it.Date)
+			}
+			if !prev.IsZero() && !d.After(prev) {
+				return nil, fmt.Errorf("rate file %s: dates must be in strictly ascending order, %s is not after the one before", cur, it.Date)
+			}
+			prev = d
+			m, err := parseMicro(it.Rate)
+			if err != nil {
+				return nil, fmt.Errorf("rate file %s %s: rate %q: %w", cur, it.Date, it.Rate, err)
+			}
+			list = append(list, obs{date: d, iso: it.Date, micro: m})
+		}
+		if len(list) == 0 {
+			continue
+		}
+		t.byCur[cur] = list
+	}
+	if len(t.byCur) == 0 {
+		return nil, errors.New("rate file has no rates")
+	}
+	return t, nil
+}
+
+// decodeFile reads the table by exact key names. It does not use struct fields:
+// encoding/json matches those case-insensitively, so a key repeated as "Rate" or
+// "SOURCE" would replace the validated value without a word. Here a key is either
+// exactly one of the expected names or the file is refused.
+func decodeFile(raw []byte) (file, error) {
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	var top map[string]json.RawMessage
+	if err := dec.Decode(&top); err != nil {
+		return file{}, fmt.Errorf("rate file is not valid json for this format: %w", err)
+	}
+	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
+		return file{}, errors.New("rate file has data after the rate table")
+	}
+	if err := exactKeys(top, "rate file", []string{"source", "fetched", "currencies"}, []string{"source", "currencies"}); err != nil {
+		return file{}, err
+	}
+	var f file
+	if err := json.Unmarshal(top["source"], &f.Source); err != nil {
+		return file{}, fmt.Errorf("rate file source must be a string: %w", err)
+	}
+	if raw, ok := top["fetched"]; ok {
+		if err := json.Unmarshal(raw, &f.Fetched); err != nil {
+			return file{}, fmt.Errorf("rate file fetched must be a string: %w", err)
+		}
+	}
+	var cur map[string]json.RawMessage
+	if err := json.Unmarshal(top["currencies"], &cur); err != nil || cur == nil {
+		return file{}, errors.New("rate file currencies must be an object of lists")
+	}
+	f.Currencies = make(map[string][]item, len(cur))
+	for code, rawList := range cur {
+		var elems []json.RawMessage
+		if err := json.Unmarshal(rawList, &elems); err != nil {
+			return file{}, fmt.Errorf("rate file %s must be a list of observations", code)
+		}
+		list := make([]item, 0, len(elems))
+		for _, el := range elems {
+			var obj map[string]json.RawMessage
+			if err := json.Unmarshal(el, &obj); err != nil || obj == nil {
+				return file{}, fmt.Errorf("rate file %s: an observation must be an object with a date and a rate", code)
+			}
+			if err := exactKeys(obj, "rate file "+code+" observation", []string{"date", "rate"}, []string{"date", "rate"}); err != nil {
+				return file{}, err
+			}
+			var it item
+			if err := json.Unmarshal(obj["date"], &it.Date); err != nil {
+				return file{}, fmt.Errorf("rate file %s: date must be a string", code)
+			}
+			if err := json.Unmarshal(obj["rate"], &it.Rate); err != nil {
+				return file{}, fmt.Errorf("rate file %s: rate must be a string, not a number", code)
+			}
+			list = append(list, it)
+		}
+		f.Currencies[code] = list
+	}
+	return f, nil
+}
+
+// exactKeys refuses any key that is not exactly one of allowed, whatever its case,
+// and any required key that is missing. Keys are reported in a fixed order.
+func exactKeys(m map[string]json.RawMessage, what string, allowed, required []string) error {
+	ok := make(map[string]bool, len(allowed))
+	for _, k := range allowed {
+		ok[k] = true
+	}
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		if !ok[k] {
+			return fmt.Errorf("%s has the key %q, which is not one of %s (names are matched exactly, case included)", what, k, strings.Join(allowed, ", "))
+		}
+	}
+	for _, k := range required {
+		if _, have := m[k]; !have {
+			return fmt.Errorf("%s is missing %q", what, k)
+		}
+	}
+	return nil
+}
+
+// rejectDuplicateKeys walks the JSON tokens and refuses an object that repeats a
+// key, at any depth. A document that is not valid json is left for the real decode
+// to report.
+func rejectDuplicateKeys(raw []byte) error {
+	type frame struct {
+		keys      map[string]bool // nil for an array
+		expectKey bool
+	}
+	var stack []*frame
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	for {
+		tok, err := dec.Token()
+		if err != nil {
+			return nil //nolint:nilerr // io.EOF ends the walk; a syntax error is reported by the real decode
+		}
+		switch t := tok.(type) {
+		case json.Delim:
+			switch t {
+			case '{':
+				stack = append(stack, &frame{keys: map[string]bool{}, expectKey: true})
+			case '[':
+				stack = append(stack, &frame{})
+			default: // } or ]
+				if len(stack) > 0 {
+					stack = stack[:len(stack)-1]
+				}
+				if n := len(stack); n > 0 && stack[n-1].keys != nil {
+					stack[n-1].expectKey = true // the value just ended; the next token is a key
+				}
+			}
+		default: // string, number, bool, null
+			if n := len(stack); n > 0 && stack[n-1].keys != nil {
+				top := stack[n-1]
+				if top.expectKey {
+					key, _ := t.(string)
+					if top.keys[key] {
+						return fmt.Errorf("rate file repeats the key %q: duplicate keys are refused", key)
+					}
+					top.keys[key] = true
+					top.expectKey = false
+				} else {
+					top.expectKey = true
+				}
+			}
+		}
+	}
+}
+
+// parseMicro reads a plain decimal with up to six places into millionths,
+// without floating point, and checks it is a plausible rate.
+func parseMicro(s string) (int64, error) {
+	if !rateRe.MatchString(s) {
+		return 0, errors.New("is not a plain decimal with at most six places")
+	}
+	whole, frac, _ := strings.Cut(s, ".")
+	for len(frac) < 6 {
+		frac += "0"
+	}
+	var n int64
+	for _, c := range whole + frac {
+		n = n*10 + int64(c-'0')
+	}
+	if n < minMicro || n > maxMicro {
+		return 0, errors.New("is outside the plausible range 0.0001 to 100000 SEK per unit")
+	}
+	return n, nil
+}
+
+// Currencies lists the currencies in the table, sorted.
+func (t *Table) Currencies() []string {
+	out := make([]string, 0, len(t.byCur))
+	for c := range t.byCur {
+		out = append(out, c)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// Lookup returns the rate for a currency on a date: that day's, or the latest
+// earlier one within seven days (weekends and holidays have no published rate).
+// Otherwise it returns ErrNoRate, with a reason that is safe to show.
+func (t *Table) Lookup(currency, date string) (Rate, error) {
+	if !currencyRe.MatchString(currency) {
+		return Rate{}, fmt.Errorf("%w: %q is not a currency code", ErrNoRate, currency)
+	}
+	d, err := time.Parse("2006-01-02", date)
+	if err != nil || d.Format("2006-01-02") != date {
+		return Rate{}, fmt.Errorf("%w: the invoice date %q is not a usable date", ErrNoRate, date)
+	}
+	list, ok := t.byCur[currency]
+	if !ok {
+		return Rate{}, fmt.Errorf("%w for %s: the rate file has no %s", ErrNoRate, currency, currency)
+	}
+	// The latest observation on or before d.
+	i := sort.Search(len(list), func(i int) bool { return list[i].date.After(d) }) - 1
+	if i < 0 || d.Sub(list[i].date) > maxLookback {
+		return Rate{}, fmt.Errorf("%w for %s on %s: none published within the 7 days before it", ErrNoRate, currency, date)
+	}
+	o := list[i]
+	return Rate{Currency: currency, Date: o.iso, Micro: o.micro, Source: t.source}, nil
+}
+
+// String is the rate as a decimal with at least four places and no needless zeros.
+func (r Rate) String() string {
+	s := fmt.Sprintf("%d.%06d", r.Micro/microPerUnit, r.Micro%microPerUnit)
+	for strings.HasSuffix(s, "0") && len(s)-strings.IndexByte(s, '.') > 5 {
+		s = s[:len(s)-1]
+	}
+	return s
+}
+
+// Convert returns the amount, in minor units of the currency, as minor units of
+// SEK, rounded half away from zero. A negative amount is refused (credit notes
+// are not converted), and so is one too large to convert exactly.
+func (r Rate) Convert(minor int64) (int64, error) {
+	if minor < 0 {
+		return 0, errors.New("a negative amount is not converted")
+	}
+	if minor > maxConvertible {
+		return 0, fmt.Errorf("an amount above %d minor units is not converted", maxConvertible)
+	}
+	if r.Micro < minMicro || r.Micro > maxMicro {
+		return 0, errors.New("the rate is outside the accepted range")
+	}
+	p := new(big.Int).Mul(big.NewInt(minor), big.NewInt(r.Micro))
+	half := big.NewInt(microPerUnit / 2)
+	p.Add(p, half)
+	p.Quo(p, big.NewInt(microPerUnit)) // non-negative, so truncation rounds half up = half away from zero
+	if !p.IsInt64() {
+		return 0, errors.New("the converted amount is too large")
+	}
+	return p.Int64(), nil
+}

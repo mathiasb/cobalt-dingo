@@ -42,6 +42,17 @@ Other settings: `DEMO_TEXT_MODEL` (default `DEMO_MODEL`). If the converter is mi
 
 Samples of every format: copy the generated documents next to the PNGs, named `NNN.pdf`, `NNN.docx`, `NNN.xml` (three digits), into `~/invoice-demo-data/invoices/`. Other names are ignored. Generate with `uv run scripts/gen-variety.py <dir>`; the files are fictional.
 
+## Exchange rates (SEK conversion)
+
+The demo reads `~/invoice-demo-data/fx-rates.json` (override: `DEMO_FX`) at startup and makes **no network call for rates**. Refresh it, then restart the service:
+
+```
+python3 scripts/fetch-riksbank-rates.py ~/invoice-demo-data/fx-rates.json   # last 120 days; EUR USD DKK NOK GBP CHF
+systemctl --user restart invoice-demo.service
+```
+
+The API rate-limits; the script waits and retries. The file is refused whole at startup if anything in it is implausible (a rate outside 0.0001 to 100000 SEK per unit, dates out of order, more than six decimals, an unknown field, over 1 MiB); the log then says `exchange-rate file refused` and the demo runs unconverted. A missing file is normal and logged as such. Rates are exact integers (millionths of a krona), never floats; conversion rounds half away from zero per line, and a difference of at most one minor unit per line goes to 3740.
+
 ## Everyday commands
 
 ```
@@ -67,7 +78,7 @@ Wildcard DNS means there is no record to remove. After step 2 the name falls thr
 - Reads up to 4 files per submit (and total size capped). Formats, decided from the file's bytes and not its name: PNG and JPEG images (vision model), **PDF with a text layer and Word .docx** (converted to text by `markitdown`, read by the text model), and **e-invoice XML, Peppol BIS Billing 3 / UBL** (parsed by code, no model). A **scanned PDF** is refused with an explanation, never guessed at; CII (XRechnung/ZUGFeRD) is not read yet (#161). Measured on generated data only: `docs/research/2026-11-25-multiformat-extraction-eval.md`.
 - Shows the fields, proposes an expense account from past bookings with the vouchers behind it, and learns corrections in memory.
 - For each trusted invoice it shows the **proposed accounts payable entry**: debit the expense account, debit input VAT (the account past bookings used, else 2641), credit 2440; a gap up to 0.50 balances on 3740. One CSV of all entries is downloadable for 30 minutes (20 submits at most, memory only). An invoice that does not reconcile, has no proposed account, or is a credit note gets **no entry** and the page says why.
-- Entries are in the invoice currency, not converted to SEK, and reverse-charge VAT on foreign purchases is not modelled (the entry says so). See #152.
+- **Foreign currency:** with a rate file loaded (see below) a EUR, USD, DKK, NOK, GBP or CHF entry is converted to SEK line by line, exactly, with the foreign amounts, the rate, its date and its source kept beside it (page and CSV). Without a rate for the invoice date (none published within the 7 days before it) there is **no entry**, and the page says why. Without a rate file entries stay in the invoice currency and say so. The rate is Riksbanken's published daily rate and is indicative: it is not necessarily the rate your accountant uses. **Reverse-charge VAT on foreign purchases is not modelled** (the entry says so; #164). Exchange differences at payment and year-end revaluation are not modelled.
 - **No accounting-system access of any kind.** Nothing is posted anywhere. Uploads are held in memory for one request and are not written to disk (pinned by a test with the temp directory watched).
 - One model call at a time and at most 2 uploads being read at once (more get 503). One shared 150 s model deadline per submit. Corrections are capped at 200 until restart.
 - The data is synthetic, and the page says so. The accuracy shown says nothing about a real company's books.
