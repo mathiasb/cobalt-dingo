@@ -27,6 +27,9 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /bin/overvie
 # structs read (#92). It needs the stored token, so it ships with the rest.
 # Read-only, and prints field names and types only — never values.
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /bin/fortnox-shape ./cmd/fortnox-shape
+# history-eval ships for the same reason as overview: it reads the stored token and the
+# production books from inside the cluster. It prints aggregates only (ADR-0013, spike 1).
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /bin/history-eval ./cmd/history-eval
 
 FROM gcr.io/distroless/static-debian12 AS runtime
 COPY --from=builder /bin/cobalt-dingo /cobalt-dingo
@@ -34,6 +37,7 @@ COPY --from=builder /bin/migrate /migrate
 COPY --from=builder /bin/fortnox-check /fortnox-check
 COPY --from=builder /bin/overview /overview
 COPY --from=builder /bin/fortnox-shape /fortnox-shape
+COPY --from=builder /bin/history-eval /history-eval
 # golang-migrate reads the .sql files at runtime, so they have to be in the
 # image. MIGRATIONS_DIR points the runner at this path.
 COPY --from=builder /src/migrations /migrations
