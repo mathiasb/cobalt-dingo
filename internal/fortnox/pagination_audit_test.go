@@ -33,6 +33,10 @@ var singlePageByDesign = map[string]string{
 	"SupplierInvoiceStateCounts": "delegates to invoiceStateCounts — counts, not records",
 	"CustomerInvoiceStateCounts": "delegates to invoiceStateCounts — counts, not records",
 
+	// One resource, not a collection endpoint.
+	"GetSupplierInvoiceRows": "reads ONE supplier invoice (GET /3/supplierinvoices/{n}); the rows are an " +
+		"embedded array of that single resource, returned whole, so there is no page of data to miss",
+
 	// Bounded by something other than how much data the company has.
 	"ListPredefinedAccounts": "the system-defined account roles are a fixed Fortnox set of " +
 		"roughly thirty entries; it cannot grow with the company's data",
