@@ -26,6 +26,22 @@ systemctl --user restart invoice-demo.service
 
 A restart forgets every correction and every downloadable CSV (both are in memory only).
 
+## Converter dependency (PDF and Word)
+
+The demo runs `markitdown` as a subprocess for PDF and Word. Install it once into its own virtualenv (not through `uvx`: that is a launcher which starts python itself and misbehaves under a memory limit):
+
+```
+uv venv ~/invoice-demo/markitdown-venv
+uv pip install --python ~/invoice-demo/markitdown-venv/bin/python 'markitdown[docx,pdf]'
+export DEMO_MARKITDOWN=$HOME/invoice-demo/markitdown-venv/bin/markitdown   # in run.sh
+```
+
+Do not install `markitdown[all]`: it pulls cloud document-intelligence converters. The child gets only `PATH`, `HOME`, the cache variables and `LANG`, never the login or the 1Password session, and runs with these bounds: 60 s wall clock, 45 s CPU, **2 GiB of address space**, 1 MiB of output. Those bounds exist because a 447 KB PDF whose content stream inflates took 3.1 GB, and a 90 KB DOCX 1.5 GB, in an unbounded converter (review of #162). 2 GiB is virtual memory: python and its libraries need most of 1.5 GiB of it, so do not lower it without running `go test ./internal/ingest` with the virtualenv present, which converts the real fixtures and a real inflating PDF. A DOCX XML part over 4 MiB, or a DOCX over 16 MiB when unpacked, is refused before conversion.
+
+Other settings: `DEMO_TEXT_MODEL` (default `DEMO_MODEL`). If the converter is missing the demo starts with a warning and images and e-invoice XML still work; a PDF or Word upload then fails. A converter failure that a document causes (timeout, over the limits, crash) shows "This file could not be read" with status 422; a converter that cannot start is logged as `converter could not run` and shows the model-busy sentence.
+
+Samples of every format: copy the generated documents next to the PNGs, named `NNN.pdf`, `NNN.docx`, `NNN.xml` (three digits), into `~/invoice-demo-data/invoices/`. Other names are ignored. Generate with `uv run scripts/gen-variety.py <dir>`; the files are fictional.
+
 ## Everyday commands
 
 ```
@@ -48,7 +64,8 @@ Wildcard DNS means there is no record to remove. After step 2 the name falls thr
 
 ## What it does and does not do
 
-- Reads up to 4 invoice images per submit (and total size capped), shows the fields, proposes an expense account from past bookings with the vouchers behind it, and learns corrections in memory.
+- Reads up to 4 files per submit (and total size capped). Formats, decided from the file's bytes and not its name: PNG and JPEG images (vision model), **PDF with a text layer and Word .docx** (converted to text by `markitdown`, read by the text model), and **e-invoice XML, Peppol BIS Billing 3 / UBL** (parsed by code, no model). A **scanned PDF** is refused with an explanation, never guessed at; CII (XRechnung/ZUGFeRD) is not read yet (#161). Measured on generated data only: `docs/research/2026-11-25-multiformat-extraction-eval.md`.
+- Shows the fields, proposes an expense account from past bookings with the vouchers behind it, and learns corrections in memory.
 - For each trusted invoice it shows the **proposed accounts payable entry**: debit the expense account, debit input VAT (the account past bookings used, else 2641), credit 2440; a gap up to 0.50 balances on 3740. One CSV of all entries is downloadable for 30 minutes (20 submits at most, memory only). An invoice that does not reconcile, has no proposed account, or is a credit note gets **no entry** and the page says why.
 - Entries are in the invoice currency, not converted to SEK, and reverse-charge VAT on foreign purchases is not modelled (the entry says so). See #152.
 - **No accounting-system access of any kind.** Nothing is posted anywhere. Uploads are held in memory for one request and are not written to disk (pinned by a test with the temp directory watched).

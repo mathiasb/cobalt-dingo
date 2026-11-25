@@ -305,3 +305,36 @@ func TestExtract_RefusesASupplierOrInvoiceNumberLongerThan200Characters(t *testi
 		})
 	}
 }
+
+// A credit note's amounts are negative. The entry builder refuses them as
+// "credit notes are not supported"; before this, the amount did not parse at all
+// and the page said "field total is not a number", which names the wrong problem.
+func TestParseAmount_AcceptsOneLeadingMinusForACreditNote(t *testing.T) {
+	tests := []struct {
+		in   string
+		want int64
+	}{
+		{"-132.95", -13295},
+		{"-0,50", -50},
+		{"-3 592.39", -359239},
+		{"-17", -1700},
+	}
+	for _, tt := range tests {
+		t.Run(tt.in, func(t *testing.T) {
+			got, err := extract.ParseAmount(tt.in)
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestParseAmount_RefusesASignThatIsNotOneLeadingMinus(t *testing.T) {
+	for _, in := range []string{"--5", "5-", "-", "- ", "-.5", "+5", "-abc", "-99999999999.99", "-1.234"} {
+		t.Run(in, func(t *testing.T) {
+			_, err := extract.ParseAmount(in)
+
+			require.Error(t, err)
+		})
+	}
+}

@@ -1,10 +1,12 @@
 package demo_test
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"encoding/csv"
 	"errors"
+	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -23,6 +25,7 @@ import (
 	"github.com/mathiasb/cobalt-dingo/internal/booking"
 	"github.com/mathiasb/cobalt-dingo/internal/demo"
 	"github.com/mathiasb/cobalt-dingo/internal/extract"
+	"github.com/mathiasb/cobalt-dingo/internal/ingest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -199,10 +202,10 @@ func TestProcess_ShowsAnErrorAndNoProposalWhenExtractionFails(t *testing.T) {
 	assert.NotContains(t, rec.Body.String(), "6540")
 }
 
-func TestProcess_RefusesANonImageUpload(t *testing.T) {
+func TestProcess_RefusesAnUploadThatIsNoSupportedFormat(t *testing.T) {
 	h := newHandler(t, &fakeExtractor{inv: good()})
 
-	rec := upload(t, h, []byte("%PDF-1.7 not an image we accept"))
+	rec := upload(t, h, []byte("MZ\x90\x00 an executable, not an invoice"))
 
 	assert.Equal(t, http.StatusUnsupportedMediaType, rec.Code)
 }
@@ -981,4 +984,165 @@ func TestHome_TheFileInputHasTheMultipleAttribute(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, rec.Code)
 	assert.Regexp(t, `<input type="file" name="image"[^>]*\smultiple[\s>]`, rec.Body.String())
+}
+
+func docxBytes(t *testing.T) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	w := zip.NewWriter(&buf)
+	f, err := w.Create("word/document.xml")
+	require.NoError(t, err)
+	_, err = f.Write([]byte("<w:document/>"))
+	require.NoError(t, err)
+	require.NoError(t, w.Close())
+	return buf.Bytes()
+}
+
+// What the page accepts is decided by content, whatever the form field was
+// called, and the extractor is handed the bytes of any supported kind.
+func TestProcess_HandsEverySupportedFormatToTheExtractor(t *testing.T) {
+	ubl := []byte(`<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"></Invoice>`)
+	for name, data := range map[string][]byte{
+		"png":  pngBytes,
+		"pdf":  []byte("%PDF-1.7\n%body"),
+		"docx": docxBytes(t),
+		"ubl":  ubl,
+	} {
+		t.Run(name, func(t *testing.T) {
+			ex := &fakeExtractor{inv: good()}
+			h := newHandler(t, ex)
+
+			rec := upload(t, h, data)
+
+			assert.Equal(t, http.StatusOK, rec.Code)
+			assert.Equal(t, int32(1), ex.started.Load())
+		})
+	}
+}
+
+func TestProcess_AnUnsupportedUploadSaysWhatIsAccepted(t *testing.T) {
+	ex := &fakeExtractor{inv: good()}
+	h := newHandler(t, ex)
+
+	rec := upload(t, h, []byte("hello, plain text"))
+
+	assert.Equal(t, http.StatusUnsupportedMediaType, rec.Code)
+	for _, want := range []string{"PNG", "PDF", "Word", "e-invoice"} {
+		assert.Contains(t, rec.Body.String(), want)
+	}
+	assert.Equal(t, int32(0), ex.started.Load())
+}
+
+func TestProcess_AScannedPDFIsExplainedInFixedWords(t *testing.T) {
+	h := newHandler(t, &fakeExtractor{err: ingest.ErrScanned})
+
+	rec := upload(t, h, []byte("%PDF-1.7 scan"))
+
+	assert.Equal(t, http.StatusUnprocessableEntity, rec.Code, "the document is the problem, not the model")
+	assert.Contains(t, rec.Body.String(), "scan with no text layer")
+	assert.NotContains(t, rec.Body.String(), "model may be busy")
+}
+
+// A refusal can quote the document. The page shows a fixed sentence and the
+// detail goes to the log.
+func TestProcess_ARefusedDocumentShowsAFixedMessageNotItsDetail(t *testing.T) {
+	h := newHandler(t, &fakeExtractor{err: fmt.Errorf("%w: IssueDate %q is not a date <script>alert(1)</script>", ingest.ErrRefused, "secret-detail-from-the-file")})
+
+	rec := upload(t, h, []byte("%PDF-1.7 x"))
+
+	assert.Equal(t, http.StatusUnprocessableEntity, rec.Code)
+	assert.Contains(t, rec.Body.String(), "could not be read")
+	assert.NotContains(t, rec.Body.String(), "secret-detail-from-the-file")
+	assert.NotContains(t, rec.Body.String(), "<script>alert")
+}
+
+func TestProcess_AModelOutageIsStillABadGatewayWhenSomeFailuresAreTheDocumentsFault(t *testing.T) {
+	ex := &fakeExtractor{errAt: map[int]error{0: ingest.ErrScanned, 1: errors.New("model down")}, inv: good()}
+	h := newHandler(t, ex)
+
+	rec := uploadMany(t, h, []byte("%PDF-1.7 a"), []byte("%PDF-1.7 b"))
+
+	assert.Equal(t, http.StatusBadGateway, rec.Code)
+}
+
+func TestHome_NamesTheAcceptedFormatsAndTheFileInputOffersThem(t *testing.T) {
+	h := newHandler(t, &fakeExtractor{inv: good()})
+	rec := httptest.NewRecorder()
+
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+
+	body := rec.Body.String()
+	assert.Regexp(t, `<input type="file" name="image"[^>]*accept="[^"]*\.pdf[^"]*\.docx[^"]*\.xml`, body)
+	for _, want := range []string{"PDF", "Word", "e-invoice"} {
+		assert.Contains(t, body, want)
+	}
+}
+
+func samplesOfEveryFormat(c *demo.Config) {
+	c.Samples = fstest.MapFS{
+		"001.png":  {Data: pngBytes},
+		"101.pdf":  {Data: []byte("%PDF-1.7 sample")},
+		"102.docx": {Data: []byte("PK\x03\x04 docx sample")},
+		"103.xml":  {Data: []byte(`<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"/>`)},
+		// Names that must stay out whatever the filesystem holds.
+		"104.exe": {Data: []byte("MZ")}, "10.pdf": {Data: []byte("%PDF")}, "105.PDF": {Data: []byte("%PDF")},
+	}
+}
+
+func TestHome_ListsASampleOfEveryFormatAndOnlyAnImageGetsAThumbnail(t *testing.T) {
+	h := newHandler(t, &fakeExtractor{inv: good()}, samplesOfEveryFormat)
+	rec := httptest.NewRecorder()
+
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+
+	body := rec.Body.String()
+	for _, name := range []string{"001.png", "101.pdf", "102.docx", "103.xml"} {
+		assert.Contains(t, body, `value="`+name+`"`)
+	}
+	assert.Contains(t, body, `<img src="/samples/001.png"`)
+	assert.NotContains(t, body, `<img src="/samples/101.pdf"`, "a document is not drawn as an image")
+	for _, name := range []string{"104.exe", "10.pdf", "105.PDF"} {
+		assert.NotContains(t, body, name)
+	}
+}
+
+func TestSample_ServesADocumentAsAnAttachmentOfItsOwnType(t *testing.T) {
+	h := newHandler(t, &fakeExtractor{inv: good()}, samplesOfEveryFormat)
+	for name, ctype := range map[string]string{
+		"101.pdf":  "application/pdf",
+		"102.docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+		"103.xml":  "application/xml",
+	} {
+		t.Run(name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+
+			h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/samples/"+name, nil))
+
+			require.Equal(t, http.StatusOK, rec.Code)
+			assert.Equal(t, ctype, rec.Header().Get("Content-Type"))
+			assert.Contains(t, rec.Header().Get("Content-Disposition"), "attachment")
+			assert.Equal(t, "nosniff", rec.Header().Get("X-Content-Type-Options"))
+		})
+	}
+}
+
+func TestSample_ARefusedNameIsNotFoundEvenWhenTheFileExists(t *testing.T) {
+	h := newHandler(t, &fakeExtractor{inv: good()}, samplesOfEveryFormat)
+	for _, name := range []string{"104.exe", "10.pdf", "105.PDF"} {
+		rec := httptest.NewRecorder()
+
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/samples/"+name, nil))
+
+		assert.Equal(t, http.StatusNotFound, rec.Code, name)
+	}
+}
+
+func TestProcess_ClickingASampleOfAnotherFormatHandsItsBytesToTheExtractor(t *testing.T) {
+	ex := &fakeExtractor{inv: good()}
+	h := newHandler(t, ex, samplesOfEveryFormat)
+
+	rec := postForm(h, "/process", url.Values{"sample": {"102.docx"}})
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, int32(1), ex.started.Load())
 }

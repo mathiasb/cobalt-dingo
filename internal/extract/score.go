@@ -10,6 +10,7 @@ import (
 // scripts/gen-synthetic-invoices.py. Amounts are decimal strings.
 type Truth struct {
 	File            string `json:"file"`
+	Format          string `json:"format"` // png, pdf_text, pdf_scan, docx, ubl; empty for older sets
 	Supplier        string `json:"supplier"`
 	InvoiceNumber   string `json:"invoice_number"`
 	InvoiceDate     string `json:"invoice_date"`

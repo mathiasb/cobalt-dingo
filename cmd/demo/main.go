@@ -9,9 +9,12 @@
 //	DEMO_DATA        directory made by scripts/gen-synthetic-invoices.py (default testdata/synthetic)
 //	DEMO_MODEL_URL   Ollama-compatible endpoint on the local network (default http://iguana:11434)
 //	DEMO_MODEL       vision model (default qwen2.5vl:7b)
+//	DEMO_TEXT_MODEL  model that reads text from PDF and Word files (default: DEMO_MODEL)
+//	DEMO_MARKITDOWN  path of the markitdown binary for PDF and Word (default: markitdown on PATH; install it in a virtualenv, see docs/demo-runbook.md)
 //	DEMO_DATE_ORDER  dmy (default) or mdy: how 02.11.2026 is read when both readings are valid
 //
-// It has no accounting-system access and writes nothing to disk.
+// It has no accounting-system access and writes nothing to disk. Uploads are
+// held in memory; the PDF and Word converter receives them on stdin.
 package main
 
 import (
@@ -22,8 +25,10 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -31,6 +36,7 @@ import (
 	"github.com/mathiasb/cobalt-dingo/internal/demo"
 	"github.com/mathiasb/cobalt-dingo/internal/domain"
 	"github.com/mathiasb/cobalt-dingo/internal/extract"
+	"github.com/mathiasb/cobalt-dingo/internal/ingest"
 )
 
 func env(key, def string) string {
@@ -53,6 +59,11 @@ func run(log *slog.Logger) error {
 	data := env("DEMO_DATA", "testdata/synthetic")
 	modelURL := env("DEMO_MODEL_URL", "http://iguana:11434")
 	model := env("DEMO_MODEL", "qwen2.5vl:7b")
+	textModel := env("DEMO_TEXT_MODEL", model)
+	converter := ingest.NewMarkitdown()
+	if v := os.Getenv("DEMO_MARKITDOWN"); v != "" {
+		converter.Command = strings.Fields(v)
+	}
 	user, pass := os.Getenv("DEMO_USER"), os.Getenv("DEMO_PASS")
 
 	if err := demo.ValidateExposure(addr, user, pass); err != nil {
@@ -79,10 +90,15 @@ func run(log *slog.Logger) error {
 		return fmt.Errorf("parse history: %w", err)
 	}
 	history := booking.ExamplesFromVouchers(vouchers)
+	if _, err := exec.LookPath(converter.Command[0]); err != nil {
+		// Not fatal: images and e-invoice XML do not need it.
+		log.Warn("converter not found: PDF and Word uploads will fail until it is installed (docs/demo-runbook.md)", "command", converter.Command[0])
+	}
+	reader := &extract.Client{BaseURL: modelURL, Model: model, TextModel: textModel, DateOrder: order}
 
 	handler := demo.New(demo.Config{
 		History:   history,
-		Extractor: &extract.Client{BaseURL: modelURL, Model: model, DateOrder: order},
+		Extractor: &ingest.Reader{Vision: reader, Text: reader, Convert: converter},
 		Samples:   os.DirFS(filepath.Join(data, "invoices")),
 		MaxUpload: 8 << 20,
 		User:      user,
