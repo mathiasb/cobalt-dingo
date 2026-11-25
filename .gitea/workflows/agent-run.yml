@@ -159,7 +159,10 @@ jobs:
           LITELLM_BASE_URL: ${{ secrets.LITELLM_BASE_URL }}
           LITELLM_API_KEY: ${{ secrets.LITELLM_API_KEY }}
           # infra#347/dispatch#68: repointed from the dead berget/kimi-k2.6.
-          LITELLM_EXECUTORS: "kimi=berget/kimi-k3,qwen=koala/qwen36-35b-a3b,glm=berget/glm-4.7-fp8"
+          # cobalt-dingo#136: berget/kimi-k3 is a deprecated alias that infra#754 will delete
+          # (it was served by iguana/granite4 from about 2026-11-07). glm=berget/glm-4.7-fp8 has
+          # no route in the gateway (404) and is left unchanged until its replacement is decided.
+          LITELLM_EXECUTORS: "kimi=berget/kimi-k3.1-pro,qwen=koala/qwen36-35b-a3b,glm=berget/glm-4.7-fp8"
           DISPATCH_KIMI_MAX_TURNS: "80"
           # signals#47: event values reach the shell only through env, never
           # through `${{ }}` expansion inside run:.
