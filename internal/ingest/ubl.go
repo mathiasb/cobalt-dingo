@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 	"time"
 	"unicode"
@@ -61,6 +62,8 @@ func ParseUBL(data []byte) (extract.Invoice, error) {
 	)
 	want := map[string]string{
 		"ID":                   "number",
+		"InvoiceTypeCode":      "typeCode",
+		"CreditNoteTypeCode":   "typeCode",
 		"IssueDate":            "IssueDate",
 		"DueDate":              "DueDate",
 		"DocumentCurrencyCode": "currency",
@@ -91,7 +94,7 @@ func ParseUBL(data []byte) (extract.Invoice, error) {
 			}
 			if !sawRoot {
 				sawRoot = true
-				if !ublNamespaces[t.Name.Space] || (t.Name.Local != "Invoice" && t.Name.Local != "CreditNote") {
+				if ublRoots[t.Name.Space] != t.Name.Local {
 					return extract.Invoice{}, errors.New("not a UBL Invoice or CreditNote")
 				}
 				credit = t.Name.Local == "CreditNote"
@@ -158,6 +161,15 @@ func ParseUBL(data []byte) (extract.Invoice, error) {
 	}
 	inv.Currency = fields["currency"]
 
+	// The document element and its type code must agree about whether this is a
+	// credit note: the sign of every amount rests on it.
+	code := fields["typeCode"]
+	switch {
+	case code == "":
+		return extract.Invoice{}, errors.New("the document type code is missing")
+	case credit != creditTypeCodes[code]:
+		return extract.Invoice{}, fmt.Errorf("the document type code %q does not match a %s", code, map[bool]string{true: "CreditNote", false: "Invoice"}[credit])
+	}
 	sign := int64(1)
 	if credit {
 		sign = -1
@@ -186,6 +198,15 @@ func ParseUBL(data []byte) (extract.Invoice, error) {
 	}
 	return inv, nil
 }
+
+// creditTypeCodes are the UN/CEFACT 1001 codes that mean a credit.
+var creditTypeCodes = map[string]bool{
+	"381": true, "396": true, "261": true, "262": true, "296": true, "308": true, "420": true, "458": true, "532": true,
+}
+
+// plainDecimal is the only amount shape UBL allows here: digits, then at most
+// two decimals after a point. No spaces, commas or exponents.
+var plainDecimal = regexp.MustCompile(`^[0-9]+(\.[0-9]{1,2})?$`)
 
 func boundedText(name, v string) (string, error) {
 	if v == "" {
@@ -224,6 +245,9 @@ func unsigned(name, v string, sign int64) (int64, error) {
 	}
 	if strings.HasPrefix(v, "-") || strings.HasPrefix(v, "+") {
 		return 0, fmt.Errorf("%s %q carries a sign; UBL amounts are unsigned", name, v)
+	}
+	if !plainDecimal.MatchString(v) {
+		return 0, fmt.Errorf("%s %q is not a plain decimal with at most two places", name, v)
 	}
 	n, err := extract.ParseAmount(v)
 	if err != nil {

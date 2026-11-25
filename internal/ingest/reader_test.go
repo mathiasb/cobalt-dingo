@@ -148,8 +148,15 @@ func TestReader_ADocxThatExpandsPastTheLimitIsRefusedBeforeConversion(t *testing
 	w := zip.NewWriter(&buf)
 	f, err := w.Create("word/document.xml")
 	require.NoError(t, err)
-	_, err = f.Write(make([]byte, ingest.MaxDocxExpanded+1))
+	_, err = f.Write([]byte("<w:document/>"))
 	require.NoError(t, err)
+	// Each part is within the part cap; together they are over the total cap.
+	for i := 0; i <= ingest.MaxDocxExpanded/ingest.MaxDocxPart; i++ {
+		f, err = w.Create("word/media/m" + string(rune('a'+i)) + ".bin")
+		require.NoError(t, err)
+		_, err = f.Write(make([]byte, ingest.MaxDocxPart))
+		require.NoError(t, err)
+	}
 	require.NoError(t, w.Close())
 	require.Less(t, buf.Len(), 200<<10, "the bomb is small as sent")
 	r, _, tx, c := newReader()
@@ -232,4 +239,44 @@ func TestReader_EveryRefusalOnItsOwnRulesIsErrRefused(t *testing.T) {
 		_, err := r.Extract(context.Background(), doc)
 		assert.ErrorIs(t, err, ingest.ErrRefused, name)
 	}
+}
+
+// One XML part of a Word file is text; a few megabytes of it is not an invoice
+// and is what made the converter take gigabytes (review of #162).
+func TestReader_ADocxWithAnOversizeXMLPartIsRefusedBeforeConversionEvenWhenTheTotalIsSmall(t *testing.T) {
+	var buf bytes.Buffer
+	w := zip.NewWriter(&buf)
+	f, err := w.Create("word/document.xml")
+	require.NoError(t, err)
+	_, err = f.Write(make([]byte, ingest.MaxDocxPart+1))
+	require.NoError(t, err)
+	require.NoError(t, w.Close())
+	require.Less(t, int64(ingest.MaxDocxPart+1), int64(ingest.MaxDocxExpanded), "this must be the part cap, not the total cap")
+	r, _, tx, c := newReader()
+
+	_, err = r.Extract(context.Background(), buf.Bytes())
+
+	require.ErrorIs(t, err, ingest.ErrRefused)
+	assert.Contains(t, err.Error(), "part")
+	assert.Zero(t, c.calls+tx.calls)
+}
+
+func TestReader_AMediaPartLargerThanTheXMLCapIsStillAccepted(t *testing.T) {
+	var buf bytes.Buffer
+	w := zip.NewWriter(&buf)
+	f, err := w.Create("word/document.xml")
+	require.NoError(t, err)
+	_, err = f.Write([]byte("<w:document/>"))
+	require.NoError(t, err)
+	f, err = w.Create("word/media/logo.png")
+	require.NoError(t, err)
+	_, err = f.Write(make([]byte, ingest.MaxDocxPart+1))
+	require.NoError(t, err)
+	require.NoError(t, w.Close())
+	r, _, _, _ := newReader()
+
+	inv, err := r.Extract(context.Background(), buf.Bytes())
+
+	require.NoError(t, err, "a logo is not text")
+	assert.Equal(t, "from text", inv.Supplier)
 }

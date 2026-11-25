@@ -25,6 +25,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"strings"
@@ -89,6 +90,10 @@ func run(log *slog.Logger) error {
 		return fmt.Errorf("parse history: %w", err)
 	}
 	history := booking.ExamplesFromVouchers(vouchers)
+	if _, err := exec.LookPath(converter.Command[0]); err != nil {
+		// Not fatal: images and e-invoice XML do not need it.
+		log.Warn("converter not found: PDF and Word uploads will fail until it is installed (docs/demo-runbook.md)", "command", converter.Command[0])
+	}
 	reader := &extract.Client{BaseURL: modelURL, Model: model, TextModel: textModel, DateOrder: order}
 
 	handler := demo.New(demo.Config{

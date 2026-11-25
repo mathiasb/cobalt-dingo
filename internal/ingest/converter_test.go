@@ -1,7 +1,10 @@
 package ingest_test
 
 import (
+	"bytes"
+	"compress/zlib"
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -111,6 +114,7 @@ wait`)
 func TestMarkitdown_StopsAConverterThatFloodsStdout(t *testing.T) {
 	c := conv(t, `yes "FLOOD"`)
 	c.MaxOutput = 4096
+	c.Timeout = 3 * time.Second
 
 	start := time.Now()
 	_, err := c.Convert(context.Background(), ingest.KindPDF, []byte("x"))
@@ -168,19 +172,119 @@ func TestMarkitdown_ACommandThatDoesNotExistIsAnErrorNotAPanic(t *testing.T) {
 	require.Error(t, err)
 }
 
-// The real converter, on the real fixtures. Skipped where uvx is not installed.
-func TestMarkitdown_RealConverterReadsATextPDFAndADocxAndFindsNoTextInAScan(t *testing.T) {
+// Passing the cap must stop the child at once, even when it would not exit by
+// itself. Without the kill the call waits for the child's own end.
+func TestMarkitdown_KillsAConverterAtOnceWhenOutputPassesTheCapEvenIfItWouldNotExit(t *testing.T) {
+	c := conv(t, `head -c 20000 /dev/zero | tr '\0' 'x'; sleep 30`)
+	c.MaxOutput = 4096
+	c.Timeout = 25 * time.Second
+
+	start := time.Now()
+	_, err := c.Convert(context.Background(), ingest.KindPDF, []byte("x"))
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "larger")
+	assert.Less(t, time.Since(start), 8*time.Second, "the child was waited out instead of killed")
+}
+
+// Review of #162: a 447 KB PDF took 3.1 GB of memory in the real converter. Wall
+// time and output size were the only bounds. A memory limit is set on the child.
+func TestMarkitdown_ChildCannotAddressMoreMemoryThanTheLimit(t *testing.T) {
+	if _, err := exec.LookPath("python3"); err != nil {
+		t.Skip("python3 not installed")
+	}
+	grab := func(mib int) string {
+		return `exec python3 -c "x = bytearray(` + strconv.Itoa(mib) + ` * 1024 * 1024); print('allocated')"`
+	}
+	c := conv(t, grab(16))
+	c.MaxMemory = 512 << 20
+
+	out, err := c.Convert(context.Background(), ingest.KindPDF, []byte("x"))
+	require.NoError(t, err, "a small allocation must still work, or this test proves nothing")
+	assert.Contains(t, out, "allocated")
+
+	c = conv(t, grab(2048))
+	c.MaxMemory = 512 << 20
+	start := time.Now()
+	_, err = c.Convert(context.Background(), ingest.KindPDF, []byte("x"))
+
+	require.Error(t, err, "2 GiB must not be allocatable under a 512 MiB limit")
+	assert.Less(t, time.Since(start), 10*time.Second)
+}
+
+func TestMarkitdown_ChildIsStoppedWhenItUsesMoreCPUTimeThanTheLimit(t *testing.T) {
+	c := conv(t, `while :; do :; done`)
+	c.MaxCPU = time.Second
+	c.Timeout = 20 * time.Second
+
+	start := time.Now()
+	_, err := c.Convert(context.Background(), ingest.KindPDF, []byte("x"))
+
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), "timed out", "the CPU limit stopped it, not the wall clock")
+	assert.Less(t, time.Since(start), 10*time.Second)
+}
+
+// A limit too small for the child to start means the child does not run: the
+// limits are applied before the converter is exec'd, not after.
+func TestMarkitdown_ALimitTooSmallToStartTheChildMeansTheChildNeverRuns(t *testing.T) {
+	marker := filepath.Join(t.TempDir(), "ran")
+	c := conv(t, `touch `+marker+`; cat`)
+	c.MaxMemory = 1
+
+	_, err := c.Convert(context.Background(), ingest.KindPDF, []byte("x"))
+
+	require.Error(t, err)
+	_, statErr := os.Stat(marker)
+	assert.True(t, os.IsNotExist(statErr), "the converter ran without its memory limit")
+}
+
+// Converter failures that a hostile or broken document causes are the document's
+// fault; a converter that cannot start at all is ours.
+func TestMarkitdown_ADocumentThatKillsTheConverterIsRefusedButAMissingConverterIsNot(t *testing.T) {
+	short := conv(t, `sleep 30`)
+	short.Timeout = 300 * time.Millisecond
+	flood := conv(t, `yes`)
+	flood.MaxOutput = 100
+	for name, c := range map[string]*ingest.Markitdown{"exit code": conv(t, `exit 3`), "timeout": short, "output flood": flood} {
+		_, err := c.Convert(context.Background(), ingest.KindPDF, []byte("x"))
+		require.ErrorIs(t, err, ingest.ErrRefused, name)
+	}
+
+	missing := &ingest.Markitdown{Command: []string{"/nonexistent/markitdown"}, Timeout: time.Second, MaxOutput: 100}
+	_, err := missing.Convert(context.Background(), ingest.KindPDF, []byte("x"))
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, ingest.ErrRefused, "a missing converter is a server problem, not the document's")
+}
+
+// realMarkitdown returns the real converter from a virtualenv with markitdown
+// installed (INGEST_MARKITDOWN, or ~/invoice-demo/markitdown-venv), or skips. uvx is
+// not used: it is a launcher that starts python itself, and a memory limit on it
+// misbehaves.
+func realMarkitdown(t *testing.T) *ingest.Markitdown {
+	t.Helper()
 	if testing.Short() {
 		t.Skip("short mode")
 	}
-	if _, err := exec.LookPath("uvx"); err != nil {
-		t.Skip("uvx not installed")
+	bin := os.Getenv("INGEST_MARKITDOWN")
+	if bin == "" {
+		home, _ := os.UserHomeDir()
+		bin = filepath.Join(home, "invoice-demo", "markitdown-venv", "bin", "markitdown")
+	}
+	if _, err := os.Stat(bin); err != nil {
+		t.Skip("no markitdown virtualenv: set INGEST_MARKITDOWN or create ~/invoice-demo/markitdown-venv")
 	}
 	c := ingest.NewMarkitdown()
+	c.Command = []string{bin}
 	c.Timeout = 120 * time.Second
+	return c
+}
+
+func TestMarkitdown_RealConverterReadsATextPDFAndADocxAndFindsNoTextInAScan(t *testing.T) {
+	c := realMarkitdown(t)
 
 	pdf, err := c.Convert(context.Background(), ingest.KindPDF, fixture(t, "invoice-text-layer.pdf"))
-	require.NoError(t, err)
+	require.NoError(t, err, "the default memory limit must not break a real invoice")
 	assert.Contains(t, pdf, "Nordkloud AB")
 	assert.Contains(t, pdf, "Att betala 4 349,08 SEK", "the total as printed, with its thousands separator")
 
@@ -190,4 +294,62 @@ func TestMarkitdown_RealConverterReadsATextPDFAndADocxAndFindsNoTextInAScan(t *t
 
 	_, err = c.Convert(context.Background(), ingest.KindPDF, fixture(t, "invoice-scan-no-text.pdf"))
 	require.ErrorIs(t, err, ingest.ErrNoText)
+}
+
+// The attack from the review of #162: a small PDF whose content stream inflates to
+// gigabytes. Under the default limit the real converter must fail fast.
+func TestMarkitdown_RealConverterStopsAPDFWhoseContentStreamInflatesToGigabytes(t *testing.T) {
+	c := realMarkitdown(t)
+	bomb := inflatingPDF(t)
+	require.Less(t, len(bomb), 1<<20, "the bomb is small as sent")
+
+	start := time.Now()
+	_, err := c.Convert(context.Background(), ingest.KindPDF, bomb)
+
+	require.Error(t, err)
+	assert.Less(t, time.Since(start), 40*time.Second)
+}
+
+func inflatingPDF(t *testing.T) []byte {
+	t.Helper()
+	var raw bytes.Buffer
+	for i := 0; i < 8_000_000/32; i++ {
+		raw.WriteString("BT /F1 12 Tf 10 10 Td (a) Tj ET\n")
+	}
+	var z bytes.Buffer
+	zw := zlib.NewWriter(&z)
+	_, err := zw.Write(raw.Bytes())
+	require.NoError(t, err)
+	require.NoError(t, zw.Close())
+	var b bytes.Buffer
+	offs := []int{}
+	obj := func(body string) {
+		offs = append(offs, b.Len())
+		b.WriteString(strconv.Itoa(len(offs)) + " 0 obj\n" + body + "\nendobj\n")
+	}
+	b.WriteString("%PDF-1.4\n")
+	obj("<< /Type /Catalog /Pages 2 0 R >>")
+	obj("<< /Type /Pages /Kids [3 0 R] /Count 1 >>")
+	obj("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>")
+	obj("<< /Length " + strconv.Itoa(z.Len()) + " /Filter /FlateDecode >>\nstream\n" + z.String() + "\nendstream")
+	obj("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
+	x := b.Len()
+	b.WriteString("xref\n0 6\n0000000000 65535 f \n")
+	for _, o := range offs {
+		b.WriteString(fmt.Sprintf("%010d 00000 n \n", o))
+	}
+	b.WriteString("trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n" + strconv.Itoa(x) + "\n%%EOF\n")
+	return b.Bytes()
+}
+
+// With limits on, the command is started through the shell, which reports a
+// missing converter as exit 127. That is still ours to fix, not the document's.
+func TestMarkitdown_AMissingConverterBehindTheLimitWrapperIsStillNotTheDocumentsFault(t *testing.T) {
+	c := &ingest.Markitdown{Command: []string{"/nonexistent/markitdown"}, Timeout: 5 * time.Second, MaxOutput: 100, MaxMemory: 512 << 20, MaxCPU: 5 * time.Second}
+
+	_, err := c.Convert(context.Background(), ingest.KindPDF, []byte("x"))
+
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, ingest.ErrRefused)
+	assert.Contains(t, err.Error(), "could not run")
 }

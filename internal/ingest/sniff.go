@@ -44,10 +44,12 @@ func (k Kind) String() string {
 	return "unsupported"
 }
 
-// ublNamespaces are the document element namespaces of a UBL invoice and credit note.
-var ublNamespaces = map[string]bool{
-	"urn:oasis:names:specification:ubl:schema:xsd:Invoice-2":    true,
-	"urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2": true,
+// ublRoots pairs each UBL namespace with the one element name allowed in it. The
+// pairing matters: the document element decides whether amounts are negated, so
+// a CreditNote renamed to Invoice (or the reverse) is refused, not read.
+var ublRoots = map[string]string{
+	"urn:oasis:names:specification:ubl:schema:xsd:Invoice-2":    "Invoice",
+	"urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2": "CreditNote",
 }
 
 // sniffXMLWindow bounds how much of a file is read to find the root element.
@@ -105,7 +107,7 @@ func isUBL(data []byte) bool {
 			return false
 		}
 		if se, ok := tok.(xml.StartElement); ok {
-			return (se.Name.Local == "Invoice" || se.Name.Local == "CreditNote") && ublNamespaces[se.Name.Space]
+			return ublRoots[se.Name.Space] == se.Name.Local
 		}
 	}
 }

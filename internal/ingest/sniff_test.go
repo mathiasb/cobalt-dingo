@@ -54,6 +54,8 @@ func TestSniff_DecidesByTheBytesAndNothingElse(t *testing.T) {
 		{"plain text", []byte("hello"), ingest.KindUnknown},
 		{"html", []byte("<html><body>x</body></html>"), ingest.KindUnknown},
 		{"xml that is not ubl", []byte(`<?xml version="1.0"?><note>hi</note>`), ingest.KindUnknown},
+		{"an Invoice element in the CreditNote namespace", []byte(`<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2"/>`), ingest.KindUnknown},
+		{"a CreditNote element in the Invoice namespace", []byte(`<CreditNote xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"/>`), ingest.KindUnknown},
 		{"xml with the right name in the wrong namespace", []byte(`<Invoice xmlns="urn:example:other"/>`), ingest.KindUnknown},
 		{"zip that is not a docx", zipOf(t, "xl/workbook.xml"), ingest.KindUnknown},
 		{"zip with a docx part name but no content types", zipOf(t, "word/document.xml"), ingest.KindDOCX},

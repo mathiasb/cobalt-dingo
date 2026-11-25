@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/mathiasb/cobalt-dingo/internal/extract"
 )
@@ -28,7 +29,12 @@ const (
 	// MaxDocxExpanded bounds the total declared size of what a DOCX unpacks to.
 	// A real invoice document is tens of kilobytes; a few megabytes of images at
 	// most.
-	MaxDocxExpanded = 32 << 20
+	MaxDocxExpanded = 16 << 20
+
+	// MaxDocxPart bounds one XML part of a DOCX. It is text: a document.xml of a
+	// few megabytes is not an invoice, and 31 MiB of it took the converter 1.5 GB
+	// (review of #162). Images and other media are not limited by this.
+	MaxDocxPart = 4 << 20
 
 	// MaxDocxEntries bounds the number of parts in a DOCX.
 	MaxDocxEntries = 1000
@@ -113,6 +119,9 @@ func checkDocxSize(doc []byte) error {
 	}
 	var total uint64
 	for _, f := range zr.File {
+		if strings.HasSuffix(f.Name, ".xml") && f.UncompressedSize64 > MaxDocxPart {
+			return fmt.Errorf("a part of the document is larger than %d bytes", MaxDocxPart)
+		}
 		total += f.UncompressedSize64
 		if total > MaxDocxExpanded {
 			return fmt.Errorf("the document expands to more than %d bytes", MaxDocxExpanded)
