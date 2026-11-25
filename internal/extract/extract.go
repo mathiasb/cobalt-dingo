@@ -64,6 +64,10 @@ type Client struct {
 	Model   string
 	HTTP    *http.Client // optional; defaults to a client with a 5 minute timeout
 
+	// TextModel reads documents that arrive as text (ExtractText). Empty means
+	// Model, the vision model, which also reads text.
+	TextModel string
+
 	// DateOrder resolves numeric dates such as 02.11.2026. The zero value is
 	// DMY. It is a setting of the deployment, not something the model guesses.
 	DateOrder DateOrder
@@ -73,31 +77,39 @@ type Client struct {
 // not valid JSON, or lacks or garbles a field, is an error naming the field;
 // partial data is never returned as a result.
 func (c *Client) Extract(ctx context.Context, image []byte) (Invoice, error) {
+	content, err := c.chat(ctx, c.Model, prompt, []string{base64.StdEncoding.EncodeToString(image)})
+	if err != nil {
+		return Invoice{}, err
+	}
+	return parseInvoice(content, c.DateOrder)
+}
+
+// chat sends one user message to the model and returns the reply's content. The
+// document goes to the configured host and nowhere else: redirects are not followed.
+func (c *Client) chat(ctx context.Context, model, content string, images []string) (string, error) {
+	msg := map[string]any{"role": "user", "content": content}
+	if len(images) > 0 {
+		msg["images"] = images
+	}
 	reqBody, err := json.Marshal(map[string]any{
-		"model":   c.Model,
-		"stream":  false,
-		"format":  "json",
-		"options": map[string]any{"temperature": 0},
-		"messages": []map[string]any{{
-			"role":    "user",
-			"content": prompt,
-			"images":  []string{base64.StdEncoding.EncodeToString(image)},
-		}},
+		"model":    model,
+		"stream":   false,
+		"format":   "json",
+		"options":  map[string]any{"temperature": 0},
+		"messages": []map[string]any{msg},
 	})
 	if err != nil {
-		return Invoice{}, fmt.Errorf("marshal request: %w", err)
+		return "", fmt.Errorf("marshal request: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(c.BaseURL, "/")+"/api/chat", bytes.NewReader(reqBody))
 	if err != nil {
-		return Invoice{}, fmt.Errorf("build request: %w", err)
+		return "", fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	hc := c.HTTP
 	if hc == nil {
-		// Redirects are not followed: the document goes to the configured host
-		// and nowhere else, whatever that host answers.
 		hc = &http.Client{
 			Timeout:       5 * time.Minute,
 			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
@@ -105,15 +117,15 @@ func (c *Client) Extract(ctx context.Context, image []byte) (Invoice, error) {
 	}
 	resp, err := hc.Do(req)
 	if err != nil {
-		return Invoice{}, fmt.Errorf("call model: %w", err)
+		return "", fmt.Errorf("call model: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return Invoice{}, fmt.Errorf("read model reply: %w", err)
+		return "", fmt.Errorf("read model reply: %w", err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return Invoice{}, fmt.Errorf("model returned %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+		return "", fmt.Errorf("model returned %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
 	var envelope struct {
@@ -122,9 +134,9 @@ func (c *Client) Extract(ctx context.Context, image []byte) (Invoice, error) {
 		} `json:"message"`
 	}
 	if err := json.Unmarshal(body, &envelope); err != nil {
-		return Invoice{}, fmt.Errorf("parse model envelope as json: %w", err)
+		return "", fmt.Errorf("parse model envelope as json: %w", err)
 	}
-	return parseInvoice(envelope.Message.Content, c.DateOrder)
+	return envelope.Message.Content, nil
 }
 
 // amountText accepts a JSON string or a JSON number.
@@ -210,11 +222,15 @@ func parseInvoice(content string, order DateOrder) (Invoice, error) {
 }
 
 // ParseAmount reads a decimal amount into minor units without floating point.
+// A single leading minus gives a negative amount (a credit note).
 // A comma is accepted as the decimal mark and spaces as thousands separators;
 // more than two decimals is an error rather than a silent rounding.
 func ParseAmount(s string) (int64, error) {
 	s = strings.ReplaceAll(strings.TrimSpace(s), " ", "")
 	s = strings.ReplaceAll(s, ",", ".")
+	// One leading minus marks a credit note's amount. Any other sign is not a number.
+	negative := strings.HasPrefix(s, "-")
+	s = strings.TrimPrefix(s, "-")
 	if s == "" {
 		return 0, errors.New("amount is empty")
 	}
@@ -236,6 +252,9 @@ func ParseAmount(s string) (int64, error) {
 		if n > MaxAmountMinor {
 			return 0, fmt.Errorf("amount %q is larger than the %d minor units accepted", s, MaxAmountMinor)
 		}
+	}
+	if negative {
+		n = -n
 	}
 	return n, nil
 }
