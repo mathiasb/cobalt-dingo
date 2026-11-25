@@ -6,10 +6,24 @@
       "Bash(pytest:tests/**)",
       "Bash(cat:*)",
       "Bash(ls:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(rm -r /home/mathias/worktrees/*)"
     ],
     "deny": [
-      "Bash(rm:*)",
+      "Bash(rm -f:*)",
+      "Bash(rm -rf:*)",
+      "Bash(rm -fr:*)",
+      "Bash(rm -Rf:*)",
+      "Bash(rm -fR:*)",
+      "Bash(rm -r -f:*)",
+      "Bash(rm -r --force:*)",
+      "Bash(rm --force:*)",
+      "Bash(rm --no-preserve-root:*)",
+      "Bash(rm *..*)",
+      "Bash(rm *$(*)",
+      "Bash(rm *`*)",
+      "Bash(rm -r /home/mathias/worktrees/* /*)",
+      "Bash(rm -r /home/mathias/worktrees/* ~*)",
       "Bash(curl:*DELETE*)",
       "Bash(curl:*skatteverket.se*)"
     ]
@@ -22,6 +36,7 @@
   },
   "notes": {
     "FORTNOX_ENV": "Byt till 'production' när sandbox-tester är godkända",
-    "permissions": "Alla POST/PUT till Fortnox kräver bekräftelse via bookkeeper-agenten"
+    "permissions": "Alla POST/PUT till Fortnox kräver bekräftelse via bookkeeper-agenten",
+    "rm": "2026-11-25, Mathias (live approval): the blanket rm deny is replaced by denies for forced and risky forms plus an allow for 'rm -r' under /home/mathias/worktrees/ only, so finished worktrees can be cleaned up. Any other plain rm still prompts. This is pattern matching on the command text, not a sandbox: it stops the common mistakes (force, '..', command substitution, a second path), not a determined bypass."
   }
 }
