@@ -93,6 +93,17 @@ type Tenant struct {
 	CreatedAt time.Time
 }
 
+type ToolEvent struct {
+	ID         int64
+	At         time.Time
+	TenantID   string
+	Actor      string
+	Tool       string
+	Class      string
+	Status     string
+	DurationMs int64
+}
+
 type User struct {
 	ID        string
 	Email     string
