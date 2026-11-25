@@ -31,6 +31,7 @@ import (
 
 	"github.com/mathiasb/cobalt-dingo/internal/apentry"
 	"github.com/mathiasb/cobalt-dingo/internal/booking"
+	"github.com/mathiasb/cobalt-dingo/internal/ingest"
 	"github.com/mathiasb/cobalt-dingo/internal/process"
 )
 
@@ -58,7 +59,7 @@ const ( // multipartOverhead is slack for form framing above the file limit; the
 )
 
 var (
-	sampleNameRe = regexp.MustCompile(`^[0-9]{3}\.png$`)
+	sampleNameRe = regexp.MustCompile(`^[0-9]{3}\.(png|pdf|docx|xml)$`)
 	accountRe    = regexp.MustCompile(`^[1-8][0-9]{3}$`)
 	entryNameRe  = regexp.MustCompile(`^[0-9a-f]{32}\.csv$`)
 )
@@ -67,7 +68,7 @@ var (
 type Config struct {
 	History   []booking.Example
 	Extractor process.Extractor
-	Samples   fs.FS // flat directory of NNN.png sample invoices; may be nil
+	Samples   fs.FS // flat directory of NNN.png|pdf|docx|xml sample invoices; may be nil
 	MaxUpload int64 // largest accepted upload in bytes
 	User      string
 	Pass      string // both empty disables auth; ValidateExposure guards when that is allowed
@@ -125,6 +126,7 @@ func New(cfg Config) http.Handler {
 		prop:    booking.NewProposer(cfg.History),
 		page: template.Must(template.New("page").Funcs(template.FuncMap{
 			"money": money, "pct": pct, "amt": amt, "inc": func(i int) int { return i + 1 },
+			"isImage": func(name string) bool { return strings.HasSuffix(name, ".png") },
 		}).Parse(pageHTML)),
 	}
 	mux := http.NewServeMux()
@@ -210,7 +212,7 @@ func (s *server) sampleNames() []string {
 	if s.cfg.Samples == nil {
 		return nil
 	}
-	names, _ := fs.Glob(s.cfg.Samples, "*.png")
+	names, _ := fs.Glob(s.cfg.Samples, "*")
 	out := names[:0]
 	for _, n := range names {
 		if sampleNameRe.MatchString(n) {
@@ -244,8 +246,21 @@ func (s *server) sample(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	w.Header().Set("Content-Type", "image/png")
+	ext := name[strings.LastIndex(name, "."):]
+	w.Header().Set("Content-Type", sampleTypes[ext])
+	if ext != ".png" {
+		// A document is offered for download so a visitor can try the upload with it,
+		// never rendered in the page.
+		w.Header().Set("Content-Disposition", `attachment; filename="`+name+`"`)
+	}
 	_, _ = w.Write(data)
+}
+
+var sampleTypes = map[string]string{
+	".png":  "image/png",
+	".pdf":  "application/pdf",
+	".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+	".xml":  "application/xml",
 }
 
 // input is one invoice image to read: a sample or an upload held in memory.
@@ -322,10 +337,9 @@ func (s *server) inputs(w http.ResponseWriter, r *http.Request) ([]input, bool) 
 			s.render(w, http.StatusRequestEntityTooLarge, view{Error: "Those uploads are too large together."})
 			return nil, false
 		}
-		switch http.DetectContentType(b) {
-		case "image/png", "image/jpeg":
-		default:
-			s.render(w, http.StatusUnsupportedMediaType, view{Error: "Only PNG and JPEG images are accepted."})
+		// By content, not by the file's name or the browser's Content-Type.
+		if ingest.Sniff(b) == ingest.KindUnknown {
+			s.render(w, http.StatusUnsupportedMediaType, view{Error: ingest.ErrUnsupported.Error()})
 			return nil, false
 		}
 		out = append(out, input{name: fmt.Sprintf("upload %d", i+1), data: b})
@@ -364,7 +378,7 @@ func (s *server) processHandler(w http.ResponseWriter, r *http.Request) {
 
 	items := make([]item, 0, len(ins))
 	var entries []apentry.Entry
-	failed := 0
+	failed, documentFault := 0, 0
 	for _, in := range ins {
 		it := item{Name: in.name}
 		if ctx.Err() != nil {
@@ -375,9 +389,14 @@ func (s *server) processHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		inv, err := s.cfg.Extractor.Extract(ctx, in.data)
 		if err != nil {
-			// The detail names the model host and its error text: log it, do not show it.
+			// The detail can name the model host, its error text or the document's own
+			// text: log it, show only a fixed sentence.
 			slog.Warn("demo: extraction failed", "error", err)
-			it.Error = "Could not read the invoice. The model may be busy or unreachable; try again."
+			var mine bool
+			it.Error, mine = readFailure(err)
+			if mine {
+				documentFault++
+			}
 			failed++
 			items = append(items, it)
 			continue
@@ -408,9 +427,29 @@ func (s *server) processHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	code := http.StatusOK
 	if failed == len(items) {
+		// Every document failed. If each failure was the document's, say so; if any
+		// was the model's, the server is what to retry.
 		code = http.StatusBadGateway
+		if documentFault == failed {
+			code = http.StatusUnprocessableEntity
+		}
 	}
 	s.render(w, code, v)
+}
+
+// readFailure is the sentence shown for a document that could not be read, and
+// whether the document (not the model) is to blame.
+func readFailure(err error) (string, bool) {
+	switch {
+	case errors.Is(err, ingest.ErrScanned):
+		return ingest.ErrScanned.Error() + ".", true
+	case errors.Is(err, ingest.ErrRefused):
+		return "This file could not be read: it is malformed, empty, too large, or not in a layout this demo reads.", true
+	case errors.Is(err, ingest.ErrUnsupported):
+		return ingest.ErrUnsupported.Error() + ".", true
+	default:
+		return "Could not read the invoice. The model may be busy or unreachable; try again.", false
+	}
 }
 
 // newWarnings returns the warnings in have that are not already in shown.
@@ -586,11 +625,12 @@ the CSV is a file you choose what to do with.</p>
 
 <h2>1. Choose an invoice</h2>
 <form method="post" action="/process" enctype="multipart/form-data">
- <p><label>Upload PNG or JPEG files: <input type="file" name="image" accept="image/png,image/jpeg" multiple></label>
+ <p><label>Upload invoices: <input type="file" name="image" accept="image/png,image/jpeg,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/xml,text/xml,.png,.jpg,.jpeg,.pdf,.docx,.xml" multiple></label>
  <button type="submit">Read it</button></p>
+<p class="note">Reads PNG and JPEG images, PDF files with a text layer, Word (.docx) documents and e-invoice XML (Peppol/UBL). A scanned PDF has no text to read: export it as a PNG or JPEG.</p>
 </form>
 {{if .Samples}}<p>Or a sample:</p><div class="samples">
-{{range .Samples}}<form method="post" action="/process"><img src="/samples/{{.}}" alt="sample {{.}}">
+{{range .Samples}}<form method="post" action="/process">{{if isImage .}}<img src="/samples/{{.}}" alt="sample {{.}}">{{else}}<a class="doc" href="/samples/{{.}}" download>download {{.}}</a>{{end}}
  <button name="sample" value="{{.}}">{{.}}</button></form>{{end}}</div>{{end}}
 
 {{if .EntriesID}}<p><a href="/entries/{{.EntriesID}}.csv">Download all proposed entries (CSV)</a></p>{{end}}
