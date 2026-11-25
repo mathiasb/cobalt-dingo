@@ -107,8 +107,41 @@ wait`)
 	require.NoError(t, rerr)
 	pid, perr := strconv.Atoi(strings.TrimSpace(string(raw)))
 	require.NoError(t, perr)
-	assert.Eventually(t, func() bool { return syscall.Kill(pid, 0) != nil }, 3*time.Second, 50*time.Millisecond,
+	assert.Eventually(t, func() bool { return !processRunning(pid) }, 3*time.Second, 50*time.Millisecond,
 		"the grandchild process is still running after the timeout")
+}
+
+// processRunning reports whether pid is a live process. A zombie (killed, not yet
+// reaped by its parent) is not running: in a container whose init does not reap
+// orphans, a killed grandchild stays a zombie for good and kill(pid, 0) still
+// succeeds on it, which made this test fail in CI and nowhere else.
+func processRunning(pid int) bool {
+	b, err := os.ReadFile("/proc/" + strconv.Itoa(pid) + "/stat")
+	if err != nil {
+		return syscall.Kill(pid, 0) == nil // no /proc entry: fall back to the signal probe
+	}
+	i := bytes.LastIndexByte(b, ')')
+	if i < 0 || i+2 >= len(b) {
+		return true
+	}
+	return b[i+2] != 'Z' && b[i+2] != 'X'
+}
+
+// The helper itself, on a real zombie: a child that has exited and has not been
+// waited for. kill(pid, 0) says it exists; it is not running.
+func TestProcessRunning_AnExitedChildThatWasNotReapedIsNotRunning(t *testing.T) {
+	cmd := exec.Command("sh", "-c", "exit 0")
+	require.NoError(t, cmd.Start())
+	t.Cleanup(func() { _ = cmd.Wait() })
+	pid := cmd.Process.Pid
+
+	require.Eventually(t, func() bool { return !processRunning(pid) }, 3*time.Second, 20*time.Millisecond, "a zombie must count as not running")
+	assert.NoError(t, syscall.Kill(pid, 0), "the signal probe alone cannot tell, which is the point")
+
+	sleeper := exec.Command("sleep", "30")
+	require.NoError(t, sleeper.Start())
+	t.Cleanup(func() { _ = sleeper.Process.Kill(); _ = sleeper.Wait() })
+	assert.True(t, processRunning(sleeper.Process.Pid), "a live process must count as running")
 }
 
 func TestMarkitdown_StopsAConverterThatFloodsStdout(t *testing.T) {
