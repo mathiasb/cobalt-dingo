@@ -1,11 +1,11 @@
 # Invoice processing service: target design (v2, after review)
 
-Status: **DRAFT for a decision, 2026-11-25.** Author: agent. Owner: Mathias. Proposed ADR: `docs/adr/0013-invoice-processing-service-direction.md`.
+Status: **the four items in section 0 were approved by Mathias on 2026-11-25 and recorded as ADR-0013 (accepted).** The rest of this document is direction, not commitment. Author: agent. Owner: Mathias.
 v1 was reviewed by six independent agents with different lenses (design, scope, contradictions, implementation readiness, code accuracy, a cold read). Section 11 records what was taken and what was discarded and why.
 
-## 0. What you are asked to decide
+## 0. What was decided
 
-Approve **only** these four things. Everything else here is direction, not commitment.
+Approved on 2026-11-25, **only** these four things. Everything else here is direction, not commitment.
 
 1. **The direction and the principles in section 3.**
 2. **Scope: propose-only, two output rungs only** (on-screen/CSV and a SIE4 file the user imports). No rung that writes to a ledger. ADR-0001 stays in force.

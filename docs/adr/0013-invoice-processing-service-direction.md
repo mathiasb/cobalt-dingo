@@ -1,7 +1,7 @@
 ---
 adr:           "0013"
 title:         "Invoice processing is a propose-only service that learns per tenant; invoices get their own document port"
-status:        proposed
+status:        accepted
 date:          2026-11-25
 deciders:      Mathias
 supersedes:    null
@@ -12,7 +12,7 @@ verify:        null
 
 ## Status
 
-**Proposed 2026-11-25.** Not accepted. No `verify:` script exists; see Validation. Reference design and review record: `docs/design/invoice-processing-service.md`.
+**Accepted 2026-11-25 by Mathias (tier 4, live approval).** Evidence: in a recorded session on koala, asked "Approve the four items in the invoice-service design (direction and principles; propose-only scope with only on-screen/CSV and a SIE4 file; a sibling invoice port beside ADR-0002; the three spikes)? This records ADR-0013 as accepted.", Mathias answered **"Approve all four (Recommended)"**. The recommendation was the agent's; the choice is his. No `verify:` script exists yet; see Validation. Reference design and review record: `docs/design/invoice-processing-service.md`.
 
 ## Context
 
