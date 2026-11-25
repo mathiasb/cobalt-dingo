@@ -22,6 +22,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"math"
 	"os"
@@ -106,9 +107,13 @@ func run(log *slog.Logger) error {
 	// lookup away from the company name, and names stay out of Job logs (#94).
 	log.Info("reading", "mode", cfg.Mode)
 
+	// The token store and the refresh lock log the tenant id (which embeds the
+	// organisation number) when two processes refresh at once or a lock release
+	// fails. They get a logger that discards, so those lines never reach the Job log.
+	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 	tokens := adapterfortnox.NewFortnoxRefreshingTokenStore(
-		postgres.NewTokenStore(store, cipher), cfg, tokenHeadroom, log).
-		WithRefreshLock(postgres.NewRefreshLock(store, log))
+		postgres.NewTokenStore(store, cipher), cfg, tokenHeadroom, quiet).
+		WithRefreshLock(postgres.NewRefreshLock(store, quiet))
 	tok, err := tokens.Load(ctx, tenant.ID)
 	if err != nil {
 		return safe("load token", err)

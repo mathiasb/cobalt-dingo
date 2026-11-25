@@ -266,7 +266,7 @@ func TestRender_PrintsLabelledCountsAndRatesAndNAWhereThereIsNothingToDivide(t *
 	r.Invoices.FirstDate, r.Invoices.LastDate = "2025-01-03", "2026-11-20"
 	r.Suppliers.Total = 40
 	r.Suppliers.WithOrganisationNumber = 30
-	r.ByNumber.Test, r.ByNumber.Top1, r.ByNumber.Top3, r.ByNumber.Unseen = 30, 24, 28, 3
+	r.ByNumber.Test, r.ByNumber.Top1, r.ByNumber.Top3, r.ByNumber.Unseen = 30, 24, 26, 3
 	// ByName, Predefined and Diversity left at zero on purpose.
 
 	out := historyeval.Render(r)
@@ -277,7 +277,7 @@ func TestRender_PrintsLabelledCountsAndRatesAndNAWhereThereIsNothingToDivide(t *
 	assert.Contains(t, out, "2025-01-03 to 2026-11-20")
 	assert.Contains(t, out, "organisation number: 75.0% (30/40)")
 	assert.Contains(t, out, "top-1 80.0% (24/30)")
-	assert.Contains(t, out, "top-3 93.3% (28/30)")
+	assert.Contains(t, out, "top-3 86.7% (26/30)")
 	assert.Contains(t, out, "unseen suppliers 3")
 	assert.Contains(t, out, "n/a", "a zero denominator is n/a, not 0% and not NaN")
 	assert.NotContains(t, out, "NaN")
@@ -453,4 +453,30 @@ func TestRender_DoesNotClaimAnonymityItDoesNotHave(t *testing.T) {
 
 	assert.Contains(t, out, "not anonymisation", "a total and its parts can still subtract to a suppressed count")
 	assert.NotContains(t, out, "no single supplier or invoice can be picked out")
+}
+
+// A rate whose numerator is all but one or two of the total gives the
+// complement away just as a printed 1 or 2 would: 9 of 10 says exactly one is
+// not. Both sides of the split are held to the same k (#157 review).
+func TestRender_SuppressesARateWhoseComplementIsOneOrTwo(t *testing.T) {
+	cases := []struct {
+		name string
+		n, d int
+		want string
+	}{
+		{"complement of one", 9, 10, "VAT number: all but <3 of 10\n"},
+		{"complement of two", 98, 100, "VAT number: all but <3 of 100\n"},
+		{"complement of three is printed", 7, 10, "VAT number: 70.0% (7/10)\n"},
+		{"everything is printed", 10, 10, "VAT number: 100.0% (10/10)\n"},
+		{"nothing is printed", 0, 10, "VAT number: 0.0% (0/10)\n"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var r historyeval.Report
+			r.Suppliers.Total = c.d
+			r.Suppliers.WithVATNumber = c.n
+
+			assert.Contains(t, historyeval.Render(r), c.want)
+		})
+	}
 }

@@ -59,8 +59,8 @@ func cnt(n int) string {
 	return fmt.Sprint(n)
 }
 
-// pct prints a rate with its counts. A numerator or denominator of one or two
-// is suppressed; zero is printed as it is, because an empty category identifies
+// pct prints a rate with its counts. A numerator, denominator or complement of
+// one or two is suppressed; zero is printed as it is, because an empty category identifies
 // nobody.
 func pct(n, d int) string {
 	switch {
@@ -70,6 +70,9 @@ func pct(n, d int) string {
 		return fmt.Sprintf("<%d", k)
 	case n > 0 && n < k:
 		return fmt.Sprintf("<%d of %d", k, d)
+	case d-n > 0 && d-n < k:
+		// The complement is one or two: printing n would say so.
+		return fmt.Sprintf("all but <%d of %d", k, d)
 	}
 	return fmt.Sprintf("%.1f%% (%d/%d)", 100*float64(n)/float64(d), n, d)
 }
