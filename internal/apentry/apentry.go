@@ -106,7 +106,7 @@ func (e Entry) Balanced() bool {
 func Build(res process.Result) (Entry, error) {
 	inv := res.Invoice
 	switch {
-	case res.DoNotTrust:
+	case res.DoNotTrust || inv.TotalDisputed:
 		return Entry{}, ErrDoNotTrust
 	case len(res.Proposal.Candidates) == 0:
 		return Entry{}, ErrNoProposal

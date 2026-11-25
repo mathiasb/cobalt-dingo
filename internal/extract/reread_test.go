@@ -175,3 +175,41 @@ func TestExtractText_TheSecondReadGoesToTheTextModelWithTheFencedDocumentAndNoIm
 	require.NotNil(t, first)
 	assert.NotEqual(t, first[1], open[1], "a fresh fence token for the second request")
 }
+
+// serverFailsOnSecondCall answers the first call with reply and every later one with HTTP 500.
+func serverFailsOnSecondCall(t *testing.T, reply string) *extract.Client {
+	t.Helper()
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		if calls > 1 {
+			http.Error(w, "model fell over", http.StatusInternalServerError)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"message": map[string]any{"content": reply}})
+	}))
+	t.Cleanup(srv.Close)
+	return &extract.Client{BaseURL: srv.URL, Model: "m"}
+}
+
+func TestExtract_AFailedSecondCallLeavesTheTotalUnconfirmedInsteadOfFailingTheInvoiceOrTrustingIt(t *testing.T) {
+	c := serverFailsOnSecondCall(t, replyWithAmounts("100.00", "25.00", "125.00"))
+
+	inv, err := c.Extract(context.Background(), []byte("IMG"))
+
+	require.NoError(t, err)
+	assert.False(t, inv.Reconciled())
+	require.NotEmpty(t, inv.Warnings())
+	assert.Contains(t, inv.Warnings()[0], "second read")
+}
+
+func TestExtractText_AFailedSecondCallLeavesTheTotalUnconfirmedInsteadOfFailingTheInvoiceOrTrustingIt(t *testing.T) {
+	c := serverFailsOnSecondCall(t, replyWithAmounts("100.00", "25.00", "125.00"))
+
+	inv, err := c.ExtractText(context.Background(), "Total 125.00")
+
+	require.NoError(t, err)
+	assert.False(t, inv.Reconciled())
+	require.NotEmpty(t, inv.Warnings())
+	assert.Contains(t, inv.Warnings()[0], "second read")
+}
