@@ -92,11 +92,19 @@ func Load(r io.Reader) (*Table, error) {
 	if len(raw) > MaxFileBytes {
 		return nil, fmt.Errorf("rate file is larger than %d bytes", MaxFileBytes)
 	}
+	// Go's decoder keeps the last of a repeated key and says nothing, so a second
+	// "EUR" list could replace a validated one. Refuse any repeated key first.
+	if err := rejectDuplicateKeys(raw); err != nil {
+		return nil, err
+	}
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.DisallowUnknownFields()
 	var f file
 	if err := dec.Decode(&f); err != nil {
 		return nil, fmt.Errorf("rate file is not valid json for this format: %w", err)
+	}
+	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
+		return nil, errors.New("rate file has data after the rate table")
 	}
 	if f.Source == "" || len(f.Source) > maxSourceLen {
 		return nil, fmt.Errorf("rate file source must be 1 to %d characters", maxSourceLen)
@@ -146,6 +154,54 @@ func Load(r io.Reader) (*Table, error) {
 		return nil, errors.New("rate file has no rates")
 	}
 	return t, nil
+}
+
+// rejectDuplicateKeys walks the JSON tokens and refuses an object that repeats a
+// key, at any depth. A document that is not valid json is left for the real decode
+// to report.
+func rejectDuplicateKeys(raw []byte) error {
+	type frame struct {
+		keys      map[string]bool // nil for an array
+		expectKey bool
+	}
+	var stack []*frame
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	for {
+		tok, err := dec.Token()
+		if err != nil {
+			return nil //nolint:nilerr // io.EOF ends the walk; a syntax error is reported by the real decode
+		}
+		switch t := tok.(type) {
+		case json.Delim:
+			switch t {
+			case '{':
+				stack = append(stack, &frame{keys: map[string]bool{}, expectKey: true})
+			case '[':
+				stack = append(stack, &frame{})
+			default: // } or ]
+				if len(stack) > 0 {
+					stack = stack[:len(stack)-1]
+				}
+				if n := len(stack); n > 0 && stack[n-1].keys != nil {
+					stack[n-1].expectKey = true // the value just ended; the next token is a key
+				}
+			}
+		default: // string, number, bool, null
+			if n := len(stack); n > 0 && stack[n-1].keys != nil {
+				top := stack[n-1]
+				if top.expectKey {
+					key, _ := t.(string)
+					if top.keys[key] {
+						return fmt.Errorf("rate file repeats the key %q: duplicate keys are refused", key)
+					}
+					top.keys[key] = true
+					top.expectKey = false
+				} else {
+					top.expectKey = true
+				}
+			}
+		}
+	}
 }
 
 // parseMicro reads a plain decimal with up to six places into millionths,

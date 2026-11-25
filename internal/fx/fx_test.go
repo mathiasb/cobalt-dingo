@@ -123,6 +123,11 @@ func TestLoad_RefusesAFileThatIsMalformedOrHostile(t *testing.T) {
 		{"duplicate dates", wrap("EUR", obs("2026-11-18", "11.1")+","+obs("2026-11-18", "11.2")), "order"},
 		{"dates out of order", wrap("EUR", obs("2026-11-19", "11.1")+","+obs("2026-11-18", "11.2")), "order"},
 		{"too many observations", wrap("EUR", strings.Join(many, ",")), "too many"},
+		{"a currency listed twice", `{"source":"s","fetched":"2026-11-25","currencies":{"EUR":[` + obs("2026-11-18", "11.1") + `],"EUR":[` + obs("2026-11-18", "99.9") + `]}}`, "duplicate"},
+		{"the source given twice", `{"source":"s","source":"t","fetched":"2026-11-25","currencies":{"EUR":[` + obs("2026-11-18", "11.1") + `]}}`, "duplicate"},
+		{"a duplicate key inside an observation", `{"source":"s","fetched":"2026-11-25","currencies":{"EUR":[{"date":"2026-11-18","rate":"11.1","rate":"99.9"}]}}`, "duplicate"},
+		{"data after the table", `{"source":"s","fetched":"2026-11-25","currencies":{"EUR":[` + obs("2026-11-18", "11.1") + `]}} {"more":1}`, "after"},
+		{"only empty lists", `{"source":"s","fetched":"2026-11-25","currencies":{"EUR":[],"USD":[]}}`, "no rates"},
 		{"larger than the size limit", `{"source":"` + strings.Repeat("x", fx.MaxFileBytes) + `"}`, "larger"},
 	}
 	for _, tt := range tests {
@@ -203,7 +208,7 @@ func TestLoad_TheShapeTheFetchScriptWritesLoadsAndAWeekendUsesFriday(t *testing.
 	tb, err := fx.Load(f)
 
 	require.NoError(t, err)
-	assert.Equal(t, []string{"DKK", "EUR", "USD"}, tb.Currencies())
+	assert.Equal(t, []string{"CHF", "DKK", "EUR", "GBP", "NOK", "USD"}, tb.Currencies())
 	sat, err := tb.Lookup("EUR", "2026-11-21")
 	require.NoError(t, err)
 	assert.Equal(t, "2026-11-20", sat.Date)
@@ -224,4 +229,40 @@ func TestConvert_RefusesAnAmountOneAboveTheCapEvenAtAUnitRate(t *testing.T) {
 
 	_, err = r.Convert(1_000_000_000_001)
 	require.Error(t, err)
+}
+
+// Rates normally arrive through Lookup, which has validated them. A Rate built by
+// hand is held to the same range, so the converter cannot be used with a rate the
+// loader would have refused.
+func TestConvert_RefusesARateOutsideTheAcceptedRangeEvenWhenBuiltByHand(t *testing.T) {
+	for _, micro := range []int64{0, 1, 99, 100_000_000_001, -5} {
+		_, err := fx.Rate{Currency: "EUR", Micro: micro}.Convert(100)
+
+		require.Error(t, err, "micro %d", micro)
+	}
+	_, err := fx.Rate{Currency: "EUR", Micro: 100}.Convert(100)
+	require.NoError(t, err, "the lowest accepted rate converts")
+	_, err = fx.Rate{Currency: "EUR", Micro: 100_000_000_000}.Convert(100)
+	require.NoError(t, err, "the highest accepted rate converts")
+}
+
+// Every currency the acceptance criteria name, from real published rates: NOK is
+// quoted per one krone and DKK per one krone, so neither needs a per-100 factor.
+func TestLoad_TheSampleCoversEveryCurrencyTheDemoConverts(t *testing.T) {
+	f, err := os.Open("testdata/riksbank-sample.json")
+	require.NoError(t, err)
+	defer func() { _ = f.Close() }()
+	tb, err := fx.Load(f)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"CHF", "DKK", "EUR", "GBP", "NOK", "USD"}, tb.Currencies())
+
+	for _, cur := range tb.Currencies() {
+		r, err := tb.Lookup(cur, "2026-11-20")
+		require.NoError(t, err, cur)
+		got, err := r.Convert(10000) // 100.00 in the currency
+		require.NoError(t, err, cur)
+		// A rate per ONE unit puts 100 units between 5 SEK (JPY-like) and 2000 SEK.
+		assert.Greater(t, got, int64(10000), "%s: 100 units should be worth more than 100 SEK-minor, got %d", cur, got)
+		assert.Less(t, got, int64(2_500_000), "%s: 100 units should be worth less than 2500 SEK, got %d", cur, got)
+	}
 }
