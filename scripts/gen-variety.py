@@ -72,7 +72,7 @@ for s in synth.SUPPLIERS:  # reuse the demo's suppliers so their booking history
     SUPS.append((name, addr, cty, cur, [rate], main, alt, idline, lang, lo, hi, "SE" + "".join(c for c in idline if c.isdigit()) + "01" if cty == "SE" else idline.split()[-1], False))
 SUPS += EXTRA
 
-CUSTOMER = ("Definitely Mabe AB", "Drottninggatan 99, 111 60 Stockholm", "Org.nr 559900-0001", "SE559900000101")
+CUSTOMER = ("Exempelkund Demo AB", "Provgatan 1, 100 00 Teststad", "Org.nr 000000-0000", "SE000000000001")
 BANK = {"SE": "Bankgiro 123-4567", "DE": "IBAN DE89 3704 0044 0532 0130 00", "IE": "IBAN IE29 AIBK 9311 5212 3456 78",
         "CH": "IBAN CH93 0076 2011 6238 5295 7", "FI": "IBAN FI21 1234 5600 0007 85", "DK": "IBAN DK50 0040 0440 1162 43",
         "NO": "IBAN NO93 8601 1117 947", "US": "ACH routing 021000021", "EE": "IBAN EE38 2200 2210 2014 5685"}
@@ -138,8 +138,10 @@ def build(rng: random.Random, sup, seq: int, kind: str, multipage: bool):
 
 def truth_row(inv, fn, fmt):
     s = inv["sup"]
+    # A UBL credit note carries no due date, so the truth for that file has none.
+    due = "" if (fmt == "ubl" and inv["kind"] == "credit") else inv["due"].isoformat()
     return {"file": fn, "format": fmt, "layout": inv["layout"], "kind": inv["kind"], "supplier": s[0], "invoice_number": inv["number"],
-            "invoice_date": inv["date"].isoformat(), "due_date": inv["due"].isoformat(), "currency": s[3],
+            "invoice_date": inv["date"].isoformat(), "due_date": due, "currency": s[3],
             "net": dec(inv["net"]), "vat_amount": dec(inv["vat"]), "total": dec(inv["total"]),
             "expected_account": s[5], "new_supplier": s[12]}
 
