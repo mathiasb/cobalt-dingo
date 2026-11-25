@@ -115,3 +115,63 @@ func TestExtract_ACreditNoteTotalIsComparedWithItsSign(t *testing.T) {
 
 	assert.True(t, inv.Reconciled())
 }
+
+func (s *sequence) extractText(t *testing.T, text string) extract.Invoice {
+	t.Helper()
+	c := &extract.Client{BaseURL: s.srv.URL, Model: "vision", TextModel: "text"}
+	inv, err := c.ExtractText(context.Background(), text)
+	require.NoError(t, err)
+	return inv
+}
+
+func TestExtractText_ASecondReadOfTheTotalThatDisagreesLeavesTheInvoiceUnreconciled(t *testing.T) {
+	s := newSequence(t, discountAsVAT, `{"total_label":"TOTAL :","total":"1550.24"}`)
+
+	inv := s.extractText(t, "Discount 17.54\nTOTAL : 1550.24 USD")
+
+	assert.False(t, inv.Reconciled())
+	require.NotEmpty(t, inv.Warnings())
+	assert.Contains(t, inv.Warnings()[0], "1567.78")
+	assert.Contains(t, inv.Warnings()[0], "1550.24")
+}
+
+func TestExtractText_ASecondReadThatAgreesChangesNothing(t *testing.T) {
+	s := newSequence(t, replyWithAmounts("100.00", "25.00", "125.00"), `{"total":"125.00"}`)
+
+	inv := s.extractText(t, "Total 125.00")
+
+	assert.True(t, inv.Reconciled())
+	assert.Empty(t, inv.Warnings())
+}
+
+func TestExtractText_ASecondReadThatCannotBeParsedLeavesTheTotalUnconfirmed(t *testing.T) {
+	s := newSequence(t, replyWithAmounts("100.00", "25.00", "125.00"), `I cannot read it`)
+
+	inv := s.extractText(t, "Total 125.00")
+
+	assert.False(t, inv.Reconciled())
+	require.NotEmpty(t, inv.Warnings())
+	assert.Contains(t, inv.Warnings()[0], "second read")
+}
+
+func TestExtractText_TheSecondReadGoesToTheTextModelWithTheFencedDocumentAndNoImage(t *testing.T) {
+	s := newSequence(t, replyWithAmounts("100.00", "25.00", "125.00"), `{"total":"125.00"}`)
+
+	s.extractText(t, "Total 125.00 SECRET-LINE")
+
+	require.Len(t, s.requests, 2)
+	second := s.requests[1]
+	assert.Equal(t, "text", second["model"])
+	msg := second["messages"].([]any)[0].(map[string]any)
+	assert.NotContains(t, msg, "images")
+	text := msg["content"].(string)
+	assert.Contains(t, text, "SECRET-LINE", "the second read sees the document")
+	assert.Contains(t, text, "untrusted", "and is told it is data")
+	assert.Contains(t, text, "total")
+	assert.NotContains(t, text, "vat_amount", "it asks only for the total")
+	open := fenceOpen.FindStringSubmatch(text)
+	require.NotNil(t, open, "the document is fenced")
+	first := fenceOpen.FindStringSubmatch(s.requests[0]["messages"].([]any)[0].(map[string]any)["content"].(string))
+	require.NotNil(t, first)
+	assert.NotEqual(t, first[1], open[1], "a fresh fence token for the second request")
+}

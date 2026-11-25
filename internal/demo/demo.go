@@ -662,7 +662,7 @@ the CSV is a file you choose what to do with.</p>
 {{if $it.Error}}<p class="bad">{{$it.Error}}</p>{{end}}
 {{with $it.Result}}
 <h3>What was read</h3>
-{{if .DoNotTrust}}<p class="bad">DO NOT TRUST this reading: the amounts do not add up. Check the invoice by hand.</p>{{end}}
+{{if .DoNotTrust}}<p class="bad">DO NOT TRUST this reading: the amounts do not add up, or the total could not be confirmed. Check the invoice by hand.</p>{{end}}
 {{range .Warnings}}<p class="warn">{{.}}</p>{{end}}
 <table>
  <tr><th>Supplier</th><td>{{.Invoice.Supplier}}</td></tr>

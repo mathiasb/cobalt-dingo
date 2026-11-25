@@ -100,16 +100,16 @@ func (c *Client) Extract(ctx context.Context, image []byte) (Invoice, error) {
 	if err != nil {
 		return Invoice{}, err
 	}
-	c.confirmTotal(ctx, image, &inv)
+	c.confirmTotal(ctx, c.Model, totalPrompt, []string{base64.StdEncoding.EncodeToString(image)}, &inv)
 	return inv, nil
 }
 
-// confirmTotal reads the total a second time, from the image and with a different
+// confirmTotal reads the total a second time, from the same document and with a different
 // question, and marks the invoice disputed unless the two readings are equal. A
 // second read that fails or cannot be parsed also disputes: an unconfirmed total
 // is not a confirmed one.
-func (c *Client) confirmTotal(ctx context.Context, image []byte, inv *Invoice) {
-	content, err := c.chat(ctx, c.Model, totalPrompt, []string{base64.StdEncoding.EncodeToString(image)})
+func (c *Client) confirmTotal(ctx context.Context, model, question string, images []string, inv *Invoice) {
+	content, err := c.chat(ctx, model, question, images)
 	if err == nil {
 		var raw struct {
 			Total amountText `json:"total"`

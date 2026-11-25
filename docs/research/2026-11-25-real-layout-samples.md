@@ -51,5 +51,5 @@ flagged and no entry is proposed. Cost: one more model call per image (2-4 s).
 
 Re-run on the live demo: 206 (the silent failure) is now flagged. 204 turned out to be wrong too: the invoice prints
 TOTAL 706.20, the first read said 748.48, and I had counted it correct by mistake; it is now flagged as well. 201, 205,
-207 and 210 are unchanged. Not covered: the text path (PDF, DOCX) has no second read, and 202 (no VAT line) is still
-refused.
+207 and 210 are unchanged. The text path (PDF, DOCX) gets the same second read, with the document fenced and a fresh fence token; seven
+text samples re-run with no change. Not covered: 202 (no VAT line) is still refused.
