@@ -116,3 +116,15 @@ func TestExtract_AsksTheModelForTheNetTotalToo(t *testing.T) {
 	prompt := got["messages"].([]any)[0].(map[string]any)["content"].(string)
 	assert.Contains(t, prompt, "net_total")
 }
+
+// Invoices built by ParseAmount cannot reach these values, but an Invoice is a
+// plain struct, and a wrap here would make a garbled one look reconciled.
+func TestReconciled_DoesNotWrapAroundForAnInvoiceBuiltByHand(t *testing.T) {
+	const huge = int64(9223372036854775807)
+	for _, total := range []int64{-2, 0, -3} {
+		inv := extract.Invoice{NetKnown: true, NetTotal: huge, VATAmount: huge, Total: total}
+
+		assert.False(t, inv.Reconciled(), "total %d", total)
+		assert.NotEmpty(t, inv.Warnings(), "total %d", total)
+	}
+}

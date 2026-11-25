@@ -90,3 +90,15 @@ func TestRun_AnUnseenSupplierGetsNoCandidatesRatherThanAGuess(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, res.Proposal.Candidates)
 }
+
+func TestAssess_MarksAnUnreconciledInvoiceDoNotTrustAndStillProposes(t *testing.T) {
+	inv := reconciled()
+	inv.Total = 1250
+
+	got := process.Assess(inv, proposer())
+
+	assert.True(t, got.DoNotTrust)
+	require.NotEmpty(t, got.Proposal.Candidates)
+	assert.Equal(t, 6540, got.Proposal.Candidates[0].Account)
+	require.NotEmpty(t, got.Warnings)
+}

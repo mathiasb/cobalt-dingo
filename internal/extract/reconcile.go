@@ -1,6 +1,9 @@
 package extract
 
-import "fmt"
+import (
+	"fmt"
+	"math/big"
+)
 
 // reconcileTolerance is the largest gap, in minor units, accepted between
 // net + VAT and the total. Swedish invoices round to whole kronor as a
@@ -17,11 +20,12 @@ func (i Invoice) Reconciled() bool {
 	if !i.NetKnown {
 		return false
 	}
-	gap := i.NetTotal + i.VATAmount - i.Total
-	if gap < 0 {
-		gap = -gap
-	}
-	return gap <= reconcileTolerance
+	// Big integers: an Invoice is a plain struct, and a hand-built one with
+	// amounts near int64's edge must not wrap into a small gap.
+	gap := new(big.Int).Add(big.NewInt(i.NetTotal), big.NewInt(i.VATAmount))
+	gap.Sub(gap, big.NewInt(i.Total))
+	gap.Abs(gap)
+	return gap.Cmp(big.NewInt(reconcileTolerance)) <= 0
 }
 
 // Warnings lists what a reader should check before trusting this invoice.
