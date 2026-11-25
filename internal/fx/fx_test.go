@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -119,13 +120,27 @@ func TestLoad_RefusesAFileThatIsMalformedOrHostile(t *testing.T) {
 		{"a rate with a comma", wrap("EUR", obs("2026-11-18", "11,1")), "rate"},
 		{"a rate far too small", wrap("EUR", obs("2026-11-18", "0.00001")), "rate"},
 		{"a rate far too large", wrap("EUR", obs("2026-11-18", "999999")), "rate"},
-		{"a rate sent as a json number", wrap("EUR", `{"date":"2026-11-18","rate":11.1}`), "rate"},
+		{"a rate sent as a json number", wrap("EUR", `{"date":"2026-11-18","rate":11.1}`), "must be a string"},
 		{"duplicate dates", wrap("EUR", obs("2026-11-18", "11.1")+","+obs("2026-11-18", "11.2")), "order"},
 		{"dates out of order", wrap("EUR", obs("2026-11-19", "11.1")+","+obs("2026-11-18", "11.2")), "order"},
 		{"too many observations", wrap("EUR", strings.Join(many, ",")), "too many"},
 		{"a currency listed twice", `{"source":"s","fetched":"2026-11-25","currencies":{"EUR":[` + obs("2026-11-18", "11.1") + `],"EUR":[` + obs("2026-11-18", "99.9") + `]}}`, "duplicate"},
 		{"the source given twice", `{"source":"s","source":"t","fetched":"2026-11-25","currencies":{"EUR":[` + obs("2026-11-18", "11.1") + `]}}`, "duplicate"},
 		{"a duplicate key inside an observation", `{"source":"s","fetched":"2026-11-25","currencies":{"EUR":[{"date":"2026-11-18","rate":"11.1","rate":"99.9"}]}}`, "duplicate"},
+		// encoding/json matches field names case-insensitively, so a key repeated in a
+		// different case used to replace the validated value without a word.
+		{"a rate repeated in another case", `{"source":"s","fetched":"2026-11-25","currencies":{"EUR":[{"date":"2026-11-18","rate":"11.1","Rate":"99.9"}]}}`, "Rate"},
+		{"a date repeated in another case", `{"source":"s","fetched":"2026-11-25","currencies":{"EUR":[{"date":"2026-11-18","DATE":"2026-11-19","rate":"11.1"}]}}`, "DATE"},
+		{"the source repeated in capitals", `{"source":"s","SOURCE":"evil","fetched":"2026-11-25","currencies":{"EUR":[` + obs("2026-11-18", "11.1") + `]}}`, "SOURCE"},
+		{"a second currencies table in another case", `{"source":"s","fetched":"2026-11-25","currencies":{"EUR":[` + obs("2026-11-18", "11.1") + `]},"Currencies":{"EUR":[` + obs("2026-11-18", "99.9") + `]}}`, "Currencies"},
+		{"a wrongly cased key on its own", `{"source":"s","fetched":"2026-11-25","currencies":{"EUR":[{"Date":"2026-11-18","Rate":"11.1"}]}}`, "Date"},
+		{"a key that only case-folds to source", `{"ſource":"s","fetched":"2026-11-25","currencies":{"EUR":[` + obs("2026-11-18", "11.1") + `]}}`, "ſource"},
+		{"an observation missing its rate", `{"source":"s","fetched":"2026-11-25","currencies":{"EUR":[{"date":"2026-11-18"}]}}`, "missing"},
+		{"no source key at all", `{"fetched":"2026-11-25","currencies":{"EUR":[{"date":"2026-11-18","rate":"11.1"}]}}`, "missing"},
+		{"no currencies key at all", `{"source":"s","fetched":"2026-11-25"}`, "missing"},
+		{"an extra key inside an observation", `{"source":"s","fetched":"2026-11-25","currencies":{"EUR":[{"date":"2026-11-18","rate":"11.1","note":"x"}]}}`, "note"},
+		{"currencies that is not an object", `{"source":"s","fetched":"2026-11-25","currencies":[1]}`, "currencies"},
+		{"a currency list that is not a list", `{"source":"s","fetched":"2026-11-25","currencies":{"EUR":"11.1"}}`, "EUR"},
 		{"data after the table", `{"source":"s","fetched":"2026-11-25","currencies":{"EUR":[` + obs("2026-11-18", "11.1") + `]}} {"more":1}`, "after"},
 		{"only empty lists", `{"source":"s","fetched":"2026-11-25","currencies":{"EUR":[],"USD":[]}}`, "no rates"},
 		{"larger than the size limit", `{"source":"` + strings.Repeat("x", fx.MaxFileBytes) + `"}`, "larger"},
@@ -265,4 +280,36 @@ func TestLoad_TheSampleCoversEveryCurrencyTheDemoConverts(t *testing.T) {
 		assert.Greater(t, got, int64(10000), "%s: 100 units should be worth more than 100 SEK-minor, got %d", cur, got)
 		assert.Less(t, got, int64(2_500_000), "%s: 100 units should be worth less than 2500 SEK, got %d", cur, got)
 	}
+}
+
+// The loader decodes every object by exact key names, which costs a map per
+// observation. A file at the observation limit must still load at once.
+func TestLoad_AFileAtTheObservationLimitLoadsQuickly(t *testing.T) {
+	var b strings.Builder
+	b.WriteString(`{"source":"s","fetched":"2026-11-25","currencies":{`)
+	curs := []string{"AAA", "BBB", "CCC", "DDD"}
+	per := fx.MaxObservations / len(curs)
+	for ci, c := range curs {
+		if ci > 0 {
+			b.WriteString(",")
+		}
+		b.WriteString(`"` + c + `":[`)
+		d := time.Date(1990, 1, 1, 0, 0, 0, 0, time.UTC)
+		for i := 0; i < per; i++ {
+			if i > 0 {
+				b.WriteString(",")
+			}
+			fmt.Fprintf(&b, `{"date":%q,"rate":"%d.%04d"}`, d.AddDate(0, 0, i).Format("2006-01-02"), 1+i%50, i%10000)
+		}
+		b.WriteString("]")
+	}
+	b.WriteString("}}")
+	require.Less(t, b.Len(), fx.MaxFileBytes, "the test file must itself be within the size limit")
+
+	start := time.Now()
+	tb, err := fx.Load(strings.NewReader(b.String()))
+
+	require.NoError(t, err)
+	assert.Len(t, tb.Currencies(), 4)
+	assert.Less(t, time.Since(start), 2*time.Second)
 }

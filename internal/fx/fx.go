@@ -97,14 +97,9 @@ func Load(r io.Reader) (*Table, error) {
 	if err := rejectDuplicateKeys(raw); err != nil {
 		return nil, err
 	}
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	dec.DisallowUnknownFields()
-	var f file
-	if err := dec.Decode(&f); err != nil {
-		return nil, fmt.Errorf("rate file is not valid json for this format: %w", err)
-	}
-	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
-		return nil, errors.New("rate file has data after the rate table")
+	f, err := decodeFile(raw)
+	if err != nil {
+		return nil, err
 	}
 	if f.Source == "" || len(f.Source) > maxSourceLen {
 		return nil, fmt.Errorf("rate file source must be 1 to %d characters", maxSourceLen)
@@ -154,6 +149,89 @@ func Load(r io.Reader) (*Table, error) {
 		return nil, errors.New("rate file has no rates")
 	}
 	return t, nil
+}
+
+// decodeFile reads the table by exact key names. It does not use struct fields:
+// encoding/json matches those case-insensitively, so a key repeated as "Rate" or
+// "SOURCE" would replace the validated value without a word. Here a key is either
+// exactly one of the expected names or the file is refused.
+func decodeFile(raw []byte) (file, error) {
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	var top map[string]json.RawMessage
+	if err := dec.Decode(&top); err != nil {
+		return file{}, fmt.Errorf("rate file is not valid json for this format: %w", err)
+	}
+	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
+		return file{}, errors.New("rate file has data after the rate table")
+	}
+	if err := exactKeys(top, "rate file", []string{"source", "fetched", "currencies"}, []string{"source", "currencies"}); err != nil {
+		return file{}, err
+	}
+	var f file
+	if err := json.Unmarshal(top["source"], &f.Source); err != nil {
+		return file{}, fmt.Errorf("rate file source must be a string: %w", err)
+	}
+	if raw, ok := top["fetched"]; ok {
+		if err := json.Unmarshal(raw, &f.Fetched); err != nil {
+			return file{}, fmt.Errorf("rate file fetched must be a string: %w", err)
+		}
+	}
+	var cur map[string]json.RawMessage
+	if err := json.Unmarshal(top["currencies"], &cur); err != nil || cur == nil {
+		return file{}, errors.New("rate file currencies must be an object of lists")
+	}
+	f.Currencies = make(map[string][]item, len(cur))
+	for code, rawList := range cur {
+		var elems []json.RawMessage
+		if err := json.Unmarshal(rawList, &elems); err != nil {
+			return file{}, fmt.Errorf("rate file %s must be a list of observations", code)
+		}
+		list := make([]item, 0, len(elems))
+		for _, el := range elems {
+			var obj map[string]json.RawMessage
+			if err := json.Unmarshal(el, &obj); err != nil || obj == nil {
+				return file{}, fmt.Errorf("rate file %s: an observation must be an object with a date and a rate", code)
+			}
+			if err := exactKeys(obj, "rate file "+code+" observation", []string{"date", "rate"}, []string{"date", "rate"}); err != nil {
+				return file{}, err
+			}
+			var it item
+			if err := json.Unmarshal(obj["date"], &it.Date); err != nil {
+				return file{}, fmt.Errorf("rate file %s: date must be a string", code)
+			}
+			if err := json.Unmarshal(obj["rate"], &it.Rate); err != nil {
+				return file{}, fmt.Errorf("rate file %s: rate must be a string, not a number", code)
+			}
+			list = append(list, it)
+		}
+		f.Currencies[code] = list
+	}
+	return f, nil
+}
+
+// exactKeys refuses any key that is not exactly one of allowed, whatever its case,
+// and any required key that is missing. Keys are reported in a fixed order.
+func exactKeys(m map[string]json.RawMessage, what string, allowed, required []string) error {
+	ok := make(map[string]bool, len(allowed))
+	for _, k := range allowed {
+		ok[k] = true
+	}
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		if !ok[k] {
+			return fmt.Errorf("%s has the key %q, which is not one of %s (names are matched exactly, case included)", what, k, strings.Join(allowed, ", "))
+		}
+	}
+	for _, k := range required {
+		if _, have := m[k]; !have {
+			return fmt.Errorf("%s is missing %q", what, k)
+		}
+	}
+	return nil
 }
 
 // rejectDuplicateKeys walks the JSON tokens and refuses an object that repeats a
