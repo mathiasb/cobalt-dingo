@@ -336,7 +336,7 @@ func inflatingPDF(t *testing.T) []byte {
 	x := b.Len()
 	b.WriteString("xref\n0 6\n0000000000 65535 f \n")
 	for _, o := range offs {
-		b.WriteString(fmt.Sprintf("%010d 00000 n \n", o))
+		fmt.Fprintf(&b, "%010d 00000 n \n", o)
 	}
 	b.WriteString("trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n" + strconv.Itoa(x) + "\n%%EOF\n")
 	return b.Bytes()
