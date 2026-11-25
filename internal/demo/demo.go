@@ -586,7 +586,7 @@ the CSV is a file you choose what to do with.</p>
 
 <h2>1. Choose an invoice</h2>
 <form method="post" action="/process" enctype="multipart/form-data">
- <p><label>Upload a PNG or JPEG: <input type="file" name="image" accept="image/png,image/jpeg"></label>
+ <p><label>Upload PNG or JPEG files: <input type="file" name="image" accept="image/png,image/jpeg" multiple></label>
  <button type="submit">Read it</button></p>
 </form>
 {{if .Samples}}<p>Or a sample:</p><div class="samples">

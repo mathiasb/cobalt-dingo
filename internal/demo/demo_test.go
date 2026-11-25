@@ -969,3 +969,16 @@ func TestBatch_AnAmbiguousDateIsWarnedOnceNotOncePerPlaceItIsComputed(t *testing
 func TestTimeouts_TheConstantsForReadModelAndWriteFitTogether(t *testing.T) {
 	assert.Less(t, demo.ReadTimeout+demo.DefaultModelTimeout, demo.WriteTimeout)
 }
+
+// The server reads every file sent under "image" (batch upload), but a browser
+// only offers more than one in the file chooser when the input says `multiple`.
+// Found on the live page 2026-11-25: the form took one file at a time.
+func TestHome_TheFileInputHasTheMultipleAttribute(t *testing.T) {
+	h := newHandler(t, &fakeExtractor{inv: good()})
+	rec := httptest.NewRecorder()
+
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.Regexp(t, `<input type="file" name="image"[^>]*\smultiple[\s>]`, rec.Body.String())
+}
