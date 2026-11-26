@@ -398,3 +398,12 @@ func TestBuild_ANegativeTotalAloneIsACreditNoteNotAnUnbalancedEntry(t *testing.T
 
 	require.ErrorIs(t, err, apentry.ErrCreditNote)
 }
+
+func TestBuild_RefusesAnInvoiceWhoseTotalWasDisputedEvenIfTheCallerDidNotMarkItDoNotTrust(t *testing.T) {
+	res := read(10000, 2500, 12500, "SEK")
+	res.Invoice.TotalDisputed = true
+
+	_, err := apentry.Build(res)
+
+	require.ErrorIs(t, err, apentry.ErrDoNotTrust)
+}

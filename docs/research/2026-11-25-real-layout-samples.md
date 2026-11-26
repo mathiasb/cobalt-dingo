@@ -41,3 +41,15 @@ documents with placeholder content (`[Seller name]`) and multiple pages, so they
 **CII**, which we do not parse (#161). Not installed.
 
 Samples that were moved out of the live set are kept on the demo host in `~/invoice-demo-data/invoices-held-out/`.
+
+## Update: second read of the total (#167)
+
+The broad prompt reads a discount as VAT and can invent a matching total. A narrow second question ("what is the
+final amount to pay, as printed") gave the printed total on every sample tried. `Client.Extract` now asks it after
+the first read and, if the two totals differ or the second cannot be parsed, the invoice is not reconciled: it is
+flagged and no entry is proposed. Cost: one more model call per image (2-4 s).
+
+Re-run on the live demo: 206 (the silent failure) is now flagged. 204 turned out to be wrong too: the invoice prints
+TOTAL 706.20, the first read said 748.48, and I had counted it correct by mistake; it is now flagged as well. 201, 205,
+207 and 210 are unchanged. The text path (PDF, DOCX) gets the same second read, with the document fenced and a fresh fence token; seven
+text samples re-run with no change. Not covered: 202 (no VAT line) is still refused.

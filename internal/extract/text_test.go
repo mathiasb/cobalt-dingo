@@ -23,15 +23,15 @@ func userMessage(t *testing.T, req map[string]any) map[string]any {
 }
 
 func TestExtractText_SendsTheTextAndNoImageToTheTextModel(t *testing.T) {
-	var got map[string]any
-	srv := stub(t, goodReply, &got)
-	defer srv.Close()
-	c := &extract.Client{BaseURL: srv.URL, Model: "vision-model", TextModel: "text-model"}
+	s := newSequence(t, goodReply)
+	c := &extract.Client{BaseURL: s.srv.URL, Model: "vision-model", TextModel: "text-model"}
 
 	inv, err := c.ExtractText(context.Background(), "Faktura 56260004\nAtt betala 3 592,39 SEK")
 
 	require.NoError(t, err)
 	assert.Equal(t, "Fjällresor AB", inv.Supplier)
+	require.NotEmpty(t, s.requests)
+	got := s.requests[0]
 	assert.Equal(t, "text-model", got["model"])
 	assert.Equal(t, "json", got["format"])
 	msg := userMessage(t, got)

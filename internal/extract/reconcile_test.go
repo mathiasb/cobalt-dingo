@@ -106,14 +106,12 @@ func TestWarnings_NameAnAmbiguousDateAlongsideReconciliation(t *testing.T) {
 }
 
 func TestExtract_AsksTheModelForTheNetTotalToo(t *testing.T) {
-	var got map[string]any
-	srv := stub(t, goodReply, &got)
-	defer srv.Close()
-	c := &extract.Client{BaseURL: srv.URL, Model: "m"}
+	s := newSequence(t, goodReply)
 
-	_, _ = c.Extract(context.Background(), []byte("x"))
+	s.extract(t)
 
-	prompt := got["messages"].([]any)[0].(map[string]any)["content"].(string)
+	require.NotEmpty(t, s.requests)
+	prompt := s.requests[0]["messages"].([]any)[0].(map[string]any)["content"].(string)
 	assert.Contains(t, prompt, "net_total")
 }
 
