@@ -42,6 +42,8 @@
 #   EXTRA_LABELS     optional, space-separated K=V pairs
 #   GIT_SHA          optional, stamped as org.opencontainers.image.revision
 #   IMAGE_SOURCE     optional, stamped as org.opencontainers.image.source
+#   DIGEST_FILE      optional path to write the pushed sha256:... digest for $REF
+#                    (also written to $GITHUB_OUTPUT as digest=... and ref=... when set)
 #
 # Note on shell style below: every conditional is a full `if` block, never
 # `[ -n "$X" ] && cmd`. Under `set -e` the && form exits the script whenever the
@@ -67,8 +69,15 @@ fi
 
 REF="${REGISTRY}/${IMAGE}:${SHA_TAG}"
 
+if [ -n "${DIGEST_FILE:-}" ]; then
+  rm -f "$DIGEST_FILE"
+fi
+
+TAR_FILE=""
+TMP_DIGEST=""
+trap 'rm -f "${TAR_FILE:-}" "${TMP_DIGEST:-}"' EXIT
 TAR_FILE="$(mktemp)"
-trap 'rm -f "$TAR_FILE"' EXIT
+TMP_DIGEST="$(mktemp)"
 
 args=(
   --frontend dockerfile.v0
@@ -104,18 +113,47 @@ buildctl --addr "$BUILDKIT_HOST" build "${args[@]}" --output "type=oci,dest=${TA
 
 # buildctl has no registry-push equivalent to `buildah push`, so skopeo copies
 # the OCI archive up -- once per tag, from the same archive, so every tag points
-# at bit-identical content.
+# at bit-identical content. Record the pushed manifest digest via --digestfile
+# (infra#753) and fail closed if skopeo returns no valid sha256 digest.
+PRIMARY_DIGEST=""
 push_tag() {
-  echo "build-image: pushing ${1}"
-  skopeo copy --dest-tls-verify=false "oci-archive:${TAR_FILE}" "docker://${1}"
+  local target="$1"
+  local record="${2:-0}"
+  echo "build-image: pushing ${target}"
+  : > "$TMP_DIGEST"
+  skopeo copy --dest-tls-verify=false --digestfile "$TMP_DIGEST" "oci-archive:${TAR_FILE}" "docker://${target}"
+  local raw lines digest
+  raw="$(cat "$TMP_DIGEST")"
+  raw="${raw%$'\r'}"
+  lines="$(wc -l < "$TMP_DIGEST" | tr -d '[:space:]')"
+  if [ "$lines" -gt 1 ]; then
+    echo "build-image: skopeo digestfile had multiple lines for ${target}" >&2
+    return 1
+  fi
+  digest="$raw"
+  if [[ ! "$digest" =~ ^sha256:[0-9a-fA-F]{64}$ ]]; then
+    echo "build-image: skopeo produced no valid sha256 digest for ${target}" >&2
+    return 1
+  fi
+  echo "build-image: ${target} digest ${digest}"
+  if [ "$record" = "1" ]; then
+    PRIMARY_DIGEST="$digest"
+  fi
 }
 
-push_tag "$REF"
+push_tag "$REF" 1
 if [ "$PUSH_LATEST" = "1" ]; then
   push_tag "${REGISTRY}/${IMAGE}:latest"
 fi
 if [ -n "$VERSION_TAG" ]; then
   push_tag "${REGISTRY}/${IMAGE}:${VERSION_TAG}"
+fi
+
+if [ -n "${DIGEST_FILE:-}" ]; then
+  printf '%s\n' "$PRIMARY_DIGEST" > "$DIGEST_FILE"
+fi
+if [ -n "${GITHUB_OUTPUT:-}" ]; then
+  printf 'digest=%s\nref=%s@%s\n' "$PRIMARY_DIGEST" "$REF" "$PRIMARY_DIGEST" >> "$GITHUB_OUTPUT"
 fi
 
 echo "✓ build-image: ${REF} pushed"
